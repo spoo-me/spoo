@@ -70,7 +70,7 @@ pytest-sugar==1.1.1
 pytest-xdist==3.8.0
 python-discovery==1.2.1
 python-dotenv==1.2.2
-python-multipart==0.0.22
+python-multipart==0.0.27
 pyyaml==6.0.3
 redis==7.4.0
 regex==2026.3.32
