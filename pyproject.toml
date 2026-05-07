@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "argon2-cffi>=25.1.0",
-    "authlib>=1.6.5",
+    "authlib>=1.6.11",
     "crawlerdetect>=0.3.0",
     "dicttoxml>=1.7.16",
     "emoji>=2.14.1",
