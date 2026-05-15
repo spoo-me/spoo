@@ -24,6 +24,10 @@ class DatabaseSettings(BaseSettings):
     db_name: str = "url-shortener"
     max_pool_size: int = 200
     min_pool_size: int = 10
+    # socket_timeout sized for /metric aggregation; hot-path cap lives in RequestTimeoutMiddleware.
+    server_selection_timeout_ms: int = 3000
+    connect_timeout_ms: int = 3000
+    socket_timeout_ms: int = 120000
 
 
 class RedisSettings(BaseSettings):
@@ -229,6 +233,7 @@ class AppSettings(BaseSettings):
     max_active_api_keys: int = 20
     max_date_range_days: int = 90
     http_client_timeout: float = 5.0
+    request_timeout_seconds: float = 8.0
 
     # Validator constraints (overridable by self-hosters via env vars)
     blocked_url_regex_timeout: float = 0.2
@@ -248,7 +253,9 @@ class AppSettings(BaseSettings):
             raise ValueError(f"{info.field_name} must be >= 1, got {v}")
         return v
 
-    @field_validator("http_client_timeout", "blocked_url_regex_timeout")
+    @field_validator(
+        "http_client_timeout", "blocked_url_regex_timeout", "request_timeout_seconds"
+    )
     @classmethod
     def _must_be_positive_float(cls, v: float, info) -> float:
         if v <= 0:

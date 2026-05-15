@@ -22,18 +22,10 @@ class ErrorResponse(ResponseBase):
     details: Any | None = None
 
 
-class HealthChecks(ResponseBase):
-    """Individual service check statuses inside HealthResponse."""
-
-    mongodb: str
-    redis: str
-
-
 class HealthResponse(ResponseBase):
-    """Response body for GET /health."""
+    """Response body for GET /health (liveness probe)."""
 
     status: str
-    checks: dict[str, str]
 
 
 class MessageResponse(ResponseBase):

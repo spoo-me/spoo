@@ -6,7 +6,7 @@ create_app() is the single entry point for building the app.
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
@@ -44,6 +44,7 @@ from middleware.security import (
     StaticCacheHeadersMiddleware,
     configure_cors,
 )
+from middleware.timeout import RequestTimeoutMiddleware
 from repositories.indexes import ensure_indexes
 from routes.api_v1 import router as api_v1_router
 from routes.auth import router as auth_router
@@ -78,12 +79,15 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
         )
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # ── Startup ──────────────────────────────────────────────────────────
         mongo_client: AsyncMongoClient = AsyncMongoClient(
             settings.db.mongodb_uri,
             maxPoolSize=settings.db.max_pool_size,
             minPoolSize=settings.db.min_pool_size,
+            serverSelectionTimeoutMS=settings.db.server_selection_timeout_ms,
+            connectTimeoutMS=settings.db.connect_timeout_ms,
+            socketTimeoutMS=settings.db.socket_timeout_ms,
         )
         app.state.mongo_client = mongo_client
         app.state.db = mongo_client[settings.db.db_name]
@@ -239,8 +243,12 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     app.add_middleware(
         MaxContentLengthMiddleware, max_content_length=settings.max_content_length
     )
-    # 5. Request logging — innermost, logs all requests with request_id
+    # 5. Request logging — logs all requests with request_id
     app.add_middleware(RequestLoggingMiddleware)
+    # 6. Request deadline — innermost
+    app.add_middleware(
+        RequestTimeoutMiddleware, timeout_seconds=settings.request_timeout_seconds
+    )
 
     # ── Error handlers + rate limiter ────────────────────────────────────
     app.state.limiter = limiter

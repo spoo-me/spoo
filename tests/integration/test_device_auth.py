@@ -107,7 +107,13 @@ def device_auth_svc():
     # resolve_app and validate_redirect_uri are sync — must not be coroutines
     svc.resolve_app = MagicMock(side_effect=_resolve_app)
     svc.validate_redirect_uri = MagicMock(
-        side_effect=lambda uri, app: not uri or uri in app.redirect_uris
+        side_effect=lambda uri, app: (
+            not uri
+            or any(
+                uri.startswith(a[:-1]) if a.endswith("*") else uri == a
+                for a in app.redirect_uris
+            )
+        )
     )
     return svc
 

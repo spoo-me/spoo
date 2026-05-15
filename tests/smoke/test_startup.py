@@ -17,12 +17,10 @@ def test_app_boots_without_error(smoke_app: FastAPI) -> None:
 
 
 def test_health_endpoint_responds(smoke_client: TestClient) -> None:
-    """Health endpoint should return a response (mock DB will show unhealthy, but no crash)."""
+    """Liveness probe — always 200, no dependency checks."""
     resp = smoke_client.get("/health")
-    assert resp.status_code in (200, 503)
-    data = resp.json()
-    assert "status" in data
-    assert "checks" in data
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
 
 
 def test_app_title_and_version(smoke_app: FastAPI) -> None:

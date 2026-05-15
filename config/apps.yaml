@@ -78,10 +78,18 @@ apps:
   spoo-raycast:
     name: Raycast Extension
     icon: raycast.svg
-    description: Shorten links from Raycast
+    description: Shorten and manage your spoo.me links from Raycast
     verified: true
-    status: coming_soon
+    status: live
     type: device_auth
+    redirect_uris:
+      - https://raycast.com/redirect?*
+    links:
+      raycast: https://www.raycast.com/spoo-me/spoo
+    permissions:
+      - Access your spoo.me account
+      - Create and manage short URLs
+      - View and export your analytics
 
   spoo-vscode:
     name: VS Code Extension

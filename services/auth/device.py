@@ -67,8 +67,22 @@ class DeviceAuthService:
         return entry if entry and entry.is_live_device_app() else None
 
     def validate_redirect_uri(self, redirect_uri: str, app: AppEntry) -> bool:
-        """Return True if redirect_uri is empty or in the app's allowlist."""
-        return not redirect_uri or redirect_uri in app.redirect_uris
+        """Return True if redirect_uri is empty, exact-matches an allowlist
+        entry, or prefix-matches an entry ending with ``*``.
+
+        The ``*`` suffix is used for OAuth clients (e.g. Raycast) that append
+        a varying query string to a fixed redirect URL. Only exact or
+        explicit-wildcard entries are accepted; implicit wildcards are not.
+        """
+        if not redirect_uri:
+            return True
+        for allowed in app.redirect_uris:
+            if allowed.endswith("*"):
+                if redirect_uri.startswith(allowed[:-1]):
+                    return True
+            elif redirect_uri == allowed:
+                return True
+        return False
 
     async def create_device_auth_code(
         self, user_id: ObjectId, email: str, app_id: str | None = None

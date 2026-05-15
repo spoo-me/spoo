@@ -563,7 +563,7 @@ async def metric(
     async def query() -> dict:
         start = time.time()
 
-        cursor = await db["urls"].aggregate(METRIC_PIPELINE_V1)
+        cursor = await db["urls"].aggregate(METRIC_PIPELINE_V1, maxTimeMS=90000)
         results = await cursor.to_list(length=1)
         v1_result = results[0] if results else {}
         v1_shortlinks = v1_result.get("total-shortlinks", 0)
