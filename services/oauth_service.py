@@ -412,7 +412,10 @@ class OAuthService:
         new_user = await self._user_repo.find_by_id(new_user_id)
         access_token, refresh_token = self._make_tokens(new_user, provider_key)
         return AuthResult(
-            user=new_user, access_token=access_token, refresh_token=refresh_token
+            user=new_user,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            is_new=True,
         )
 
     async def unlink_provider(self, user_id: str, provider_name: str) -> None:

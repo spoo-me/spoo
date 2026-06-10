@@ -213,7 +213,12 @@ async def oauth_callback(
     )
 
     # ── Redirect with cookies ──────────────────────────────────────────────
-    next_url = validate_safe_redirect(state_data.get("next", ""))
+    # Brand-new accounts go to onboarding unless the flow carried an explicit
+    # destination (e.g. device-consent deep links must not be hijacked).
+    if result.is_new and not state_data.get("next"):
+        next_url = "/onboarding"
+    else:
+        next_url = validate_safe_redirect(state_data.get("next", ""))
     resp = RedirectResponse(next_url, status_code=302)
     set_auth_cookies(resp, result.access_token, result.refresh_token, jwt_cfg)
     return resp

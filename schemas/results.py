@@ -25,6 +25,7 @@ class AuthResult:
     refresh_token: str
     verification_sent: bool = False
     app_id: str | None = None
+    is_new: bool = False
 
 
 @dataclass(frozen=True, slots=True)

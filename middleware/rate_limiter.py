@@ -44,6 +44,7 @@ class Limits:
     LOGOUT = "60 per hour"
     TOKEN_REFRESH = "20 per minute"
     AUTH_READ = "60 per minute"
+    ONBOARDING_WRITE = "30 per minute"
     SET_PASSWORD = "5 per minute"
     RESEND_VERIFICATION = "1 per minute; 3 per hour"
     EMAIL_VERIFY = "10 per hour"

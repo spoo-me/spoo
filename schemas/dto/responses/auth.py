@@ -212,3 +212,21 @@ class OAuthProvidersResponse(ResponseBase):
     password_set: bool = Field(
         description="Whether the user has a password set (affects unlink eligibility)"
     )
+
+
+class OnboardingStateResponse(ResponseBase):
+    """Response body for GET/PUT /auth/onboarding (200).
+
+    Empty state (all-null, completed=false) means the user has no stored
+    progress — either onboarding never started or the 24h cache expired.
+    """
+
+    step: str | None = Field(
+        default=None, description="Stored wizard step", examples=["artifact"]
+    )
+    path: str | None = Field(
+        default=None, description="Chosen path (links or api)", examples=["links"]
+    )
+    completed: bool = Field(
+        default=False, description="Whether the wizard was finished"
+    )
