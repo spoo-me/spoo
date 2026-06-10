@@ -120,5 +120,7 @@ apps:
     icon: spoo-cli.svg
     description: Shorten links from your terminal
     verified: true
-    status: coming_soon
+    status: live
     type: device_auth
+    redirect_uris:
+      - http://127.0.0.1:53682/callback
