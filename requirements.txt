@@ -58,7 +58,7 @@ propcache==0.5.2
 pycountry==26.2.16
 pycparser==3.0
 pydantic==2.13.4
-pydantic-core==2.46.4
+pydantic-core==2.47.0
 pydantic-settings==2.14.2
 pygments==2.20.0
 pyjwt==2.13.0
@@ -75,7 +75,7 @@ python-discovery==1.4.3
 python-dotenv==1.2.2
 python-multipart==0.0.32
 pyyaml==6.0.3
-redis==7.4.1
+redis==8.0.1
 regex==2026.6.28
 requests==2.34.2
 requests-file==3.0.1
