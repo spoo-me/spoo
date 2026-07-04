@@ -13,7 +13,11 @@ from schemas.enums.domain_status import DomainStatus
 from services.tenant_resolver.protocol import TenantInfo
 
 
-def _app(resolver=None, omit_resolver: bool = False) -> Starlette:
+def _app(
+    resolver=None,
+    omit_resolver: bool = False,
+    custom_domains_enabled: bool = True,
+) -> Starlette:
     async def root(request):
         tenant = getattr(request.state, "tenant", "<unset>")
         if tenant is None:
@@ -35,7 +39,9 @@ def _app(resolver=None, omit_resolver: bool = False) -> Starlette:
     )
     if not omit_resolver:
         app.state.tenant_resolver = resolver
-    app.add_middleware(TenantMiddleware)
+    app.add_middleware(
+        TenantMiddleware, custom_domains_enabled=custom_domains_enabled
+    )
     return app
 
 
@@ -95,6 +101,33 @@ class TestTenantMiddleware:
         # message stays generic. Jinja auto-escapes the apostrophe.
         assert "This URL doesn" in r.text and "t exist" in r.text
         assert "Not found" in r.text
+
+    def test_unknown_host_passes_through_when_custom_domains_disabled(self):
+        """Self-host mode: hosts the app was never told about (IPs, internal
+        DNS, reverse-proxy names) serve the full app surface — the sitewide
+        404 is a SaaS-mode concern only."""
+        from starlette.testclient import TestClient
+
+        resolver = MagicMock()
+        resolver.resolve = AsyncMock(return_value=None)
+        app = _app(resolver, custom_domains_enabled=False)
+        with TestClient(app) as client:
+            r = client.get("/", headers={"host": "my-vps.example.com"})
+        assert r.status_code == 200
+        assert r.text == "none"  # state.tenant is set to None, not left unset
+
+    def test_known_custom_tenant_still_resolves_when_disabled(self):
+        """Flipping the feature off must not break live redirects on
+        already-registered domains."""
+        from starlette.testclient import TestClient
+
+        resolver = MagicMock()
+        resolver.resolve = AsyncMock(return_value=_custom_tenant())
+        app = _app(resolver, custom_domains_enabled=False)
+        with TestClient(app) as client:
+            r = client.get("/abc123", headers={"host": "links.acme.com"})
+        assert r.status_code == 200
+        assert r.text == "links.acme.com"
 
     def test_system_tenant_root_passes_through(self):
         resolver = MagicMock()
