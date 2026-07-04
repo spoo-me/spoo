@@ -1,6 +1,6 @@
 [project]
 name = "spoo-me"
-version = "2.0.0"
+version = "2.1.0"
 description = "Open-Source URL Shortener Built with FastAPI"
 readme = "README.md"
 requires-python = ">=3.10"
