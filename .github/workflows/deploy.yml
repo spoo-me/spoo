@@ -61,6 +61,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # QEMU enables the arm64 leg of the multi-arch build (Apple Silicon,
+      # Raspberry Pi, Graviton/ARM VPS self-hosters). Wheels are prebuilt
+      # for both arches so emulation cost is mostly I/O.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -95,7 +101,7 @@ jobs:
             APP_VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
 
   deploy:
     needs: build
