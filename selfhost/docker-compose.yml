@@ -1,0 +1,120 @@
+# spoo.me — self-hosted
+#
+# Quick start (no clone, no build, no .env required):
+#   wget https://github.com/spoo-me/spoo/releases/latest/download/docker-compose.yml
+#   docker compose up -d
+#   → http://localhost:8000
+#
+# Upgrade:
+#   docker compose pull && docker compose up -d
+#
+# Pin a version (recommended for production): create a .env file next to
+# this compose with SPOO_VERSION=2.0.2 — or export it in your shell.
+# Every ${VAR:-default} below can be overridden the same way; the file
+# itself never needs editing.
+#
+# Everything optional is off by default and the app degrades gracefully:
+# no OAuth → no social login, no Zepto token → no emails, no hCaptcha →
+# captcha checks pass, no Sentry → no tracking. MongoDB is the only hard
+# requirement, and it's bundled below.
+
+name: spoo
+
+services:
+  app:
+    image: ghcr.io/spoo-me/spoo:${SPOO_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "${SPOO_PORT:-8000}:8000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # ── Core ────────────────────────────────────────────────────────────
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
+      REDIS_URI: ${REDIS_URI:-redis://redis:6379/0}
+      # Set to the public URL your instance is reached at (e.g.
+      # https://s.example.com) — it's used to build the short links you
+      # hand out.
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      ENV: production
+      LOG_FORMAT: ${LOG_FORMAT:-console}
+
+      # ── Secrets ─────────────────────────────────────────────────────────
+      # The app boots and shortens URLs without these, but account tokens
+      # are only tamper-proof once they're set. Generate each with:
+      #   openssl rand -hex 32
+      SECRET_KEY: ${SECRET_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      # Login cookies require HTTPS when true. Flip to true once you're
+      # behind a TLS-terminating reverse proxy.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+
+      # ── Optional integrations (empty = feature off) ─────────────────────
+      # Social login — see https://docs.spoo.me/self-hosting/setting-up-authentication
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-}
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
+      GITHUB_OAUTH_REDIRECT_URI: ${GITHUB_OAUTH_REDIRECT_URI:-}
+      DISCORD_OAUTH_CLIENT_ID: ${DISCORD_OAUTH_CLIENT_ID:-}
+      DISCORD_OAUTH_CLIENT_SECRET: ${DISCORD_OAUTH_CLIENT_SECRET:-}
+      DISCORD_OAUTH_REDIRECT_URI: ${DISCORD_OAUTH_REDIRECT_URI:-}
+      # Transactional email (account verification, password reset)
+      ZEPTO_API_TOKEN: ${ZEPTO_API_TOKEN:-}
+      ZEPTO_FROM_EMAIL: ${ZEPTO_FROM_EMAIL:-}
+      # Contact / abuse-report forms → Discord webhooks
+      CONTACT_WEBHOOK: ${CONTACT_WEBHOOK:-}
+      URL_REPORT_WEBHOOK: ${URL_REPORT_WEBHOOK:-}
+      # Bot protection on public forms
+      HCAPTCHA_SITEKEY: ${HCAPTCHA_SITEKEY:-}
+      HCAPTCHA_SECRET: ${HCAPTCHA_SECRET:-}
+      # Error tracking
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    # Not exposed on the host — reachable only inside the compose network.
+    # Point MONGODB_URI at your own server (e.g. Atlas) to skip this
+    # container entirely; compose still starts it, but nothing talks to it.
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Cache semantics: bounded memory, LRU eviction, no persistence — the
+    # cache rebuilds from Mongo. The app runs fine without Redis at all
+    # (set REDIS_URI to empty), just slower under load.
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongo-data:
+  mongo-config:

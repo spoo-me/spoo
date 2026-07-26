@@ -166,7 +166,18 @@ class TenantMiddleware(BaseHTTPMiddleware):
     On custom tenants additionally enforces the allowlist routing policy
     documented at the top of this module and stamps the noindex header on
     every response.
+
+    ``custom_domains_enabled=False`` (self-host default) relaxes exactly one
+    rule: an unknown host serves the full app surface instead of a sitewide
+    404. Self-hosters reach their instance through IPs, internal DNS names,
+    or domains the app was never told about — rejecting unknown hosts is a
+    SaaS-mode concern. Existing custom-domain rows keep resolving either
+    way, so flipping the switch never breaks live redirects.
     """
+
+    def __init__(self, app, *, custom_domains_enabled: bool = True) -> None:
+        super().__init__(app)
+        self._custom_domains_enabled = custom_domains_enabled
 
     async def dispatch(self, request: Request, call_next) -> Response:
         resolver: TenantResolver | None = getattr(
@@ -184,6 +195,8 @@ class TenantMiddleware(BaseHTTPMiddleware):
         request.state.tenant = tenant
 
         if tenant is None:
+            if not self._custom_domains_enabled:
+                return await call_next(request)
             log.info("tenant_unknown_host", host=host)
             return _tenant_not_found(request, tenant=None)
 
