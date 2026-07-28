@@ -61,6 +61,18 @@ class TestClaimDeadLetterGuard:
         assert kwargs["maxlen"] == DLQ_MAXLEN
         assert kwargs["approximate"] is True
 
+    async def test_custom_dlq_maxlen_is_used(self):
+        redis = _redis_with_deliveries(times=6)
+        guard = ClaimDeadLetterGuard(
+            stream="events:clicks",
+            group="stats",
+            dlq_stream="events:clicks:dlq",
+            max_deliveries=5,
+            dlq_maxlen=100_000,
+        )
+        assert await guard.intercept(redis, "5-0", {}) is True
+        assert redis.xadd.await_args.kwargs["maxlen"] == 100_000
+
     async def test_bytes_delivery_metadata_is_handled(self):
         """The broker's internal client speaks bytes."""
         redis = AsyncMock()

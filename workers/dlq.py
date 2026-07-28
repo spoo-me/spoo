@@ -42,11 +42,13 @@ class ClaimDeadLetterGuard:
         group: str,
         dlq_stream: str,
         max_deliveries: int,
+        dlq_maxlen: int = DLQ_MAXLEN,
     ) -> None:
         self._stream = stream
         self._group = group
         self._dlq_stream = dlq_stream
         self._max_deliveries = max_deliveries
+        self._dlq_maxlen = dlq_maxlen
 
     async def intercept(self, redis: Any, message_id: str, payload: Any) -> bool:
         """Return True when the message was dead-lettered (skip processing).
@@ -68,7 +70,7 @@ class ClaimDeadLetterGuard:
                     DLQ_FIELD_GROUP: self._group,
                     DLQ_FIELD_REASON: _REASON_MAX_DELIVERIES,
                 },
-                maxlen=DLQ_MAXLEN,
+                maxlen=self._dlq_maxlen,
                 approximate=True,
             )
         except Exception as exc:
