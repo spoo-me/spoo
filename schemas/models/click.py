@@ -60,3 +60,14 @@ class ClickDoc(MongoBaseModel):
     utm_source: str | None = None
     utm_medium: str | None = None
     utm_campaign: str | None = None
+
+    def to_mongo(self) -> dict:
+        """Serialise for insertion, omitting None fields entirely.
+
+        Time-series buckets track one BSON type per field. An explicit
+        null following a string value (or vice versa) is a type conflict
+        that closes the bucket early, while an absent field packs fine.
+        Queries are unaffected: MongoDB treats missing and null the same
+        in $eq/$group, and the stats sentinels already map both.
+        """
+        return self.model_dump(by_alias=True, exclude_none=True)

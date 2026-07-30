@@ -303,10 +303,11 @@ class TestV2ClickHandler:
 
         await handler.handle(make_context(url_data))
 
+        # Absent, not null: explicit nulls close time-series buckets.
         doc = d.click_repo.insert.call_args[0][0]
-        assert doc["utm_source"] is None
-        assert doc["utm_medium"] is None
-        assert doc["utm_campaign"] is None
+        assert "utm_source" not in doc
+        assert "utm_medium" not in doc
+        assert "utm_campaign" not in doc
 
     @pytest.mark.asyncio
     async def test_meta_carries_domain_from_cache(self):
@@ -320,9 +321,10 @@ class TestV2ClickHandler:
         assert doc["meta"]["domain"] == "links.acme.com"
 
     @pytest.mark.asyncio
-    async def test_meta_domain_none_when_cache_empty_string(self):
-        # Older cached entries pre-PR1 have domain="". Coerce to None so
-        # per-domain queries can distinguish "unknown" from a real value.
+    async def test_meta_domain_omitted_when_cache_empty_string(self):
+        # Older cached entries pre-PR1 have domain="". Coerced to None and
+        # then omitted from the insert doc ($eq: null matches missing, so
+        # per-domain queries still distinguish "unknown" from a real value).
         d = make_deps()
         handler = make_v2_handler(d.click_repo, d.url_repo, d.geoip, d.url_cache)
         url_data = make_v2_cache(domain="")
@@ -330,7 +332,7 @@ class TestV2ClickHandler:
         await handler.handle(make_context(url_data))
 
         doc = d.click_repo.insert.call_args[0][0]
-        assert doc["meta"]["domain"] is None
+        assert "domain" not in doc["meta"]
 
     @pytest.mark.asyncio
     async def test_blocked_bot_skips_analytics_no_error(self):
