@@ -72,7 +72,11 @@ async def ensure_indexes(
             timeseries={
                 "timeField": "clicked_at",
                 "metaField": "meta",
-                "granularity": "seconds",
+                # "hours" spans buckets over 30 days. Most links get sparse
+                # clicks, so finer granularity degenerates into one bucket
+                # per click. Existing deploys need a one-time collMod to
+                # match (the transition is one-way, coarser only).
+                "granularity": "hours",
             },
         )
     except (CollectionInvalid, OperationFailure) as e:
