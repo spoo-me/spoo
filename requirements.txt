@@ -15,7 +15,7 @@ charset-normalizer==3.4.7
 click==8.4.2
 coverage==7.15.0
 crawlerdetect==0.3.2
-cryptography==49.0.0
+cryptography==50.0.0
 deprecated==1.3.1
 dicttoxml==1.7.16
 distlib==0.4.3
