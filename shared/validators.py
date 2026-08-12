@@ -19,6 +19,23 @@ import validators as _validators
 _ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
 
 
+def is_self_referential(host: str | None, blocked_self_domains: Sequence[str]) -> bool:
+    """Return True when *host* is one of *blocked_self_domains* or a subdomain.
+
+    Host-scoped on purpose. A destination is only a redirect loop when the
+    request would come back to us, which is decided by the host alone — a
+    blocked name appearing in a path or query string ("?filter=spoo.me") is
+    someone else's URL that happens to mention us.
+    """
+    if not host:
+        return False
+    host = host.lower().rstrip(".")
+    return any(
+        host == domain or host.endswith(f".{domain}")
+        for domain in (d.lower().strip().rstrip(".") for d in blocked_self_domains)
+    )
+
+
 def validate_url(
     url: str,
     blocked_self_domains: Sequence[str] = ("spoo.me",),
@@ -27,18 +44,22 @@ def validate_url(
 
     Args:
         url: The URL string to validate.
-        blocked_self_domains: Bare hostnames whose substring presence in the
-            URL marks it as self-referential. Defaults to ``("spoo.me",)``
-            to prevent redirect loops.
+        blocked_self_domains: Bare hostnames that mark the URL as
+            self-referential when they are the destination's HOST (or a
+            parent of it). Defaults to ``("spoo.me",)`` to prevent redirect
+            loops. Matching is host-scoped: a destination that merely
+            mentions the name in its path or query is not a loop.
     """
     # Scheme allowlist defends against ftp/file/data/etc even if the
     # validators package widens its accepted schemes upstream.
-    if urlparse(url).scheme not in _ALLOWED_URL_SCHEMES:
+    parsed = urlparse(url)
+    if parsed.scheme not in _ALLOWED_URL_SCHEMES:
         return False
     if not _validators.url(url, skip_ipv4_addr=True, skip_ipv6_addr=True):
         return False
-    url_lower = url.lower()
-    return not any(domain in url_lower for domain in blocked_self_domains)
+    # hostname is already lowercased and strips any userinfo/port, so
+    # "https://spoo.me:443@evil.com" can't smuggle the check either way.
+    return not is_self_referential(parsed.hostname, blocked_self_domains)
 
 
 def validate_url_password(password: str, min_length: int = 8) -> bool:

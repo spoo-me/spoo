@@ -21,16 +21,35 @@ from shared.validators import (
         ("https://example.com/foo/bar?q=1", True),
         ("https://spoo.me/abc", False),
         ("https://SPOO.ME/abc", False),  # case-insensitive block
+        ("https://www.spoo.me/abc", False),  # subdomain of a blocked host
         ("not-a-url", False),
         ("http://192.168.1.1/path", False),  # IPv4 skipped by validator
+        # Host-scoped: a foreign destination that merely mentions the blocked
+        # name in its path, query or fragment is not a redirect loop. The
+        # dashboard hit this shortening a PostHog analytics URL filtered on
+        # spoo.me, which the old substring check rejected.
+        ("https://eu.posthog.com/project/1?filter=spoo.me", True),
+        ("https://example.com/spoo.me/guide", True),
+        ("https://example.com/#spoo.me", True),
+        ("https://notspoo.me/abc", True),  # suffix must be a label boundary
+        # userinfo can't smuggle either direction — hostname wins.
+        ("https://spoo.me@example.com/", True),
+        ("https://example.com@spoo.me/", False),
     ],
     ids=[
         "valid",
         "valid_with_path",
         "self_ref",
         "self_ref_uppercase",
+        "self_ref_subdomain",
         "plain_text",
         "ipv4",
+        "foreign_host_mentions_in_query",
+        "foreign_host_mentions_in_path",
+        "foreign_host_mentions_in_fragment",
+        "lookalike_host_not_blocked",
+        "userinfo_lookalike_allowed",
+        "userinfo_cannot_mask_self_host",
     ],
 )
 def test_validate_url(url, expected):
