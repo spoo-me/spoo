@@ -24,6 +24,7 @@ from shared.validators import (
         ("https://www.spoo.me/abc", False),  # subdomain of a blocked host
         ("not-a-url", False),
         ("http://192.168.1.1/path", False),  # IPv4 skipped by validator
+        ("https://[::1", False),  # urlparse raises on this, must not escape
         # Mentioning spoo.me in a foreign URL's path, query or fragment is not a loop.
         ("https://eu.posthog.com/project/1?filter=spoo.me", True),
         ("https://example.com/spoo.me/guide", True),
@@ -41,6 +42,7 @@ from shared.validators import (
         "self_ref_subdomain",
         "plain_text",
         "ipv4",
+        "malformed_ipv6_authority",
         "foreign_host_mentions_in_query",
         "foreign_host_mentions_in_path",
         "foreign_host_mentions_in_fragment",
