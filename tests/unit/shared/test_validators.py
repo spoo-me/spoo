@@ -24,6 +24,7 @@ from shared.validators import (
         ("https://www.spoo.me/abc", False),  # subdomain of a blocked host
         ("not-a-url", False),
         ("http://192.168.1.1/path", False),  # IPv4 skipped by validator
+        ("https://[::1", False),  # urlparse raises on this, must not escape
         # Host-scoped: a foreign destination that merely mentions the blocked
         # name in its path, query or fragment is not a redirect loop. The
         # dashboard hit this shortening a PostHog analytics URL filtered on
@@ -44,6 +45,7 @@ from shared.validators import (
         "self_ref_subdomain",
         "plain_text",
         "ipv4",
+        "malformed_ipv6_authority",
         "foreign_host_mentions_in_query",
         "foreign_host_mentions_in_path",
         "foreign_host_mentions_in_fragment",

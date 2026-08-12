@@ -50,9 +50,15 @@ def validate_url(
             loops. Matching is host-scoped: a destination that merely
             mentions the name in its path or query is not a loop.
     """
+    # urlparse raises on a malformed IPv6 authority ("https://[::1"), and
+    # long_url reaches here as a plain str, so an unguarded parse escapes as
+    # a 500 on the shorten endpoints instead of a 400.
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
     # Scheme allowlist defends against ftp/file/data/etc even if the
     # validators package widens its accepted schemes upstream.
-    parsed = urlparse(url)
     if parsed.scheme not in _ALLOWED_URL_SCHEMES:
         return False
     if not _validators.url(url, skip_ipv4_addr=True, skip_ipv6_addr=True):
