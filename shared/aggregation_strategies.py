@@ -274,6 +274,12 @@ class AggregationStrategyFactory:
         "short_code": lambda: FieldAggregationStrategy(
             "$meta.short_code", "short_code", 100
         ),
+        # "unknown" = clicks recorded before domain stamping existed
+        # (time-series buckets can't be backfilled). It can never collide
+        # with a real value: domains are always dotted fqdns.
+        "domain": lambda: FieldAggregationStrategy(
+            "$meta.domain", "domain", 50, default="unknown"
+        ),
         # "(none)" = untagged clicks (and clicks recorded before the utm
         # fields existed) — the campaign analogue of referrer's "Direct".
         "utm_source": lambda: FieldAggregationStrategy(

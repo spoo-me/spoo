@@ -58,6 +58,7 @@ def test_factory_get_available_strategies():
         "utm_source",
         "utm_medium",
         "utm_campaign",
+        "domain",
     }
 
 
@@ -131,6 +132,13 @@ def test_short_code_pipeline_groups_by_nested_field():
     assert group_stage["_id"]["$ifNull"][0] == "$meta.short_code"
 
 
+def test_domain_pipeline_groups_by_nested_field():
+    """Domain must group by nested meta.domain, not a top-level field."""
+    pipeline = _strategy("domain").build_pipeline(_BASE_QUERY)
+    group_stage = next(s["$group"] for s in pipeline if "$group" in s)
+    assert group_stage["_id"]["$ifNull"][0] == "$meta.domain"
+
+
 def test_referrer_pipeline_uses_direct_as_null_fallback():
     """Referrer should fall back to 'Direct' (not 'Unknown') for null values."""
     pipeline = _strategy("referrer").build_pipeline(_BASE_QUERY)
@@ -151,6 +159,8 @@ def test_referrer_pipeline_uses_direct_as_null_fallback():
         ("utm_source", "(none)"),
         ("utm_medium", "(none)"),
         ("utm_campaign", "(none)"),
+        # clicks recorded before domain stamping existed
+        ("domain", "unknown"),
     ],
 )
 def test_pipeline_uses_unknown_as_null_fallback(strategy_name, expected_null_fallback):
@@ -174,6 +184,7 @@ def test_pipeline_uses_unknown_as_null_fallback(strategy_name, expected_null_fal
         ("city", 50),
         ("referrer", 30),
         ("short_code", 100),
+        ("domain", 50),
     ],
 )
 def test_pipeline_limit_values(strategy_name, expected_limit):
@@ -297,6 +308,7 @@ _RAW = [{"_id": "Chrome", "total_clicks": 10, "unique_clicks": 7}]
         ("city", "city"),
         ("referrer", "referrer"),
         ("short_code", "short_code"),
+        ("domain", "domain"),
     ],
 )
 def test_format_results_renames_id_to_dimension_key(strategy_name, key):
