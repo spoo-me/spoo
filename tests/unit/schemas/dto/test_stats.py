@@ -82,6 +82,20 @@ class TestStatsQuery:
         q = StatsQuery.model_validate({"filters": json.dumps({"domain": ["unknown"]})})
         assert q.parsed_filters["domain"] == ["unknown"]
 
+    def test_domain_filter_values_case_folded(self):
+        """Domains are case-insensitive by definition and stored lowercase,
+        so caller casing must not silently match nothing. Both the param
+        and the filters JSON go through the fold; other dimensions stay
+        case-sensitive."""
+        q = StatsQuery.model_validate({"domain": "Spoo.Me,LINKS.example.com"})
+        assert q.parsed_filters["domain"] == ["spoo.me", "links.example.com"]
+
+        q = StatsQuery.model_validate(
+            {"filters": json.dumps({"domain": ["Spoo.me"], "browser": ["Chrome"]})}
+        )
+        assert q.parsed_filters["domain"] == ["spoo.me"]
+        assert q.parsed_filters["browser"] == ["Chrome"]
+
     def test_comma_separated_metrics(self):
         assert StatsQuery.model_validate(
             {"metrics": "unique_clicks"}

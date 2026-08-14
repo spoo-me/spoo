@@ -169,7 +169,7 @@ STATS_DOMAIN_DESC = (
     "Comma-separated domains the short links were served on (the system "
     "default domain or your custom domains). Alternative to using the "
     "`filters` JSON parameter.\n\n"
-    "**Important:** Use the exact lowercase fqdn (e.g. `links.example.com`). "
+    "**Important:** Values are case-insensitive (normalized to lowercase). "
     "`unknown` matches clicks recorded before domain tracking existed.\n\n"
     "**Note:** Both `filters` JSON and individual parameters can be combined."
 )

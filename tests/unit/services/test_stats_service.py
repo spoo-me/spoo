@@ -623,8 +623,27 @@ class TestClickQueryBuilding:
 
         pipeline = AggregationStrategyFactory.get("domain").build_pipeline({})
         group_expr = pipeline[1]["$group"]["_id"]
-        assert group_expr == {"$ifNull": ["$meta.domain", "unknown"]}
+        assert group_expr["$ifNull"][1] == "unknown"
+        assert group_expr["$ifNull"][0]["$cond"][2] == "$meta.domain"
         assert _NULL_SENTINEL_FILTERS["domain"] == "unknown"
+
+    def test_filter_field_paths_agree_with_strategy_registry(self):
+        """Drift guard: _FILTER_FIELD_PATHS and the strategy registry are
+        two hand-kept copies of each dimension's mongo field. A new
+        meta-path dimension that updates the registry but not the map
+        reproduces the silent-empty-filter bug the map exists to prevent,
+        so pin them against each other. short_code is exempt: its filter
+        branch does scope-bypass prevention, not path mapping."""
+        from schemas.enums.stats import ALLOWED_FILTERS, StatsDimension
+        from services.stats_service import _FILTER_FIELD_PATHS
+        from shared.aggregation_strategies import AggregationStrategyFactory
+
+        for dim in ALLOWED_FILTERS:
+            if dim == StatsDimension.SHORT_CODE:
+                continue
+            strategy = AggregationStrategyFactory.get(dim)
+            registry_field = strategy._mongo_field.removeprefix("$")
+            assert registry_field == _FILTER_FIELD_PATHS.get(dim, dim), dim
 
     def test_device_groupby_and_filter_agree_on_missing_docs(self):
         """The invariant: a click doc with no device field lands in the
@@ -638,7 +657,8 @@ class TestClickQueryBuilding:
 
         pipeline = AggregationStrategyFactory.get("device").build_pipeline({})
         group_expr = pipeline[1]["$group"]["_id"]
-        assert group_expr == {"$ifNull": ["$device", "unknown"]}
+        assert group_expr["$ifNull"][1] == "unknown"
+        assert group_expr["$ifNull"][0]["$cond"][2] == "$device"
 
         from ua_parser import parse as ua_parse
 

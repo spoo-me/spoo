@@ -98,7 +98,22 @@ class FieldAggregationStrategy(AggregationStrategy):
 
     def build_pipeline(self, base_query: dict[str, Any]) -> list[dict[str, Any]]:
         if self._default is not None:
-            group_expr: Any = {"$ifNull": [self._mongo_field, self._default]}
+            # Sentinel dimensions: null, missing, AND empty string all mean
+            # the sentinel — the filter side's $or group folds "" the same
+            # way ($in: [None, ""]), so group-by and filter counts can never
+            # disagree on legacy document shapes.
+            group_expr: Any = {
+                "$ifNull": [
+                    {
+                        "$cond": [
+                            {"$eq": [self._mongo_field, ""]},
+                            None,
+                            self._mongo_field,
+                        ]
+                    },
+                    self._default,
+                ]
+            }
         else:
             group_expr = {"$ifNull": [self._mongo_field, "Unknown"]}
 

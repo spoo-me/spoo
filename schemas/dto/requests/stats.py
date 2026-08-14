@@ -254,6 +254,15 @@ class StatsQuery(RequestBase):
                     continue
                 parsed_filters[dim] = _parse_comma_separated(raw)
 
+        # Domains are case-insensitive by definition and stored lowercase
+        # (model normalizer), so fold caller casing — "Spoo.me" must not
+        # silently match nothing. The only normalized dimension; all others
+        # filter on case-sensitive stored values.
+        if StatsDimension.DOMAIN in parsed_filters:
+            parsed_filters[StatsDimension.DOMAIN] = [
+                v.lower() for v in parsed_filters[StatsDimension.DOMAIN]
+            ]
+
         self._parsed_filters = parsed_filters
 
         return self
