@@ -70,6 +70,32 @@ class TestStatsQuery:
         assert q.parsed_filters["device"] == ["mobile"]
         assert q.parsed_filters["utm_source"] == ["(none)"]
 
+    def test_domain_dimension_accepted_in_group_by(self):
+        q = StatsQuery.model_validate({"group_by": "domain"})
+        assert q.parsed_group_by == ["domain"]
+
+    def test_domain_filter_param_parsed(self):
+        q = StatsQuery.model_validate({"domain": "spoo.me,links.example.com"})
+        assert q.parsed_filters["domain"] == ["spoo.me", "links.example.com"]
+
+    def test_domain_accepted_in_filters_json(self):
+        q = StatsQuery.model_validate({"filters": json.dumps({"domain": ["unknown"]})})
+        assert q.parsed_filters["domain"] == ["unknown"]
+
+    def test_domain_filter_values_case_folded(self):
+        """Domains are case-insensitive by definition and stored lowercase,
+        so caller casing must not silently match nothing. Both the param
+        and the filters JSON go through the fold; other dimensions stay
+        case-sensitive."""
+        q = StatsQuery.model_validate({"domain": "Spoo.Me,LINKS.example.com"})
+        assert q.parsed_filters["domain"] == ["spoo.me", "links.example.com"]
+
+        q = StatsQuery.model_validate(
+            {"filters": json.dumps({"domain": ["Spoo.me"], "browser": ["Chrome"]})}
+        )
+        assert q.parsed_filters["domain"] == ["spoo.me"]
+        assert q.parsed_filters["browser"] == ["Chrome"]
+
     def test_comma_separated_metrics(self):
         assert StatsQuery.model_validate(
             {"metrics": "unique_clicks"}

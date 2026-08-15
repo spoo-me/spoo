@@ -26,6 +26,7 @@ from schemas.dto.requests._descriptions import (
     STATS_CITY_DESC,
     STATS_COUNTRY_DESC,
     STATS_DEVICE_DESC,
+    STATS_DOMAIN_DESC,
     STATS_END_DATE_DESC,
     STATS_FILTERS_DESC,
     STATS_GROUP_BY_DESC,
@@ -154,6 +155,12 @@ class StatsQuery(RequestBase):
         description=STATS_REFERRER_DESC,
         examples=["https://google.com,https://twitter.com"],
     )
+    domain: str | None = Field(
+        default=None,
+        max_length=1000,
+        description=STATS_DOMAIN_DESC,
+        examples=["spoo.me,links.example.com"],
+    )
     utm_source: str | None = Field(
         default=None,
         max_length=1000,
@@ -234,6 +241,7 @@ class StatsQuery(RequestBase):
             "country",
             "city",
             "referrer",
+            "domain",
             "short_code",
             "utm_source",
             "utm_medium",
@@ -245,6 +253,15 @@ class StatsQuery(RequestBase):
                 if dim == StatsDimension.SHORT_CODE and self.scope == StatsScope.ANON:
                     continue
                 parsed_filters[dim] = _parse_comma_separated(raw)
+
+        # Domains are case-insensitive by definition and stored lowercase
+        # (model normalizer), so fold caller casing — "Spoo.me" must not
+        # silently match nothing. The only normalized dimension; all others
+        # filter on case-sensitive stored values.
+        if StatsDimension.DOMAIN in parsed_filters:
+            parsed_filters[StatsDimension.DOMAIN] = [
+                v.lower() for v in parsed_filters[StatsDimension.DOMAIN]
+            ]
 
         self._parsed_filters = parsed_filters
 

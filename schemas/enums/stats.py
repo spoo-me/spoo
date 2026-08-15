@@ -29,6 +29,7 @@ class StatsDimension(str, Enum):
     CITY = "city"
     REFERRER = "referrer"
     SHORT_CODE = "short_code"
+    DOMAIN = "domain"
     UTM_SOURCE = "utm_source"
     UTM_MEDIUM = "utm_medium"
     UTM_CAMPAIGN = "utm_campaign"
@@ -62,6 +63,7 @@ ALLOWED_FILTERS = frozenset(
         StatsDimension.CITY,
         StatsDimension.REFERRER,
         StatsDimension.SHORT_CODE,
+        StatsDimension.DOMAIN,
         StatsDimension.UTM_SOURCE,
         StatsDimension.UTM_MEDIUM,
         StatsDimension.UTM_CAMPAIGN,

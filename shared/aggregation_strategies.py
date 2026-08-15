@@ -98,7 +98,22 @@ class FieldAggregationStrategy(AggregationStrategy):
 
     def build_pipeline(self, base_query: dict[str, Any]) -> list[dict[str, Any]]:
         if self._default is not None:
-            group_expr: Any = {"$ifNull": [self._mongo_field, self._default]}
+            # Sentinel dimensions: null, missing, AND empty string all mean
+            # the sentinel — the filter side's $or group folds "" the same
+            # way ($in: [None, ""]), so group-by and filter counts can never
+            # disagree on legacy document shapes.
+            group_expr: Any = {
+                "$ifNull": [
+                    {
+                        "$cond": [
+                            {"$eq": [self._mongo_field, ""]},
+                            None,
+                            self._mongo_field,
+                        ]
+                    },
+                    self._default,
+                ]
+            }
         else:
             group_expr = {"$ifNull": [self._mongo_field, "Unknown"]}
 
@@ -273,6 +288,12 @@ class AggregationStrategyFactory:
         ),
         "short_code": lambda: FieldAggregationStrategy(
             "$meta.short_code", "short_code", 100
+        ),
+        # "unknown" = clicks recorded before domain stamping existed
+        # (time-series buckets can't be backfilled). It can never collide
+        # with a real value: domains are always dotted fqdns.
+        "domain": lambda: FieldAggregationStrategy(
+            "$meta.domain", "domain", 50, default="unknown"
         ),
         # "(none)" = untagged clicks (and clicks recorded before the utm
         # fields existed) — the campaign analogue of referrer's "Direct".

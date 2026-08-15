@@ -589,6 +589,62 @@ class TestClickQueryBuilding:
             {"device": {"$exists": False}},
         ]
 
+    def test_plain_domain_filter_targets_meta_field(self):
+        """Domain lives under the time-series metaField — a filter keyed
+        on bare "domain" would silently match nothing."""
+        from services.stats_service import StatsService
+
+        q = StatsService._build_click_query(
+            "all", OWNER_ID, None, START, NOW, {"domain": ["links.example.com"]}
+        )
+        assert q["meta.domain"] == {"$in": ["links.example.com"]}
+        assert "domain" not in q
+
+    def test_domain_unknown_sentinel_matches_missing_field(self):
+        """ "unknown" must match clicks recorded before domain stamping
+        existed (null/absent meta.domain), on the meta path."""
+        from services.stats_service import StatsService
+
+        q = StatsService._build_click_query(
+            "all", OWNER_ID, None, START, NOW, {"domain": ["unknown", "spoo.me"]}
+        )
+        assert q["$or"] == [
+            {"meta.domain": {"$in": ["unknown", "spoo.me"]}},
+            {"meta.domain": {"$in": [None, ""]}},
+            {"meta.domain": {"$exists": False}},
+        ]
+
+    def test_domain_groupby_and_filter_agree_on_missing_docs(self):
+        """A click doc with no meta.domain lands in the same "unknown"
+        bucket for group-by ($ifNull default) and for filtering
+        (null-sentinel map)."""
+        from services.stats_service import _NULL_SENTINEL_FILTERS
+        from shared.aggregation_strategies import AggregationStrategyFactory
+
+        pipeline = AggregationStrategyFactory.get("domain").build_pipeline({})
+        group_expr = pipeline[1]["$group"]["_id"]
+        assert group_expr["$ifNull"][1] == "unknown"
+        assert group_expr["$ifNull"][0]["$cond"][2] == "$meta.domain"
+        assert _NULL_SENTINEL_FILTERS["domain"] == "unknown"
+
+    def test_filter_field_paths_agree_with_strategy_registry(self):
+        """Drift guard: _FILTER_FIELD_PATHS and the strategy registry are
+        two hand-kept copies of each dimension's mongo field. A new
+        meta-path dimension that updates the registry but not the map
+        reproduces the silent-empty-filter bug the map exists to prevent,
+        so pin them against each other. short_code is exempt: its filter
+        branch does scope-bypass prevention, not path mapping."""
+        from schemas.enums.stats import ALLOWED_FILTERS, StatsDimension
+        from services.stats_service import _FILTER_FIELD_PATHS
+        from shared.aggregation_strategies import AggregationStrategyFactory
+
+        for dim in ALLOWED_FILTERS:
+            if dim == StatsDimension.SHORT_CODE:
+                continue
+            strategy = AggregationStrategyFactory.get(dim)
+            registry_field = strategy._mongo_field.removeprefix("$")
+            assert registry_field == _FILTER_FIELD_PATHS.get(dim, dim), dim
+
     def test_device_groupby_and_filter_agree_on_missing_docs(self):
         """The invariant: a click doc with no device field lands in the
         same "unknown" bucket for group-by (aggregation $ifNull default),
@@ -601,7 +657,8 @@ class TestClickQueryBuilding:
 
         pipeline = AggregationStrategyFactory.get("device").build_pipeline({})
         group_expr = pipeline[1]["$group"]["_id"]
-        assert group_expr == {"$ifNull": ["$device", "unknown"]}
+        assert group_expr["$ifNull"][1] == "unknown"
+        assert group_expr["$ifNull"][0]["$cond"][2] == "$device"
 
         from ua_parser import parse as ua_parse
 

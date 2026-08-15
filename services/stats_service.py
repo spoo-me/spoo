@@ -71,9 +71,17 @@ _KNOWN_TIMEZONES: frozenset[str] = frozenset(available_timezones())
 _NULL_SENTINEL_FILTERS: dict[StatsDimension, str] = {
     StatsDimension.REFERRER: "Direct",
     StatsDimension.DEVICE: "unknown",
+    StatsDimension.DOMAIN: "unknown",
     StatsDimension.UTM_SOURCE: "(none)",
     StatsDimension.UTM_MEDIUM: "(none)",
     StatsDimension.UTM_CAMPAIGN: "(none)",
+}
+
+# Dimensions whose clicks field lives under the time-series metaField rather
+# than at the top level. short_code is not listed — it has its own branch
+# (scope-bypass prevention).
+_FILTER_FIELD_PATHS: dict[StatsDimension, str] = {
+    StatsDimension.DOMAIN: "meta.domain",
 }
 
 
@@ -205,18 +213,19 @@ class StatsService:
                 and _NULL_SENTINEL_FILTERS[dimension] in values
             ):
                 # The stored-value $in keeps the sentinel: for device,
-                # "unknown" is also a real stored value; for referrer/utm
-                # the extra literal matches nothing (and if a visitor ever
-                # sends the literal, group-by merges it with null anyway).
+                # "unknown" is also a real stored value; for referrer/utm/
+                # domain the extra literal matches nothing (and if a stored
+                # value ever equalled it, group-by merges it with null anyway).
+                field = _FILTER_FIELD_PATHS.get(dimension, dimension)
                 or_groups.append(
                     [
-                        {dimension: {"$in": values}},
-                        {dimension: {"$in": [None, ""]}},
-                        {dimension: {"$exists": False}},
+                        {field: {"$in": values}},
+                        {field: {"$in": [None, ""]}},
+                        {field: {"$exists": False}},
                     ]
                 )
             else:
-                query[dimension] = {"$in": values}
+                query[_FILTER_FIELD_PATHS.get(dimension, dimension)] = {"$in": values}
 
         if len(or_groups) == 1:
             query["$or"] = or_groups[0]

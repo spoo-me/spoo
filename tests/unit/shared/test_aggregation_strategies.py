@@ -58,6 +58,7 @@ def test_factory_get_available_strategies():
         "utm_source",
         "utm_medium",
         "utm_campaign",
+        "domain",
     }
 
 
@@ -103,6 +104,18 @@ def _strategy(name: str) -> FieldAggregationStrategy:
 _BASE_QUERY = {"meta.owner_id": "user123"}
 
 
+def _group_field(group_id: dict) -> str:
+    """Extract the grouped mongo field from either group-expr shape.
+
+    Sentinel dimensions wrap the field in a $cond that folds "" into null
+    before the $ifNull; plain dimensions pass the field straight through.
+    """
+    inner = group_id["$ifNull"][0]
+    if isinstance(inner, dict):
+        return inner["$cond"][2]
+    return inner
+
+
 @pytest.mark.parametrize(
     "strategy_name, expected_field",
     [
@@ -119,16 +132,43 @@ def test_pipeline_groups_by_correct_field(strategy_name, expected_field):
     strategy = _strategy(strategy_name)
     pipeline = strategy.build_pipeline(_BASE_QUERY)
     group_stage = next(s["$group"] for s in pipeline if "$group" in s)
-    group_id = group_stage["_id"]
-    # _id is {"$ifNull": [<field>, <default>]}
-    assert group_id["$ifNull"][0] == expected_field
+    assert _group_field(group_stage["_id"]) == expected_field
 
 
 def test_short_code_pipeline_groups_by_nested_field():
     """ShortCode must group by nested meta.short_code, not a top-level field."""
     pipeline = _strategy("short_code").build_pipeline(_BASE_QUERY)
     group_stage = next(s["$group"] for s in pipeline if "$group" in s)
-    assert group_stage["_id"]["$ifNull"][0] == "$meta.short_code"
+    assert _group_field(group_stage["_id"]) == "$meta.short_code"
+
+
+def test_domain_pipeline_groups_by_nested_field():
+    """Domain must group by nested meta.domain, not a top-level field."""
+    pipeline = _strategy("domain").build_pipeline(_BASE_QUERY)
+    group_stage = next(s["$group"] for s in pipeline if "$group" in s)
+    assert _group_field(group_stage["_id"]) == "$meta.domain"
+
+
+def test_sentinel_dimension_group_expr_folds_empty_string():
+    """Sentinel dims must bucket "" with null/missing: the filter side's
+    $or group already matches "" as the sentinel ($in: [None, ""]), so a
+    group-by that preserved "" as its own bucket would make widget counts
+    and filter counts disagree on legacy document shapes."""
+    pipeline = _strategy("domain").build_pipeline(_BASE_QUERY)
+    group_stage = next(s["$group"] for s in pipeline if "$group" in s)
+    assert group_stage["_id"] == {
+        "$ifNull": [
+            {"$cond": [{"$eq": ["$meta.domain", ""]}, None, "$meta.domain"]},
+            "unknown",
+        ]
+    }
+
+
+def test_non_sentinel_dimension_keeps_plain_ifnull():
+    """Dimensions without a sentinel default keep the flat expression."""
+    pipeline = _strategy("browser").build_pipeline(_BASE_QUERY)
+    group_stage = next(s["$group"] for s in pipeline if "$group" in s)
+    assert group_stage["_id"] == {"$ifNull": ["$browser", "Unknown"]}
 
 
 def test_referrer_pipeline_uses_direct_as_null_fallback():
@@ -151,6 +191,8 @@ def test_referrer_pipeline_uses_direct_as_null_fallback():
         ("utm_source", "(none)"),
         ("utm_medium", "(none)"),
         ("utm_campaign", "(none)"),
+        # clicks recorded before domain stamping existed
+        ("domain", "unknown"),
     ],
 )
 def test_pipeline_uses_unknown_as_null_fallback(strategy_name, expected_null_fallback):
@@ -174,6 +216,7 @@ def test_pipeline_uses_unknown_as_null_fallback(strategy_name, expected_null_fal
         ("city", 50),
         ("referrer", 30),
         ("short_code", 100),
+        ("domain", 50),
     ],
 )
 def test_pipeline_limit_values(strategy_name, expected_limit):
@@ -297,6 +340,7 @@ _RAW = [{"_id": "Chrome", "total_clicks": 10, "unique_clicks": 7}]
         ("city", "city"),
         ("referrer", "referrer"),
         ("short_code", "short_code"),
+        ("domain", "domain"),
     ],
 )
 def test_format_results_renames_id_to_dimension_key(strategy_name, key):

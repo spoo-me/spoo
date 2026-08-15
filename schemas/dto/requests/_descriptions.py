@@ -46,6 +46,8 @@ STATS_GROUP_BY_DESC = (
     "- `city` — group by city\n"
     "- `referrer` — group by referrer URL\n"
     "- `short_code` — group by URL alias (only with `scope=all`)\n"
+    "- `domain` — group by the domain the short link is served on "
+    "(clicks recorded before domain tracking appear as `unknown`)\n"
     "- `utm_source` — group by the `utm_source` tag on the short link "
     "(untagged clicks appear as `(none)`)\n"
     "- `utm_medium` — group by the `utm_medium` tag\n"
@@ -80,6 +82,9 @@ STATS_FILTERS_DESC = (
     "- `referrer` — Filter by referrer URL (e.g., https://google.com, https://twitter.com)\n"
     "- `short_code` — Filter by URL alias (e.g., mylink, promo2024) — "
     "**not allowed** with `scope=anon`\n"
+    "- `domain` — Filter by the serving domain (e.g., spoo.me, "
+    "links.example.com); `unknown` matches clicks recorded before domain "
+    "tracking existed\n"
     "- `utm_source` / `utm_medium` / `utm_campaign` — Filter by campaign tags; "
     "`(none)` matches untagged clicks\n\n"
     "**Value format:** Array of strings for each dimension.\n\n"
@@ -156,6 +161,16 @@ STATS_UTM_DESC = (
     "JSON parameter.\n\n"
     "**Important:** Values are case-sensitive. `(none)` matches clicks with "
     "no tag.\n\n"
+    "**Note:** Both `filters` JSON and individual parameters can be combined."
+)
+
+STATS_DOMAIN_DESC = (
+    "**Method 2: Individual Filter Parameter**\n\n"
+    "Comma-separated domains the short links were served on (the system "
+    "default domain or your custom domains). Alternative to using the "
+    "`filters` JSON parameter.\n\n"
+    "**Important:** Values are case-insensitive (normalized to lowercase). "
+    "`unknown` matches clicks recorded before domain tracking existed.\n\n"
     "**Note:** Both `filters` JSON and individual parameters can be combined."
 )
 
