@@ -241,6 +241,9 @@ class ClickEventsSettings(BaseSettings):
     # a message is dead-lettered to dlq_stream.
     claim_idle_ms: int = Field(default=60_000, ge=1000)
     max_deliveries: int = Field(default=5, ge=1)
+    # DLQ bound — sized for hours of clicks (~600B/event → 100k ≈ 60MB);
+    # recover with scripts/replay_dlq.py.
+    dlq_maxlen: int = Field(default=100_000, ge=1000)
     stats_interval_seconds: float = Field(default=30.0, gt=0)
 
     # Which consumer groups this worker process runs. Lets a future

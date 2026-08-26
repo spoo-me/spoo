@@ -351,6 +351,7 @@ def _register_group(
         group=group,
         dlq_stream=ce.dlq_stream,
         max_deliveries=ce.max_deliveries,
+        dlq_maxlen=ce.dlq_maxlen,
     )
 
     async def reader(body: Any) -> None:

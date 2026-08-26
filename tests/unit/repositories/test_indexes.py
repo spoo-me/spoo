@@ -145,7 +145,7 @@ class TestEnsureIndexes:
             timeseries={
                 "timeField": "clicked_at",
                 "metaField": "meta",
-                "granularity": "seconds",
+                "granularity": "hours",
             },
         )
 
