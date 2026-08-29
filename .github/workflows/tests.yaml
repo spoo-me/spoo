@@ -2,18 +2,19 @@ name: Tests & Coverage
 
 on:
   push:
-    branches: ["*"]
+    branches: ["**"]
     paths:
       - "**.py"
       - "pyproject.toml"
       - "uv.lock"
       - "requirements.txt"
       - ".github/workflows/tests.yaml"
-  # No paths filter on PRs: the test checks are required by branch
-  # protection, and a filtered-out workflow never reports — leaving
-  # non-code PRs stuck at "Expected" forever.
+  # No paths or base filter on PRs: these checks are required by branch
+  # protection and a workflow that never reports leaves a PR stuck at
+  # "Expected" forever. Stacked PRs target feature branches, so filtering
+  # on main made every stack permanently unmergeable.
   pull_request:
-    branches: [main]
+    branches: ["**"]
   workflow_dispatch:
 
 permissions:

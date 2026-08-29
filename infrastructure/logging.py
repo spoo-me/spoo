@@ -64,6 +64,15 @@ SAFE_FIELDS = {
     "key_prefix",
     "token_prefix",
     "query_keys",
+    # LLM cost accounting: token COUNTS, not token material. Without
+    # these the substring heuristic redacts the spend telemetry and
+    # Axiom cannot answer what a task cost.
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
+    "cache_read_tokens",
+    "cache_write_tokens",
+    "max_tokens",
 }
 
 
@@ -200,6 +209,8 @@ def configure_stdlib_logging() -> None:
 
     # Reduce noise from third-party libraries
     logging.getLogger("urllib3").setLevel(logging.WARNING)
+    # httpx logs full request URLs at INFO; those must not land in the log sink.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
     logging.getLogger("botocore").setLevel(logging.WARNING)
     logging.getLogger("boto3").setLevel(logging.WARNING)

@@ -170,6 +170,23 @@ async def analytics(short_code: str, request: Request, db=Depends(get_db)) -> Re
             {"UrlError": "The requested Url never existed"}, status_code=404
         )
 
+    if url_data.get("blocked"):
+        log.info("legacy_analytics_blocked", short_code=short_code)
+        if request.method == "POST":
+            return JSONResponse(
+                {"UrlError": "This link has been disabled"}, status_code=451
+            )
+        return templates.TemplateResponse(
+            request,
+            "error.html",
+            {
+                "error_code": "451",
+                "error_message": "This link has been disabled",
+                "host_url": host_url,
+            },
+            status_code=451,
+        )
+
     if url_data.get("password") is not None and password != url_data["password"]:
         log.warning("legacy_analytics_password_incorrect", short_code=short_code)
         if request.method == "POST":
@@ -314,6 +331,12 @@ async def export(
             )
         return JSONResponse(
             {"UrlError": "The requested Url never existed"}, status_code=404
+        )
+
+    if url_data.get("blocked"):
+        log.info("legacy_export_blocked", short_code=short_code)
+        return JSONResponse(
+            {"UrlError": "This link has been disabled"}, status_code=451
         )
 
     if url_data.get("password") is not None and password != url_data["password"]:

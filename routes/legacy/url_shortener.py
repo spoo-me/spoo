@@ -19,26 +19,24 @@ from urllib.parse import unquote
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
-from dependencies import OptionalUser, Settings, UrlSvc, get_db, get_redis
+from dependencies import OptionalUser, Settings, UrlPolicy, UrlSvc, get_db, get_redis
 from errors import ForbiddenError, GoneError, NotFoundError
 from infrastructure.cache.dual_cache import DualCache
 from infrastructure.logging import get_logger
 from infrastructure.templates import templates
 from middleware.rate_limiter import Limits, limiter
-from repositories.blocked_url_repository import BlockedUrlRepository
 from repositories.legacy.emoji_url_repository import EmojiUrlRepository
 from repositories.legacy.legacy_url_repository import LegacyUrlRepository
 from repositories.url_repository import UrlRepository
 from routes.legacy.helpers import humanize_number, is_positive_integer
+from schemas.models.url import UrlStatus
 from shared.emoji_policy import canonicalize_emoji_alias, check_emoji_alias
 from shared.generators import generate_emoji_alias, generate_short_code
-from shared.url_utils import split_destination
+from shared.url_utils import parse_destination, split_destination
 from shared.validators import (
     is_emoji_alias,
     validate_alias,
-    validate_blocked_url,
     validate_safe_redirect,
-    validate_url,
     validate_url_password,
 )
 
@@ -80,6 +78,7 @@ async def index(request: Request, user: OptionalUser) -> Response:
 async def shorten_url(
     request: Request,
     url_service: UrlSvc,
+    url_policy: UrlPolicy,
     settings: Settings,
     db=Depends(get_db),
 ) -> Response:
@@ -111,23 +110,25 @@ async def shorten_url(
             status_code=400,
         )
 
-    blocked_patterns = await BlockedUrlRepository(db["blocked-urls"]).get_patterns()
-
-    if not validate_url(url, blocked_self_domains=settings.blocked_self_domains):
+    # The shared L0 gate (format + self-link + patterns + threat feeds) —
+    # same instance the v2 create path uses. Frozen legacy wire shapes.
+    rejection = await url_policy.check(url)
+    if rejection is not None:
+        log.info("url_creation_failed", reason=rejection.code, schema="v1")
+        if rejection.code == "invalid_url":
+            return JSONResponse(
+                {
+                    "UrlError": (
+                        "Invalid URL, URL must have a valid protocol and must follow"
+                        " rfc_1034 & rfc_2728 patterns"
+                    )
+                },
+                status_code=400,
+            )
+        # Published policies get their message; security stays coarse. Frozen key.
         return JSONResponse(
-            {
-                "UrlError": (
-                    "Invalid URL, URL must have a valid protocol and must follow"
-                    " rfc_1034 & rfc_2728 patterns"
-                )
-            },
-            status_code=400,
+            {"BlockedUrlError": rejection.public_message}, status_code=403
         )
-
-    if not validate_blocked_url(
-        url, blocked_patterns, timeout=settings.blocked_url_regex_timeout
-    ):
-        return JSONResponse({"BlockedUrlError": "Blocked URL ⛔"}, status_code=403)
 
     if alias and not validate_alias(alias):
         if wants_json:
@@ -193,6 +194,10 @@ async def shorten_url(
         "creation-time": datetime.now().strftime("%H:%M:%S"),
         "creation-ip-address": request.client.host if request.client else "unknown",
     }
+    # Same parsed-destination subdoc as v2 creates, so safety sweeps and
+    # takedown pivots cover the legacy collections via the sparse index.
+    if dest_parts := parse_destination(url):
+        data["dest"] = dest_parts
 
     if password:
         if not validate_url_password(
@@ -223,6 +228,7 @@ async def shorten_url(
 
     legacy_repo = LegacyUrlRepository(db["urls"])
     await legacy_repo.insert(short_code, data)
+    await url_policy.record_create(url)
 
     log.info(
         "url_created",
@@ -253,6 +259,7 @@ async def shorten_url(
 async def emoji(
     request: Request,
     url_service: UrlSvc,
+    url_policy: UrlPolicy,
     settings: Settings,
     db=Depends(get_db),
 ) -> Response:
@@ -281,8 +288,6 @@ async def emoji(
 
     if not url:
         return JSONResponse({"UrlError": "URL is required"}, status_code=400)
-
-    blocked_patterns = await BlockedUrlRepository(db["blocked-urls"]).get_patterns()
 
     emoji_repo = EmojiUrlRepository(db["emojis"])
 
@@ -314,19 +319,23 @@ async def emoji(
                 {"EmojiError": "Could not generate unique emoji alias"}, status_code=500
             )
 
-    if not validate_url(url, blocked_self_domains=settings.blocked_self_domains):
-        return JSONResponse(
-            {
-                "UrlError": (
-                    "Invalid URL, URL must have a valid protocol and must follow"
-                    " rfc_1034 & rfc_2728 patterns"
-                )
-            },
-            status_code=400,
-        )
-
-    if not validate_blocked_url(url, blocked_patterns):
-        return JSONResponse({"UrlError": "Blocked URL ⛔"}, status_code=403)
+    # Shared L0 gate; note this route's frozen blocked shape is UrlError,
+    # not BlockedUrlError. (Also fixes the old bug where this path dropped
+    # the configured regex timeout.)
+    rejection = await url_policy.check(url)
+    if rejection is not None:
+        log.info("url_creation_failed", reason=rejection.code, schema="emoji")
+        if rejection.code == "invalid_url":
+            return JSONResponse(
+                {
+                    "UrlError": (
+                        "Invalid URL, URL must have a valid protocol and must follow"
+                        " rfc_1034 & rfc_2728 patterns"
+                    )
+                },
+                status_code=400,
+            )
+        return JSONResponse({"UrlError": rejection.public_message}, status_code=403)
 
     data: dict = {
         "url": url,
@@ -337,6 +346,10 @@ async def emoji(
         "creation-time": datetime.now().strftime("%H:%M:%S"),
         "creation-ip-address": request.client.host if request.client else "unknown",
     }
+    # Same parsed-destination subdoc as v2 creates, so safety sweeps and
+    # takedown pivots cover the legacy collections via the sparse index.
+    if dest_parts := parse_destination(url):
+        data["dest"] = dest_parts
 
     if password:
         if not validate_url_password(
@@ -366,6 +379,7 @@ async def emoji(
         data["block-bots"] = True
 
     await emoji_repo.insert(emojies, data)
+    await url_policy.record_create(url)
 
     log.info(
         "url_created",
@@ -438,8 +452,9 @@ async def preview_url(
 ) -> Response:
     """Show a preview of where a short URL redirects to.
 
-    Accesses repos directly (bypassing resolve() status checks) so that
-    blocked/expired URLs can still show preview information.
+    Accesses repos directly so an EXPIRED link still previews, but a
+    blocked one reveals nothing: destination, geo destinations and meta
+    tags are all withheld behind the same 451 the redirect serves.
     """
     short_code = unquote(short_code)
     host_url = str(request.base_url)
@@ -452,7 +467,12 @@ async def preview_url(
         emoji_repo = EmojiUrlRepository(db["emojis"])
         doc = await emoji_repo.find_by_id(short_code)
         if doc:
-            url_data = {"_id": short_code, "url": doc.url, "password": doc.password}
+            url_data = {
+                "_id": short_code,
+                "url": doc.url,
+                "password": doc.password,
+                "blocked": doc.effective_status is UrlStatus.BLOCKED,
+            }
             schema_type = "emoji"
     else:
         url_repo = UrlRepository(db["urlsV2"])
@@ -463,7 +483,12 @@ async def preview_url(
             # v1 first
             doc = await legacy_repo.find_by_id(short_code)
             if doc:
-                url_data = {"_id": short_code, "url": doc.url, "password": doc.password}
+                url_data = {
+                    "_id": short_code,
+                    "url": doc.url,
+                    "password": doc.password,
+                    "blocked": doc.effective_status is UrlStatus.BLOCKED,
+                }
                 schema_type = "v1"
             else:
                 v2 = await url_repo.find_by_alias(
@@ -478,6 +503,7 @@ async def preview_url(
                         "meta_tags": v2.meta_tags.model_dump()
                         if v2.meta_tags
                         else None,
+                        "blocked": v2.effective_status is UrlStatus.BLOCKED,
                     }
                     schema_type = "v2"
         else:
@@ -492,6 +518,7 @@ async def preview_url(
                     "password": v2.password,
                     "geo_rules": v2.geo_rules,
                     "meta_tags": v2.meta_tags.model_dump() if v2.meta_tags else None,
+                    "blocked": v2.effective_status is UrlStatus.BLOCKED,
                 }
                 schema_type = "v2"
             else:
@@ -501,6 +528,7 @@ async def preview_url(
                         "_id": short_code,
                         "url": doc.url,
                         "password": doc.password,
+                        "blocked": doc.effective_status is UrlStatus.BLOCKED,
                     }
                     schema_type = "v1"
 
@@ -514,6 +542,19 @@ async def preview_url(
                 "host_url": host_url,
             },
             status_code=404,
+        )
+
+    if url_data.get("blocked"):
+        log.info("legacy_preview_blocked", short_code=short_code)
+        return templates.TemplateResponse(
+            request,
+            "error.html",
+            {
+                "error_code": "451",
+                "error_message": "This link has been disabled",
+                "host_url": host_url,
+            },
+            status_code=451,
         )
 
     if schema_type == "v2":

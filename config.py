@@ -468,6 +468,145 @@ class WebhookSettings(BaseSettings):
         return self.delivery_log_ttl_days * 86_400
 
 
+class LlmSettings(BaseSettings):
+    """The LLM capability — one client, many consumers.
+
+    This is deliberately NOT a safety setting: the model is
+    infrastructure (``infrastructure/llm``), registered tasks are the
+    consumers (safety investigation first, the report-inbox scanner
+    next), and the plumbing — client, retries, budgets, cost accounting —
+    is owned once here. ``enabled`` is the kill switch: off means every
+    task runner returns a typed failure instead of calling out.
+
+    The model is a config value on purpose: every task result records the
+    model + prompt version it was produced by, so swapping providers is a
+    replay-and-compare exercise, not a leap of faith.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore",
+        env_prefix="LLM_",
+    )
+
+    enabled: bool = False
+    # ``<provider>:<model>``; anthropic and openai are both wired. The
+    # model is a config value on purpose — see the class docstring.
+    model: str = "anthropic:claude-sonnet-5"
+    api_key: str = ""
+    # Hard ceilings applied to every task unless the task declares tighter
+    # ones. Requests = model round-trips in one task run (tool loop
+    # included); tokens = total across the run.
+    # Measured: 8 cut off 10 of 167 eval investigations mid-flight.
+    max_requests_per_run: int = Field(default=12, ge=1)
+    # Measured: a clean investigation uses 4-5 tool calls; one whose
+    # destination is dead legitimately explores more (root, variants,
+    # chain) before concluding. 10 cut those off mid-investigation.
+    max_tool_calls_per_run: int = Field(default=18, ge=1)
+    max_total_tokens_per_run: int = Field(default=120_000, ge=1000)
+    request_timeout_seconds: float = Field(default=60.0, gt=0)
+    run_timeout_seconds: float = Field(default=300.0, gt=0)
+    # Prompt overrides: a directory of <task>.md files that replaces the
+    # in-repo defaults — production prompt text is private tuning.
+    prompt_dir: str = ""
+
+
+class SafetySettings(BaseSettings):
+    """URL safety pipeline — report-triggered destination analysis,
+    verdicts, and automatic enforcement.
+
+    Fully opt-in: ``enabled=False`` wires the Null sink and nothing
+    analyzes. With queue Redis present, analysis requests ride the
+    ``events:safety`` stream and the click worker consumes; without it,
+    analysis runs inline in the app process. Detection thresholds and
+    weights are environment-only ON PURPOSE — they are private tuning,
+    never committed.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore",
+        env_prefix="SAFETY_",
+    )
+
+    enabled: bool = False
+    stream: str = "events:safety"
+    dlq_stream: str = "events:safety:dlq"
+    maxlen: int = Field(default=10_000, ge=1000)
+    batch_size: int = Field(default=16, ge=1)
+    block_ms: int = Field(default=5000, ge=100)
+    # Must exceed a large host block, or the claimer re-delivers it mid-flight.
+    claim_idle_ms: int = Field(default=600_000, ge=1000)
+    max_deliveries: int = Field(default=5, ge=1)
+    # A verdict younger than this short-circuits re-analysis of the same
+    # destination host (repeat reports of one campaign are the norm).
+    reverdict_ttl_hours: int = Field(default=24, ge=1)
+
+    # L1 creation-pattern scoring (needs the queue Redis for counters).
+    # Thresholds fire once per window on exact equality; production values
+    # are PRIVATE tuning set via env, calibrated by replaying past
+    # campaigns — the defaults here are deliberately conservative.
+    # Each changes what the public create API refuses, so each has its own switch.
+    manual_feed_enabled: bool = True
+    shorteners_enabled: bool = False
+
+    l1_enabled: bool = True
+    l1_burst_window_seconds: int = Field(default=600, ge=60)
+    # Replayed against 92 days of prod creates: campaigns peaked at 34/10min
+    # while 50/300 caught none of twelve known ones.
+    l1_domain_burst_threshold: int = Field(default=25, ge=2)
+    l1_domain_daily_threshold: int = Field(default=150, ge=2)
+
+    # L3 recent-screening sweep: every destination created in the window
+    # gets screened by the cheap providers (silently) so nothing sits
+    # permanently unjudged. The feed-delta sweep has no settings of its
+    # own — it rides each feed's sync task.
+    sweep_recent_enabled: bool = True
+    sweep_recent_window_hours: int = Field(default=48, ge=1)
+    sweep_max_enqueues: int = Field(default=1000, ge=10)
+
+    # L2 investigation stage — its own queue and consumer, entered only
+    # through the admission policy when screening ends unresolved.
+    # Reports and destination edits always admit; pattern bursts admit
+    # within the daily budget; sweep novelty never admits by default.
+    deep_enabled: bool = False
+    deep_stream: str = "events:safety:deep"
+    deep_dlq_stream: str = "events:safety:deep:dlq"
+    deep_maxlen: int = Field(default=5_000, ge=100)
+    deep_batch_size: int = Field(default=4, ge=1)
+    deep_block_ms: int = Field(default=5000, ge=100)
+    # Must exceed LLM_RUN_TIMEOUT_SECONDS (300s) with headroom, or the claimer
+    # re-claims runs that are still finishing — duplicate model spend.
+    deep_claim_idle_ms: int = Field(default=900_000, ge=1000)
+    deep_max_deliveries: int = Field(default=3, ge=1)
+    deep_report_daily_budget: int = Field(default=200, ge=1)
+    deep_daily_budget: int = Field(default=200, ge=1)
+    deep_admit_sweeps: bool = False
+    # Auto-block policy for a model toxic verdict:
+    #   corroborated — a hard source (report, feed, Web Risk) must agree
+    #                  (default; the model alone goes to review)
+    #   confident    — a high-confidence model verdict blocks alone
+    #   both         — high confidence AND corroboration
+    #   off          — never auto-block; every toxic verdict is reviewed
+    # Graduate from corroborated by measurement (review taps are labels),
+    # not by trusting the model up front.
+    deep_autoblock: Literal["corroborated", "confident", "both", "off"] = "corroborated"
+
+    # External feeds. fishfish.gg is free/no-auth and defaults on (within
+    # the master switch); its domain set syncs hourly via the scheduler.
+    fishfish_enabled: bool = True
+    fishfish_api_url: str = "https://api.fishfish.gg/v1/domains"
+    # Google Web Risk Lookup API — enabled by setting the GCP API key.
+    # (The Safe Browsing API is non-commercial-only; Web Risk is the
+    # sanctioned equivalent.)
+    web_risk_api_key: str = ""
+    web_risk_api_base: str = "https://webrisk.googleapis.com"
+
+    @property
+    def web_risk_enabled(self) -> bool:
+        return bool(self.web_risk_api_key)
+
+
 class SchedulerSettings(BaseSettings):
     """Scheduled-task system — the Mongo-lease runner for recurring jobs.
 
@@ -482,8 +621,11 @@ class SchedulerSettings(BaseSettings):
 
     Enabled by default: with only built-in tasks registered it is a
     once-an-hour heartbeat, and feature tasks gate themselves on their own
-    settings. The lease makes overlapping runners (deploy overlap, worker
-    plus app) safe — a task can never double-run.
+    settings. The lease dedupes overlapping runners (deploy overlap,
+    worker plus app) only while a run finishes within ``lease_seconds`` —
+    the real guarantee is at-least-once with idempotent handlers, so a
+    task expected to run longer than the lease needs the lease raised
+    first (there is no mid-run renewal).
     """
 
     model_config = SettingsConfigDict(
@@ -584,6 +726,10 @@ class AppSettings(BaseSettings):
     # must render everywhere.
     emoji_generate_max_version: float = 12.0
     emoji_generated_alias_length: int = 3
+    # Dark until geo destinations are visible to safety enforcement, which
+    # keys on dest.host and cannot see them. See the tripwire in
+    # tests/unit/test_geo_launch_guard.py.
+    geo_rules_enabled: bool = False
     geo_rules_max_countries: int = 50
     url_password_min_length: int = 8
     account_password_min_length: int = 8
@@ -663,7 +809,9 @@ class AppSettings(BaseSettings):
     meta_tags: MetaTagsSettings | None = None
     web_risk: WebRiskSettings | None = None
     webhooks: WebhookSettings | None = None
+    safety: SafetySettings | None = None
     scheduler: SchedulerSettings | None = None
+    llm: LlmSettings | None = None
 
     @model_validator(mode="after")
     def _populate_sub_configs_and_secret(self) -> AppSettings:
@@ -707,6 +855,10 @@ class AppSettings(BaseSettings):
             self.web_risk = WebRiskSettings()
         if self.webhooks is None:
             self.webhooks = WebhookSettings()
+        if self.llm is None:
+            self.llm = LlmSettings()
+        if self.safety is None:
+            self.safety = SafetySettings()
         if self.scheduler is None:
             self.scheduler = SchedulerSettings()
         if self.webhooks.enabled and not self.secret_key:

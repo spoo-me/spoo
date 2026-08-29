@@ -51,8 +51,17 @@ _SETTINGS = AppSettings()
 
 def _build_legacy_test_app(overrides: dict) -> FastAPI:
     """Build a test app with legacy routers, injecting get_settings override."""
-    # Always provide settings override — legacy routes use Depends(get_settings)
-    base_overrides = {get_settings: lambda: _SETTINGS}
+    from dependencies import get_url_policy
+    from services.safety.policy import UrlPolicyService
+
+    # Always provide settings + a permissive L0 gate — several tests here
+    # never enter the lifespan, so app.state is not populated.
+    base_overrides = {
+        get_settings: lambda: _SETTINGS,
+        get_url_policy: lambda: UrlPolicyService(
+            [], blocked_self_domains=[_SETTINGS.system_default_domain]
+        ),
+    }
     base_overrides.update(overrides)
     return build_test_app(
         legacy_stats_router, legacy_url_router, overrides=base_overrides
@@ -144,8 +153,6 @@ def test_legacy_shorten_json_response():
 
     with (
         patch("routes.legacy.url_shortener.generate_short_code", return_value="gen123"),
-        patch("routes.legacy.url_shortener.validate_url", return_value=True),
-        patch("routes.legacy.url_shortener.validate_blocked_url", return_value=True),
     ):
         resp = client.post(
             "/",
@@ -176,8 +183,6 @@ def test_legacy_shorten_html_redirect():
 
     with (
         patch("routes.legacy.url_shortener.generate_short_code", return_value="gen456"),
-        patch("routes.legacy.url_shortener.validate_url", return_value=True),
-        patch("routes.legacy.url_shortener.validate_blocked_url", return_value=True),
     ):
         resp = client.post(
             "/",
@@ -225,17 +230,25 @@ def test_legacy_shorten_blocked_url():
             get_url_service: lambda: mock_url_svc,
         }
     )
+    from dependencies import get_url_policy
+    from services.safety.policy import PolicyRejection, UrlPolicyService
+
+    class _BlockingGate(UrlPolicyService):
+        async def check(self, url):
+            return PolicyRejection(
+                code="blocked_pattern", public_message="URL is blocked"
+            )
+
+    app.dependency_overrides[get_url_policy] = lambda: _BlockingGate(
+        [], blocked_self_domains=[]
+    )
     client = TestClient(app, raise_server_exceptions=False)
 
-    with (
-        patch("routes.legacy.url_shortener.validate_url", return_value=True),
-        patch("routes.legacy.url_shortener.validate_blocked_url", return_value=False),
-    ):
-        resp = client.post(
-            "/",
-            data={"url": "https://blocked.example.com"},
-            headers={"Accept": "application/json"},
-        )
+    resp = client.post(
+        "/",
+        data={"url": "https://blocked.example.com"},
+        headers={"Accept": "application/json"},
+    )
 
     assert resp.status_code == 403
     body = resp.json()
@@ -256,8 +269,6 @@ def test_legacy_shorten_invalid_alias():
     client = TestClient(app, raise_server_exceptions=False)
 
     with (
-        patch("routes.legacy.url_shortener.validate_url", return_value=True),
-        patch("routes.legacy.url_shortener.validate_blocked_url", return_value=True),
         patch("routes.legacy.url_shortener.validate_alias", return_value=False),
     ):
         resp = client.post(
@@ -286,8 +297,6 @@ def test_legacy_shorten_alias_exists():
     client = TestClient(app, raise_server_exceptions=False)
 
     with (
-        patch("routes.legacy.url_shortener.validate_url", return_value=True),
-        patch("routes.legacy.url_shortener.validate_blocked_url", return_value=True),
         patch("routes.legacy.url_shortener.validate_alias", return_value=True),
     ):
         resp = client.post(
@@ -320,8 +329,6 @@ def test_legacy_emoji_shorten_success():
     client = TestClient(app, raise_server_exceptions=False)
 
     with (
-        patch("routes.legacy.url_shortener.validate_url", return_value=True),
-        patch("routes.legacy.url_shortener.validate_blocked_url", return_value=True),
         patch(
             "routes.legacy.url_shortener.generate_emoji_alias",
             return_value="\U0001f600\U0001f680\U0001f389",
@@ -353,15 +360,11 @@ def test_legacy_emoji_custom_alias_stored_canonical():
     )
     client = TestClient(app, raise_server_exceptions=False)
 
-    with (
-        patch("routes.legacy.url_shortener.validate_url", return_value=True),
-        patch("routes.legacy.url_shortener.validate_blocked_url", return_value=True),
-    ):
-        resp = client.post(
-            "/emoji",
-            data={"url": "https://example.com/long", "emojies": "⭐️🎉"},
-            headers={"Accept": "application/json"},
-        )
+    resp = client.post(
+        "/emoji",
+        data={"url": "https://example.com/long", "emojies": "⭐️🎉"},
+        headers={"Accept": "application/json"},
+    )
 
     assert resp.status_code == 200
     inserted = mock_db["emojis"].insert_one.call_args[0][0]
@@ -385,15 +388,11 @@ def test_legacy_emoji_policy_rejected_returns_400(alias):
     )
     client = TestClient(app, raise_server_exceptions=False)
 
-    with (
-        patch("routes.legacy.url_shortener.validate_url", return_value=True),
-        patch("routes.legacy.url_shortener.validate_blocked_url", return_value=True),
-    ):
-        resp = client.post(
-            "/emoji",
-            data={"url": "https://example.com/long", "emojies": alias},
-            headers={"Accept": "application/json"},
-        )
+    resp = client.post(
+        "/emoji",
+        data={"url": "https://example.com/long", "emojies": alias},
+        headers={"Accept": "application/json"},
+    )
 
     assert resp.status_code == 400
     assert resp.json() == {"EmojiError": "Invalid emoji"}
@@ -413,15 +412,11 @@ def test_legacy_emoji_collision_with_v2_returns_400():
     )
     client = TestClient(app, raise_server_exceptions=False)
 
-    with (
-        patch("routes.legacy.url_shortener.validate_url", return_value=True),
-        patch("routes.legacy.url_shortener.validate_blocked_url", return_value=True),
-    ):
-        resp = client.post(
-            "/emoji",
-            data={"url": "https://example.com/long", "emojies": "🚀🔥"},
-            headers={"Accept": "application/json"},
-        )
+    resp = client.post(
+        "/emoji",
+        data={"url": "https://example.com/long", "emojies": "🚀🔥"},
+        headers={"Accept": "application/json"},
+    )
 
     assert resp.status_code == 400
     assert resp.json() == {"EmojiError": "Emoji already exists"}

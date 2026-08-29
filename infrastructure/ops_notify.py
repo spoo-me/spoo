@@ -28,6 +28,8 @@ _FOOTER = {
 }
 _CONTACT_COLOR = 9103397
 _REPORT_COLOR = 14177041
+_SAFETY_ACTION_COLOR = 15548997  # red: automatic enforcement happened
+_SAFETY_REVIEW_COLOR = 16705372  # yellow: a human decision is needed
 
 # Summary embed: list at most this many targets, then "… and N more".
 _SUMMARY_MAX_LISTED = 10
@@ -53,6 +55,26 @@ class OpsNotifier(Protocol):
         reporter_org: str | None,
         ip: str,
         now: datetime,
+    ) -> bool: ...
+
+    async def safety_action(
+        self,
+        *,
+        host: str,
+        reason: str,
+        trigger: str,
+        blocked_count: int,
+        legacy_count: int,
+        sample_url: str | None,
+    ) -> bool: ...
+
+    async def safety_review(
+        self,
+        *,
+        host: str,
+        trigger: str,
+        sample_url: str | None,
+        context: dict | None,
     ) -> bool: ...
 
 
@@ -183,6 +205,82 @@ class DiscordOpsNotifier:
             ]
         }
         return await self._deliver(self._report_url, payload, kind="report_summary")
+
+    async def safety_action(
+        self,
+        *,
+        host: str,
+        reason: str,
+        trigger: str,
+        blocked_count: int,
+        legacy_count: int,
+        sample_url: str | None,
+    ) -> bool:
+        """Enforcement already happened — this states the ACTION TAKEN, it
+        is not a request for one. ``legacy_count`` is v1/emoji links
+        blocked via their safety flag (same 451 as v2, reversible)."""
+        fields: list[dict[str, Any]] = [
+            {"name": "Destination Host", "value": f"```{host}```"},
+            {"name": "Reason", "value": f"```{reason}```"},
+            {"name": "Trigger", "value": f"```{trigger}```"},
+            {"name": "Links Blocked (v2)", "value": f"```{blocked_count}```"},
+        ]
+        if legacy_count:
+            fields.append(
+                {
+                    "name": "Legacy v1/emoji Blocked",
+                    "value": f"```{legacy_count}```",
+                }
+            )
+        if sample_url:
+            fields.append({"name": "Sample URL", "value": f"```{sample_url}```"})
+        payload = {
+            "embeds": [
+                {
+                    "title": "Safety: destination auto-blocked",
+                    "color": _SAFETY_ACTION_COLOR,
+                    "fields": fields,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "footer": _FOOTER,
+                }
+            ]
+        }
+        return await self._deliver(self._report_url, payload, kind="safety_action")
+
+    async def safety_review(
+        self,
+        *,
+        host: str,
+        trigger: str,
+        sample_url: str | None,
+        context: dict | None,
+    ) -> bool:
+        """No local source could judge this destination — a human decision
+        is needed. Carries the trigger context so the decision takes
+        seconds, not an investigation."""
+        fields: list[dict[str, Any]] = [
+            {"name": "Destination Host", "value": f"```{host}```"},
+            {"name": "Trigger", "value": f"```{trigger}```"},
+        ]
+        if sample_url:
+            fields.append({"name": "Sample URL", "value": f"```{sample_url}```"})
+        if context:
+            lines = [f"{k}: {v}" for k, v in list(context.items())[:8]]
+            fields.append(
+                {"name": "Context", "value": "```" + "\n".join(lines) + "```"}
+            )
+        payload = {
+            "embeds": [
+                {
+                    "title": "Safety: review needed",
+                    "color": _SAFETY_REVIEW_COLOR,
+                    "fields": fields,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "footer": _FOOTER,
+                }
+            ]
+        }
+        return await self._deliver(self._report_url, payload, kind="safety_review")
 
     # ── Delivery ──────────────────────────────────────────────────────────────
 

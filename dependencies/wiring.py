@@ -29,6 +29,7 @@ from repositories.blocked_url_repository import BlockedUrlRepository
 from repositories.click_repository import ClickRepository
 from repositories.custom_domain_repository import CustomDomainRepository
 from repositories.feature_flag_repository import FeatureFlagRepository
+from repositories.feed_domain_repository import FeedDomainRepository
 from repositories.legacy.emoji_url_repository import EmojiUrlRepository
 from repositories.legacy.legacy_url_repository import LegacyUrlRepository
 from repositories.page_layout_repository import PageLayoutRepository
@@ -40,6 +41,7 @@ from repositories.scheduled_task_repository import ScheduledTaskRepository
 from repositories.token_repository import TokenRepository
 from repositories.url_repository import UrlRepository
 from repositories.user_repository import UserRepository
+from repositories.verdict_repository import VerdictRepository
 from repositories.webhook_delivery_repository import WebhookDeliveryRepository
 from repositories.webhook_endpoint_repository import WebhookEndpointRepository
 from repositories.webhook_event_repository import WebhookEventRepository
@@ -75,6 +77,28 @@ from services.public_link_resolver import PublicLinkResolver
 from services.public_preview_service import PublicPreviewService
 from services.public_stats_service import PublicStatsService
 from services.report_intake_service import ReportIntakeService
+from services.safety import (
+    AdmissionPolicy,
+    BlockedPatternProvider,
+    CreationPatternScorer,
+    DeepAnalysisSink,
+    FeedDeltaSweeper,
+    InlineSafetySink,
+    NullDeepAnalysisSink,
+    NullSafetySink,
+    RedisStreamDeepAnalysisSink,
+    RedisStreamSafetySink,
+    SafetyAnalyzer,
+    SafetyEnforcer,
+    SafetySink,
+    SweepDeps,
+    ToxicVerdictProvider,
+    UrlPolicyService,
+    WebRiskProvider,
+    build_feed_providers,
+    build_feed_tasks,
+    build_sweep_tasks,
+)
 from services.scheduler import TaskScheduler
 from services.scheduler.tasks import build_task_registry
 from services.stats_service import StatsService
@@ -287,13 +311,156 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
         max_endpoints=wh_settings.max_endpoints,
     )
 
+    # ── Safety pipeline ──────────────────────────────────────────────
+    # Analyzer + enforcer are built unconditionally (cheap objects); the
+    # SINK encodes the degradation ladder: disabled → Null, queue Redis →
+    # stream (worker analyzes), otherwise inline in this process.
+    sf_settings = settings.safety
+    safety_enforcer = SafetyEnforcer(
+        url_repo,
+        legacy_repo,
+        emoji_repo,
+        UrlCache(redis_client, ttl_seconds=settings.redis.redis_ttl_seconds),
+        events=app.state.domain_event_sink,
+        edge_kv=edge_kv_client,
+        system_default_domain=settings.system_default_domain,
+    )
+    # Each provider is built ONCE and composed twice: the L0 gate takes
+    # the cheap/local subset (blocks the 201, so no network calls), the
+    # analyzer takes the full chain. Same instances = same pattern cache,
+    # same feed set, one implementation per signal. Feed membership comes
+    # from FEED_REGISTRY (catalog as code) — adding a feed never edits
+    # this function.
+    feed_domain_repo = FeedDomainRepository(db["safety_feed_domains"])
+    verdict_repo = VerdictRepository(db["safety_verdicts"])
+    pattern_provider = BlockedPatternProvider(
+        blocked_url_repo, regex_timeout=settings.blocked_url_regex_timeout
+    )
+    feed_gate, feed_analyzer, feed_messages = build_feed_providers(
+        sf_settings, feed_domain_repo
+    )
+    gate_providers: list = [
+        pattern_provider,
+        ToxicVerdictProvider(verdict_repo),
+        *feed_gate,
+    ]
+    analyzer_providers: list = [pattern_provider, *feed_analyzer]
+    if sf_settings.web_risk_enabled:
+        # Online lookup: analyzer only, never the create path.
+        analyzer_providers.append(
+            WebRiskProvider(
+                http_client,
+                api_key=sf_settings.web_risk_api_key,
+                api_base=sf_settings.web_risk_api_base,
+            )
+        )
+        log.info("safety_web_risk_enabled")
+    # Deep tier (investigation): its own stream, entered only through the
+    # admission policy when screening ends unresolved. Requires the queue
+    # Redis — investigation makes outbound calls and must never run
+    # inline, so without a queue the deep tier is simply off.
+    deep_sink: DeepAnalysisSink = NullDeepAnalysisSink()
+    admission = None
+    if sf_settings.enabled and sf_settings.deep_enabled:
+        if queue_redis_for_webhooks is not None:
+            deep_sink = RedisStreamDeepAnalysisSink(
+                queue_redis_for_webhooks,
+                stream=sf_settings.deep_stream,
+                maxlen=sf_settings.deep_maxlen,
+            )
+            admission = AdmissionPolicy(
+                queue_redis_for_webhooks,
+                daily_budget=sf_settings.deep_daily_budget,
+                report_daily_budget=sf_settings.deep_report_daily_budget,
+                admit_sweeps=sf_settings.deep_admit_sweeps,
+            )
+            log.info("safety_deep_sink_enabled", stream=sf_settings.deep_stream)
+        else:
+            log.warning(
+                "safety_deep_unconfigured",
+                detail="deep analysis needs CLICK_EVENTS_QUEUE_REDIS_URI",
+            )
+    safety_analyzer = SafetyAnalyzer(
+        analyzer_providers,
+        verdict_repo,
+        safety_enforcer,
+        ops_notifier,
+        reverdict_ttl_hours=sf_settings.reverdict_ttl_hours,
+        admission=admission,
+        deep_sink=deep_sink if admission is not None else None,
+    )
+    app.state.safety_analyzer = safety_analyzer
+    safety_sink: SafetySink
+    if not sf_settings.enabled:
+        safety_sink = NullSafetySink()
+    elif queue_redis_for_webhooks is not None:
+        safety_sink = RedisStreamSafetySink(
+            queue_redis_for_webhooks,
+            stream=sf_settings.stream,
+            maxlen=sf_settings.maxlen,
+        )
+        log.info("safety_stream_sink_enabled", stream=sf_settings.stream)
+    else:
+        safety_sink = InlineSafetySink(safety_analyzer, background=True)
+        log.info("safety_inline_sink_enabled")
+    app.state.safety_sink = safety_sink
+    # L1 creation-pattern scoring: counters need the durable queue Redis
+    # (the cache Redis would evict them); without it, or with safety off,
+    # record_create degrades to a no-op.
+    pattern_scorer = None
+    if (
+        sf_settings.enabled
+        and sf_settings.l1_enabled
+        and queue_redis_for_webhooks is not None
+    ):
+        pattern_scorer = CreationPatternScorer(
+            queue_redis_for_webhooks,
+            safety_sink,
+            ops_notifier,
+            burst_window_seconds=sf_settings.l1_burst_window_seconds,
+            domain_burst_threshold=sf_settings.l1_domain_burst_threshold,
+            domain_daily_threshold=sf_settings.l1_domain_daily_threshold,
+        )
+        log.info("safety_l1_scoring_enabled")
+    elif sf_settings.enabled and sf_settings.l1_enabled:
+        log.warning(
+            "safety_l1_scoring_unconfigured",
+            detail="pattern scoring needs CLICK_EVENTS_QUEUE_REDIS_URI",
+        )
+    url_policy = UrlPolicyService(
+        gate_providers,
+        blocked_self_domains=settings.blocked_self_domains,
+        public_messages=feed_messages,
+        scorer=pattern_scorer,
+        # Redirect probe; off with the safety master switch.
+        redirect_feed_repo=feed_domain_repo if sf_settings.enabled else None,
+        redirect_sink=safety_sink if sf_settings.enabled else None,
+    )
+    app.state.url_policy = url_policy
     # ── Scheduled tasks ──────────────────────────────────────────────
     # Mongo-lease runner (see services/scheduler). Same runtime rule as
     # the webhook executor: embedded in this process when explicitly
     # requested or (auto) when no worker exists in the deploy — queue
     # Redis presence is the worker proxy. app.py starts/cancels the task.
     sch_settings = settings.scheduler
-    task_registry = build_task_registry()
+    # Feature tasks from the safety catalogs: feed syncs (each carrying
+    # the feed-delta sweep) plus the scheduled sweeps.
+    delta_sweeper = FeedDeltaSweeper(url_repo, safety_sink)
+    task_registry = build_task_registry(
+        [
+            *build_feed_tasks(
+                sf_settings, http_client, feed_domain_repo, delta_sweeper
+            ),
+            *build_sweep_tasks(
+                sf_settings,
+                SweepDeps(
+                    url_repo=url_repo,
+                    verdict_repo=verdict_repo,
+                    sink=safety_sink,
+                ),
+            ),
+        ]
+    )
     app.state.task_scheduler = TaskScheduler(
         ScheduledTaskRepository(db["scheduled_tasks"]),
         task_registry,
@@ -304,6 +471,20 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
         sch_settings.runtime == "embedded"
         or (sch_settings.runtime == "auto" and queue_redis_for_webhooks is None)
     )
+    if (
+        sch_settings.enabled
+        and not app.state.task_scheduler_embedded
+        and sch_settings.runtime in ("auto", "worker")
+    ):
+        # The worker only boots for its OWN features, never for the scheduler alone.
+        log.warning(
+            "task_scheduler_delegated_to_worker",
+            runtime=sch_settings.runtime,
+            detail=(
+                "scheduler will only run if a worker process is actually "
+                "deployed; no worker means nothing polls scheduled tasks"
+            ),
+        )
 
     # ── Services ─────────────────────────────────────────────────────────
     app.state.url_service = UrlService(
@@ -314,12 +495,14 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
         url_cache,
         settings.blocked_self_domains,
         system_default_domain=settings.system_default_domain,
+        url_policy=url_policy,
         blocked_url_regex_timeout=settings.blocked_url_regex_timeout,
         max_emoji_alias_length=settings.max_emoji_alias_length,
         emoji_accept_max_version=settings.emoji_accept_max_version,
         emoji_generate_max_version=settings.emoji_generate_max_version,
         emoji_generated_alias_length=settings.emoji_generated_alias_length,
         geo_rules_max_countries=settings.geo_rules_max_countries,
+        geo_rules_enabled=settings.geo_rules_enabled,
         og_writethrough=og_writethrough,
         edge_kv=edge_kv_client,
         r2_storage=r2_storage,
@@ -380,6 +563,7 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
         captcha,
         ops_notifier,
         system_default_domain=settings.system_default_domain,
+        safety_sink=safety_sink,
     )
     app.state.export_service = ExportService(
         app.state.stats_service,

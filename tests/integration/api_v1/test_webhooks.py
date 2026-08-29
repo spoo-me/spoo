@@ -367,7 +367,7 @@ def test_event_catalog_is_public_and_complete():
         resp = c.get(f"{_URL}/event-types")
     assert resp.status_code == 200
     types = resp.json()["event_types"]
-    assert len(types) == 5
+    assert len(types) == 6
     clicked = next(t for t in types if t["type"] == "link.clicked")
     assert clicked["category"] == "link"
     assert clicked["sample"]["alias"] == "summer-drop"

@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import re
 from urllib.parse import urlparse, urlsplit
+
+import idna
+import tldextract
 
 # RFC 1035 hostname matcher used by the custom-domains code path.
 # Labels: 1-63 chars, [a-z0-9-], no leading/trailing hyphen.
@@ -16,6 +20,72 @@ _HOSTNAME_RE = re.compile(
     r"(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$"
 )
 _FORBIDDEN_CHARS = re.compile(r"[\x00-\x1F\x7F-\x9F<>\"'`\\]")
+
+# Empty suffix_list_urls pins the bundled PSL snapshot — offline, deterministic
+# (cache_dir=None alone disables caching, not the first-call network fetch).
+_tld_extractor = tldextract.TLDExtract(cache_dir=None, suffix_list_urls=())
+
+
+def registrable_domain(value: str) -> str:
+    """Registrable (PSL) domain of a URL or bare host.
+
+    ``a.b.example.co.uk`` -> ``example.co.uk``. Hosts with no known public
+    suffix (localhost, intranet names, IP literals) fall back to the domain
+    label itself.
+    """
+    ext = _tld_extractor(value)
+    return f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain
+
+
+def is_registrable_apex(fqdn: str) -> bool:
+    """True when *fqdn* is a registrable apex (no subdomain), PSL-aware so
+    multi-part TLDs like ``co.uk`` work."""
+    ext = _tld_extractor(fqdn.strip("."))
+    return bool(ext.domain) and bool(ext.suffix) and not ext.subdomain
+
+
+def parse_destination(url: str | None) -> dict | None:
+    """Split a destination URL into indexable parts.
+
+    Returns ``{scheme, host, subdomain, registrable_domain}`` or ``None``
+    when there is no parseable hostname. Never raises: stamping destination
+    parts must never be the reason a link fails to save.
+
+    Normalisation: hostname is lowercased, trailing dot stripped, port and
+    userinfo discarded (``https://real.com@evil.com`` keys on ``evil.com``),
+    IDN encoded to punycode A-labels. IP literals and suffix-less hosts use
+    the host itself as their registrable key.
+    """
+    if not url:
+        return None
+    try:
+        parsed = urlsplit(url)
+        host = parsed.hostname
+    except ValueError:
+        return None
+    if not host:
+        return None
+    host = host.rstrip(".").lower()
+    if not host:
+        return None
+    if any(ord(ch) > 127 for ch in host):
+        # UTS-46 via idna (where a browser navigates); the stdlib codec is
+        # IDNA-2003 and would mis-key some IDN hosts. Failure keeps the host.
+        with contextlib.suppress(idna.IDNAError):
+            host = idna.encode(host, uts46=True).decode("ascii")
+    ext = _tld_extractor(host)
+    if ext.suffix:
+        registrable = f"{ext.domain}.{ext.suffix}"
+        subdomain = ext.subdomain
+    else:
+        registrable = host
+        subdomain = ""
+    return {
+        "scheme": parsed.scheme.lower(),
+        "host": host,
+        "subdomain": subdomain,
+        "registrable_domain": registrable,
+    }
 
 
 def extract_hostname(url: str | None) -> str | None:

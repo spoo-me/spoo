@@ -129,11 +129,13 @@ class ResolvedPublicLink:
     def effective_status(self) -> str:
         """Derived wire status (lowercase) — see ``v2_effective_status``.
 
-        v1/emoji docs have no status field and can never be inactive or
-        blocked — only "active" or (derived) "expired".
+        v1/emoji carry a ``blocked`` flag rather than a status machine; a
+        takedown must read as blocked on every public surface.
         """
         if self.is_v2:
             return v2_effective_status(self.v2_doc)
+        if (self.raw_v1 or {}).get("blocked"):
+            return "blocked"
         return "expired" if v1_is_expired(self.raw_v1) else "active"
 
     def created_at(self) -> datetime | None:

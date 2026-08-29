@@ -43,8 +43,7 @@ class TestEnsureTask:
 
     @pytest.mark.asyncio
     async def test_concurrent_upsert_race_is_success(self):
-        """Two processes racing the boot upsert on the unique _id: the
-        loser's E11000 means the doc exists — that's success, not failure."""
+        """Losing the boot-upsert race is success: the doc exists."""
         col = _col()
         col.update_one = AsyncMock(side_effect=DuplicateKeyError("E11000 dup key"))
         repo = ScheduledTaskRepository(col)
@@ -108,8 +107,7 @@ class TestClaimDue:
         doc = await repo.claim_due(names=("feed-sync",), lease_seconds=60)
         assert doc is not None
         assert doc.id == "feed-sync"
-        # The stamped token comes back on the doc so the runner can fence
-        # finish_run to this claim.
+        # The stamped token comes back on the doc to fence finish_run.
         assert doc.claim_token == "tok-1"
 
 
@@ -146,11 +144,7 @@ class TestFinishRun:
 
     @pytest.mark.asyncio
     async def test_reconciled_schedule_keeps_its_next_run_at(self):
-        """Deploy reconciles the task to a new schedule mid-run (claim_token
-        untouched, so the fence still matches). The old runner's finish must
-        release the lease and record the run, but its next_run_at was
-        computed from the OLD schedule — the $cond keeps the stored value
-        whenever the stored schedule no longer equals the executed one."""
+        """A mid-run schedule reconcile keeps its own next_run_at ($cond)."""
         col = _col()
         col.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
         repo = ScheduledTaskRepository(col)
@@ -184,9 +178,7 @@ class TestFinishRun:
 
     @pytest.mark.asyncio
     async def test_stale_finisher_noops(self):
-        """A handler that outran its lease finishes AFTER a re-claim stamped
-        a new token: no match, no write — the active claim keeps its lease
-        and run state."""
+        """A finisher whose lease was re-claimed matches nothing and writes nothing."""
         col = _col()
         col.update_one = AsyncMock(return_value=MagicMock(modified_count=0))
         repo = ScheduledTaskRepository(col)

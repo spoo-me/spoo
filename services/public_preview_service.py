@@ -108,7 +108,6 @@ class PublicPreviewService:
 
     def _v1_preview(self, link: ResolvedPublicLink) -> PublicPreviewResponse:
         data = link.raw_v1
-        # v1 has no status field and can never be inactive or blocked.
         status = link.effective_status()
         password_protected = bool(data.get("password"))
 

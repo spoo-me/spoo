@@ -24,5 +24,10 @@
     <div class="gif-upper"><img class="gif" src="https://i.ibb.co/BBQgtVS/error.webp" alt="404 GIF" loading="lazy"></div>
     <div class="error-message">
         <div class="error-text">{{ error_code }}, {{ error_message }}</div>
+        {% if error_appeal %}
+        <div class="error-appeal">{{ error_appeal }}
+            <a href="{{ error_appeal_href }}">{{ error_appeal_link }}</a>.
+        </div>
+        {% endif %}
     </div>
 {% endblock %}

@@ -98,6 +98,14 @@ def build_test_app(
         app.state.custom_domain_service = AsyncMock()
         app.state.feature_flag_service = AsyncMock()
         app.state.tenant_resolver = AsyncMock()
+        # A REAL permissive L0 gate (no providers): valid URLs pass,
+        # invalid/self-links reject — matches the pre-gate route behavior.
+        # Tests exercising blocks override get_url_policy instead.
+        from services.safety.policy import UrlPolicyService
+
+        app.state.url_policy = UrlPolicyService(
+            [], blocked_self_domains=[settings.system_default_domain]
+        )
         if extra_state:
             for key, value in extra_state.items():
                 setattr(app.state, key, value)

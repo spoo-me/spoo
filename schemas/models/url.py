@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from schemas.models.base import ANONYMOUS_OWNER_ID, MongoBaseModel, PyObjectId
 from shared.datetime_utils import as_aware_utc
+from shared.url_utils import parse_destination
 
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
 
@@ -128,6 +129,25 @@ class LinkMetaTags(BaseModel):
         return warnings
 
 
+class UrlDestination(BaseModel):
+    """Parsed destination parts, stamped at create/edit time.
+
+    Enables index-driven lookups (takedowns, sweeps, blocklist application)
+    over ``dest.registrable_domain`` without regex scans of long_url. Absent
+    on docs written before the backfill (``scripts/backfill_url_dest.py``).
+    """
+
+    scheme: str = ""
+    host: str = ""
+    subdomain: str = ""
+    registrable_domain: str = ""
+
+    @classmethod
+    def from_url(cls, url: str | None) -> UrlDestination | None:
+        parts = parse_destination(url)
+        return cls(**parts) if parts else None
+
+
 class UrlV2Doc(MongoBaseModel):
     """Document model for the `urlsV2` collection.
 
@@ -171,6 +191,9 @@ class UrlV2Doc(MongoBaseModel):
     # unknown-client, and legacy creations.
     created_via: str | None = None
     long_url: str
+    # Parsed destination parts (see UrlDestination). None/absent when the
+    # destination had no parseable hostname or the doc predates the backfill.
+    dest: UrlDestination | None = None
     password: str | None = None
     block_bots: bool | None = None
     max_clicks: int | None = Field(default=None, ge=0)
@@ -179,6 +202,14 @@ class UrlV2Doc(MongoBaseModel):
     # long_url stays the fallback for unmatched countries. None = no targeting.
     geo_rules: dict[str, str] | None = None
     status: UrlStatus = UrlStatus.ACTIVE
+    # Enforcement audit trail, stamped when safety flips status to BLOCKED.
+    # ``updated_at`` is lossy (any later touch overwrites); these survive.
+    # Also the only reason-of-record for per-link blocks, which
+    # deliberately write no host-wide verdict.
+    blocked_at: datetime | None = None
+    blocked_reason: str | None = None
+    # Stamped on reversal; blocked_at/blocked_reason stay.
+    unblocked_at: datetime | None = None
     private_stats: bool | None = True  # None for anonymous/unowned URLs
     meta_tags: LinkMetaTags | None = None
     total_clicks: int = Field(default=0, ge=0)
@@ -235,6 +266,23 @@ class LegacyUrlDoc(MongoBaseModel):
 
     url: str
     password: str | None = None
+
+    # Safety enforcement. v1 predates the v2 status machine; a single
+    # ``blocked`` flag is the whole state space it needs (absent = active,
+    # so ten million untouched docs stay valid with zero backfill).
+    # Blocking beats the historical manual delete: evidence preserved,
+    # reversible, and the clicker gets the 451 instead of a bare 404.
+    blocked: bool = False
+    blocked_at: datetime | None = None
+    blocked_reason: str | None = None
+    unblocked_at: datetime | None = None
+
+    @property
+    def effective_status(self) -> UrlStatus:
+        """v1 has no status machine, so the flag IS the state. A property,
+        like the v2 twin: two funnels with different call conventions is
+        how a caller gets a TypeError on a live route."""
+        return UrlStatus.BLOCKED if self.blocked else UrlStatus.ACTIVE
 
     # Hyphenated field names — use aliases matching exact MongoDB keys
     max_clicks: int | None = Field(default=None, alias="max-clicks")

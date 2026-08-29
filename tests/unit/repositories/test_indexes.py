@@ -22,6 +22,8 @@ class TestEnsureIndexes:
         tokens_col = AsyncMock()
 
         page_layouts_col = AsyncMock()
+        urls_legacy_col = AsyncMock()
+        emojis_col = AsyncMock()
         app_grants_col = AsyncMock()
         feature_flags_col = AsyncMock()
         custom_domains_col = AsyncMock()
@@ -30,11 +32,15 @@ class TestEnsureIndexes:
         webhook_events_col = AsyncMock()
         webhook_endpoints_col = AsyncMock()
         webhook_deliveries_col = AsyncMock()
+        safety_verdicts_col = AsyncMock()
+        feed_domains_col = AsyncMock()
         scheduled_tasks_col = AsyncMock()
 
         db.__getitem__ = lambda self, name: {
             "users": users_col,
             "urlsV2": urls_v2_col,
+            "urls": urls_legacy_col,
+            "emojis": emojis_col,
             "clicks": clicks_col,
             "api-keys": api_keys_col,
             "verification-tokens": tokens_col,
@@ -47,6 +53,8 @@ class TestEnsureIndexes:
             "webhook-events": webhook_events_col,
             "webhook-endpoints": webhook_endpoints_col,
             "webhook-deliveries": webhook_deliveries_col,
+            "safety_verdicts": safety_verdicts_col,
+            "safety_feed_domains": feed_domains_col,
             "scheduled_tasks": scheduled_tasks_col,
         }[name]
 
@@ -85,6 +93,16 @@ class TestEnsureIndexes:
         webhook_deliveries_col.create_index.assert_any_await(
             [("created_at", 1)], expireAfterSeconds=2_592_000, name="ttl_created_at"
         )
+        # Safety verdicts: one per destination host.
+        safety_verdicts_col.create_index.assert_any_await([("host", 1)], unique=True)
+        safety_verdicts_col.create_index.assert_any_await([("registrable_domain", 1)])
+        feed_domains_col.create_index.assert_any_await([("feed", 1), ("synced_at", 1)])
+        # Destination decomposition: sparse dest_registrable on all three
+        # url collections (pre-backfill docs lack `dest`).
+        for _c in (urls_v2_col, urls_legacy_col, emojis_col):
+            _c.create_index.assert_any_await(
+                [("dest.registrable_domain", 1)], name="dest_registrable", sparse=True
+            )
         # Scheduler: the task runner's claim index.
         scheduled_tasks_col.create_index.assert_any_await(
             [("enabled", 1), ("next_run_at", 1)], name="ix_claim"

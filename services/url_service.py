@@ -58,6 +58,7 @@ from services.events.protocol import DomainEventSink
 from services.events.sinks import NullDomainEventSink
 from services.meta_tags.events import MetaImageValidateEvent
 from services.meta_tags.images import ingest_meta_image
+from services.safety.policy import UrlPolicyService
 from services.webhooks.payloads import (
     build_link_expired,
     event_changes,
@@ -76,6 +77,7 @@ from schemas.models.url import (
     LegacyUrlDoc,
     LinkMetaTags,
     SchemaVersion,
+    UrlDestination,
     UrlStatus,
     UrlV2Doc,
 )
@@ -97,7 +99,6 @@ from shared.url_utils import extract_hostname
 from shared.validators import (
     validate_alias,
     validate_blocked_url,
-    validate_url,
 )
 
 log = get_logger(__name__)
@@ -107,42 +108,31 @@ AliasCheckResult = Literal[
 ]
 
 
-def _validate_geo_rules(
+def _validate_geo_rules_shape(
     rules: dict[str, str],
     *,
-    blocked_self_domains: tuple[str, ...],
-    patterns: Sequence[str],
-    timeout: float,
     max_countries: int,
+    enabled: bool = True,
 ) -> None:
-    """Validate a geo_rules map: entry cap, real ISO codes, URL safety.
-
-    Keys are already uppercase-normalised (and deduplicated) by the DTO
-    validator. Every destination URL gets the same two-stage validation as
-    long_url: format/self-link check plus the DB blocklist. Callers fetch
-    the blocklist patterns once and pass them in; ``max_countries`` comes
-    from settings (``geo_rules_max_countries``, self-hoster overridable).
+    """Entry cap + real ISO codes. Destination URL safety is NOT here — geo
+    targets go through the same ``url_policy.check`` gate as long_url.
 
     Raises:
         ValidationError: with field paths like ``geo_rules.IN``.
     """
+    if not enabled:
+        raise ValidationError("geo targeting is not available yet", field="geo_rules")
     if len(rules) > max_countries:
         raise ValidationError(
             f"geo_rules cannot exceed {max_countries} country entries",
             field="geo_rules",
         )
-    for code, url in rules.items():
+    for code in rules:
         if pycountry.countries.get(alpha_2=code) is None:
             raise ValidationError(
                 f"'{code}' is not a valid ISO 3166-1 alpha-2 country code",
                 field=f"geo_rules.{code}",
             )
-        if not validate_url(url, blocked_self_domains=blocked_self_domains):
-            raise ValidationError(
-                "URL is not allowed or invalid", field=f"geo_rules.{code}"
-            )
-        if not validate_blocked_url(url, patterns, timeout=timeout):
-            raise ValidationError("URL is blocked", field=f"geo_rules.{code}")
 
 
 # ── Field update handlers ────────────────────────────────────────────────────
@@ -162,18 +152,17 @@ async def _handle_long_url(
     request: UpdateUrlRequest, existing: UrlV2Doc, ops: dict, service: UrlService
 ) -> None:
     if request.long_url is not None and request.long_url != existing.long_url:
-        if not validate_url(
-            request.long_url, blocked_self_domains=service._blocked_self_domains
-        ):
-            raise ValidationError("URL is not allowed or invalid", field="long_url")
-        # Same blocklist check as create — an edit must not be a side door
-        # for destinations that would be rejected at creation.
-        patterns = await service._blocked_url_repo.get_patterns()
-        if not validate_blocked_url(
-            request.long_url, patterns, timeout=service._blocked_url_regex_timeout
-        ):
-            raise ValidationError("URL is blocked", field="long_url")
+        # Same gate as create — an edit must not be a side door for
+        # destinations that would be rejected at creation.
+        rejection = await service._url_policy.check(request.long_url)
+        if rejection is not None:
+            log.info("url_update_rejected", reason=rejection.code)
+            raise ValidationError(rejection.public_message, field="long_url")
         ops["long_url"] = request.long_url
+        # Destination changed -> re-stamp the parsed parts (meta_tags
+        # precedent: plain model_dump dicts go into ops).
+        dest = UrlDestination.from_url(request.long_url)
+        ops["dest"] = dest.model_dump() if dest else None
 
 
 async def _handle_alias(
@@ -316,15 +305,17 @@ async def _handle_geo_rules(
         # read-modify-write PATCH echoing unchanged rules must not 400
         # because a destination entered the blocklist since creation.
         return
-    patterns = await service._blocked_url_repo.get_patterns()
-    await asyncio.to_thread(
-        _validate_geo_rules,
+    _validate_geo_rules_shape(
         request.geo_rules,
-        blocked_self_domains=service._blocked_self_domains,
-        patterns=patterns,
-        timeout=service._blocked_url_regex_timeout,
         max_countries=service._geo_rules_max_countries,
+        enabled=service._geo_rules_enabled,
     )
+    for geo_code, geo_url in request.geo_rules.items():
+        rejection = await service._url_policy.check(geo_url)
+        if rejection is not None:
+            raise ValidationError(
+                rejection.public_message, field=f"geo_rules.{geo_code}"
+            )
     ops["geo_rules"] = request.geo_rules
 
 
@@ -419,12 +410,14 @@ class UrlService:
         url_cache: UrlCache,
         blocked_self_domains: list[str],
         system_default_domain: str,
+        url_policy: UrlPolicyService,
         blocked_url_regex_timeout: float = 0.2,
         max_emoji_alias_length: int = 15,
         emoji_accept_max_version: float = 15.1,
         emoji_generate_max_version: float = 12.0,
         emoji_generated_alias_length: int = 3,
         geo_rules_max_countries: int = 50,
+        geo_rules_enabled: bool = False,
         og_writethrough: OgEdgeWritethrough | None = None,
         edge_kv: CloudflareKVClient | None = None,
         r2_storage: R2StorageClient | None = None,
@@ -439,6 +432,10 @@ class UrlService:
         self._blocked_url_repo = blocked_url_repo
         self._url_cache = url_cache
         self._blocked_self_domains = blocked_self_domains
+        # The L0 gate — sole authority on whether a destination may be
+        # written (create AND edit). Shares provider instances with the
+        # safety analyzer via the wiring.
+        self._url_policy = url_policy
         # The only domain on which v1/legacy lookups fire — custom domains
         # are v2-only by definition.
         self._system_default_domain = system_default_domain
@@ -448,6 +445,7 @@ class UrlService:
         self._emoji_generate_max_version = emoji_generate_max_version
         self._emoji_generated_alias_length = emoji_generated_alias_length
         self._geo_rules_max_countries = geo_rules_max_countries
+        self._geo_rules_enabled = geo_rules_enabled
         # Edge KV write-through for og-links; None when edge cache is
         # unconfigured (self-host) — origin then serves all previews.
         self._og_writethrough = og_writethrough
@@ -504,10 +502,11 @@ class UrlService:
         cached = await self._url_cache.get(short_code, scope)
         if cached is not None:
             schema = cached.schema_version
-            if schema == SchemaVersion.V2 and cached.url_status in (
-                UrlStatus.BLOCKED,
-                UrlStatus.EXPIRED,
-                UrlStatus.INACTIVE,
+            # BLOCKED raises on every schema (v1/emoji carry the safety
+            # flag); EXPIRED/INACTIVE only exist on v2.
+            if cached.url_status == UrlStatus.BLOCKED or (
+                schema == SchemaVersion.V2
+                and cached.url_status in (UrlStatus.EXPIRED, UrlStatus.INACTIVE)
             ):
                 log.info(
                     "url_resolve_non_active",
@@ -543,11 +542,11 @@ class UrlService:
         # 3. Populate cache according to caching rules
         await self._populate_cache(short_code, url_cache_data, schema)
 
-        # 4a. Raise for non-ACTIVE v2 (after caching minimal data)
-        if schema == SchemaVersion.V2 and url_cache_data.url_status in (
-            UrlStatus.BLOCKED,
-            UrlStatus.EXPIRED,
-            UrlStatus.INACTIVE,
+        # 4a. Raise for non-ACTIVE (after caching minimal data). BLOCKED
+        # applies to every schema; EXPIRED/INACTIVE are v2-only states.
+        if url_cache_data.url_status == UrlStatus.BLOCKED or (
+            schema == SchemaVersion.V2
+            and url_cache_data.url_status in (UrlStatus.EXPIRED, UrlStatus.INACTIVE)
         ):
             log.info(
                 "url_resolve_non_active",
@@ -803,41 +802,29 @@ class UrlService:
         target_domain = domain or self._system_default_domain
         now = datetime.now(timezone.utc)
 
-        # 1. Validate the long URL (self-link check + format)
-        if not validate_url(
-            request.long_url, blocked_self_domains=self._blocked_self_domains
-        ):
-            log.info(
-                "url_create_rejected",
-                reason="invalid_url",
-            )
-            raise ValidationError("URL is not allowed or invalid", field="long_url")
+        # 1+2. The L0 gate: format + self-link + every registered policy
+        # provider (operator patterns, threat feeds). Precise reason is
+        # logged by the gate; the wire message stays coarse for security
+        # rejections.
+        rejection = await self._url_policy.check(request.long_url)
+        if rejection is not None:
+            log.info("url_create_rejected", reason=rejection.code)
+            raise ValidationError(rejection.public_message, field="long_url")
 
-        # 2. Check against DB blocked patterns
-        # validate_blocked_url returns True if allowed, False if blocked
-        blocked_patterns = await self._blocked_url_repo.get_patterns()
-        if not validate_blocked_url(
-            request.long_url, blocked_patterns, timeout=self._blocked_url_regex_timeout
-        ):
-            log.info(
-                "url_create_rejected",
-                reason="blocked_pattern",
-            )
-            raise ValidationError("URL is blocked", field="long_url")
-
-        # 2b. Geo rules — every destination gets the same two-stage validation
-        # as long_url (patterns already fetched above). Off the event loop:
-        # up to max_countries * len(patterns) synchronous regex scans, and
-        # the blocklist only grows.
+        # 2b. Every geo destination runs the FULL gate, same as long_url.
         if request.geo_rules:
-            await asyncio.to_thread(
-                _validate_geo_rules,
+            _validate_geo_rules_shape(
                 request.geo_rules,
-                blocked_self_domains=self._blocked_self_domains,
-                patterns=blocked_patterns,
-                timeout=self._blocked_url_regex_timeout,
                 max_countries=self._geo_rules_max_countries,
+                enabled=self._geo_rules_enabled,
             )
+            for geo_code, geo_url in request.geo_rules.items():
+                geo_rejection = await self._url_policy.check(geo_url)
+                if geo_rejection is not None:
+                    log.info("url_create_rejected", reason=geo_rejection.code)
+                    raise ValidationError(
+                        geo_rejection.public_message, field=f"geo_rules.{geo_code}"
+                    )
         # Meta-tags: resolve data-URI uploads to R2 URLs, then run abuse
         # checks (the route layer already gated the feature itself).
         meta_req = request.meta_tags
@@ -899,6 +886,7 @@ class UrlService:
             creation_ip=client_ip,
             created_via=created_via,
             long_url=request.long_url,
+            dest=UrlDestination.from_url(request.long_url),
             password=password_hash,
             block_bots=request.block_bots,
             max_clicks=request.max_clicks,
@@ -923,15 +911,20 @@ class UrlService:
             ),
         )
         doc = url_doc.model_dump(by_alias=True, exclude={"id"})
-        # Claim fields must be ABSENT (not null) when unset: the claimed-set
-        # partial index filters on $exists, and $exists matches nulls.
-        for _claim_field in ("claim_token_hash", "claimed_at"):
-            if doc.get(_claim_field) is None:
-                doc.pop(_claim_field, None)
+        # These fields must be ABSENT (not null) when unset: the claim pair
+        # feeds the owner_claimed partial index ($exists matches nulls) and
+        # dest feeds the sparse dest_registrable index.
+        for _absent_if_none in ("claim_token_hash", "claimed_at", "dest"):
+            if doc.get(_absent_if_none) is None:
+                doc.pop(_absent_if_none, None)
 
         # 8. Insert
         inserted_id = await self._url_repo.insert(doc)
         url_doc.id = inserted_id
+
+        # L1 accumulation: count the successful create (best-effort, the
+        # policy service never raises from here).
+        await self._url_policy.record_create(request.long_url)
 
         _url_base = request.long_url.split("?")[0]
         _log_url = f"{_url_base}?[REDACTED]" if "?" in request.long_url else _url_base
@@ -1099,8 +1092,14 @@ class UrlService:
 
         update_ops["updated_at"] = now
 
-        # 4. Persist
-        await self._url_repo.update(url_id, {"$set": update_ops})
+        # 4. Persist. A None dest is unset: absent-not-null parity with create.
+        update_doc: dict = {"$set": update_ops}
+        if "dest" in update_ops and update_ops["dest"] is None:
+            update_doc = {
+                "$set": {k: v for k, v in update_ops.items() if k != "dest"},
+                "$unset": {"dest": ""},
+            }
+        await self._url_repo.update(url_id, update_doc)
 
         # 5. Invalidate cache. Always clear the pre-change (alias, domain) so a
         # rename or move can't be served stale from the old key. When the new
@@ -1674,7 +1673,9 @@ def _legacy_doc_to_cache(
         password_hash=doc.password,
         expiration_time=expiration_time,
         max_clicks=doc.max_clicks,
-        url_status=UrlStatus.ACTIVE,
+        # v1/emoji have no status machine — the safety ``blocked`` flag is
+        # the only non-ACTIVE state they can be in.
+        url_status=UrlStatus.BLOCKED if doc.blocked else UrlStatus.ACTIVE,
         schema_version=schema_version,
         total_clicks=doc.total_clicks,
         owner_id=None,

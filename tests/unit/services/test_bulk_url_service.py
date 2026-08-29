@@ -53,6 +53,12 @@ def make_bulk_service(
     )
 
 
+def _make_gate():
+    from services.safety.policy import UrlPolicyService
+
+    return UrlPolicyService([], blocked_self_domains=[SYSTEM_DEFAULT_DOMAIN])
+
+
 def make_kv() -> MagicMock:
     kv = MagicMock()
     kv.bulk_delete = AsyncMock(return_value=True)
@@ -475,6 +481,7 @@ def make_single_item_service(url_repo, url_cache, og_writethrough=None, edge_kv=
         url_cache=url_cache,
         blocked_self_domains=[SYSTEM_DEFAULT_DOMAIN],
         system_default_domain=SYSTEM_DEFAULT_DOMAIN,
+        url_policy=_make_gate(),
         og_writethrough=og_writethrough,
         edge_kv=edge_kv,
     )

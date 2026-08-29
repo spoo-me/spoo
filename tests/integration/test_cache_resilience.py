@@ -96,6 +96,8 @@ def _make_url_service(
     blocked_url_repo = AsyncMock()
     blocked_url_repo.get_patterns = AsyncMock(return_value=[])
 
+    from services.safety.policy import UrlPolicyService
+
     return UrlService(
         url_repo,
         legacy_repo,
@@ -104,6 +106,7 @@ def _make_url_service(
         cache,
         [],
         system_default_domain="spoo.me",
+        url_policy=UrlPolicyService([], blocked_self_domains=[]),
     )
 
 

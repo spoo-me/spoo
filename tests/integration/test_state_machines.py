@@ -82,8 +82,23 @@ def make_url_service() -> tuple[UrlService, AsyncMock, AsyncMock, AsyncMock]:
         url_cache=url_cache,
         blocked_self_domains=["spoo.me"],
         system_default_domain="spoo.me",
+        url_policy=_make_gate(blocked_url_repo),
     )
     return service, url_repo, legacy_repo, url_cache
+
+
+def _make_gate(blocked_url_repo):
+    from services.safety.policy import UrlPolicyService
+    from services.safety.providers import BlockedPatternProvider
+
+    return UrlPolicyService(
+        [
+            BlockedPatternProvider(
+                blocked_url_repo, regex_timeout=0.2, patterns_ttl_seconds=0
+            )
+        ],
+        blocked_self_domains=["spoo.me"],
+    )
 
 
 def make_token_doc(

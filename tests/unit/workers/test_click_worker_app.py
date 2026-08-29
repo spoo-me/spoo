@@ -98,6 +98,31 @@ class TestCreateWorkerApp:
         subscribers = app.brokers[0].subscribers
         assert {s.stream_sub.group for s in subscribers} == {"meta-image"}
 
+    def test_safety_adds_reader_and_claimer_pair(self):
+        settings = _settings()
+        settings.safety.enabled = True
+        app = create_worker_app(settings)
+        subscribers = app.brokers[0].subscribers
+        # stats + meta-image + safety, each a reader/claimer pair.
+        assert len(subscribers) == 6
+        safety_specs = [
+            s.stream_sub for s in subscribers if s.stream_sub.group == "safety"
+        ]
+        assert len(safety_specs) == 2
+        assert all(s.name == "events:safety" for s in safety_specs)
+
+    def test_safety_only_mode_boots_the_worker(self):
+        """A deployment can run the worker purely for safety analysis."""
+        settings = AppSettings()
+        settings.click_events = ClickEventsSettings(
+            sink="inline", queue_redis_uri="redis://localhost:6399/0"
+        )
+        settings.meta_tags.async_image_validation = False
+        settings.safety.enabled = True
+        app = create_worker_app(settings)
+        subscribers = app.brokers[0].subscribers
+        assert {s.stream_sub.group for s in subscribers} == {"safety"}
+
     def test_health_route_registered(self):
         app = create_worker_app(_settings())
         assert "/health" in dict(app.routes)

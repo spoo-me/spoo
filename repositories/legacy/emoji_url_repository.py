@@ -8,6 +8,7 @@ which MongoDB collection operations target.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from pymongo.errors import DuplicateKeyError, PyMongoError, WriteError
@@ -26,6 +27,80 @@ class EmojiUrlRepository(BaseRepository[EmojiUrlDoc]):
     async def find_by_id(self, alias: str) -> EmojiUrlDoc | None:
         """Find an emoji URL document by its alias (_id)."""
         return await self._find_one({"_id": alias})
+
+    async def count_by_dest_host(self, host: str) -> int:
+        """Emoji links pointing at *host* (via the stamped dest subdoc) —
+        same count surface as LegacyUrlRepository's."""
+        return await self._count({"dest.host": host})
+
+    # ── Safety enforcement surface ────────────────────────────────────────
+    # Mirrors LegacyUrlRepository (this class deliberately does not inherit
+    # it); see there for the collect-then-flip ordering rationale.
+
+    async def list_by_dest_host(
+        self, host: str, *, limit: int = 50_000
+    ) -> list[tuple[str, str]]:
+        """(alias, url) of every emoji link pointing at *host*, regardless
+        of blocked state — see LegacyUrlRepository.list_by_dest_host."""
+        cursor = self._col.find({"dest.host": host}, {"_id": 1, "url": 1}).limit(limit)
+        docs = await cursor.to_list(length=limit)
+        if len(docs) >= limit:
+            log.warning("dest_host_listing_truncated", host=host, limit=limit)
+        return [(d["_id"], d.get("url", "")) for d in docs]
+
+    async def unblock_by_dest_host(self, host: str) -> int:
+        """Reverse a safety host block on emoji links. Stamps stay,
+        ``unblocked_at`` records the reversal."""
+        result = await self._col.update_many(
+            {"dest.host": host, "blocked": True},
+            {
+                "$unset": {"blocked": ""},
+                "$set": {"unblocked_at": datetime.now(timezone.utc)},
+            },
+        )
+        return int(result.modified_count)
+
+    async def block_by_ids(self, aliases: list[str], *, reason: str) -> int:
+        """Flip specific not-yet-blocked emoji links by alias."""
+        if not aliases:
+            return 0
+        result = await self._col.update_many(
+            {"_id": {"$in": aliases}, "blocked": {"$ne": True}},
+            {
+                "$set": {
+                    "blocked": True,
+                    "blocked_at": datetime.now(timezone.utc),
+                    "blocked_reason": reason,
+                }
+            },
+        )
+        return int(result.modified_count)
+
+    async def block_by_dest_host(self, host: str, *, reason: str) -> int:
+        """Flip every not-yet-blocked emoji link pointing at *host*."""
+        result = await self._col.update_many(
+            {"dest.host": host, "blocked": {"$ne": True}},
+            {
+                "$set": {
+                    "blocked": True,
+                    "blocked_at": datetime.now(timezone.utc),
+                    "blocked_reason": reason,
+                }
+            },
+        )
+        return int(result.modified_count)
+
+    async def unblock(self, alias: str) -> bool:
+        """Reverse a safety block on one emoji link; stamps stay. The caller
+        owns cache eviction (canonical VS16 key)."""
+        result = await self._col.update_one(
+            {"_id": alias, "blocked": True},
+            {
+                "$unset": {"blocked": ""},
+                "$set": {"unblocked_at": datetime.now(timezone.utc)},
+            },
+        )
+        return bool(result.modified_count)
 
     async def insert(self, alias: str, url_data: dict) -> None:
         """Insert a new emoji URL document with the alias as _id.

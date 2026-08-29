@@ -5,3 +5,10 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+  - repo: local
+    hooks:
+      - id: no-comment-blocks
+        name: no multi-line comment blocks
+        entry: python3 scripts/hooks/no_comment_blocks.py
+        language: system
+        types: [python]

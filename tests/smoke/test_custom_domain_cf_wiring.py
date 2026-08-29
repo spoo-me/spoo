@@ -43,6 +43,8 @@ def _wire(custom_domains: CustomDomainSettings):
         "webhook-events": MagicMock(name="webhook-events"),
         "webhook-endpoints": MagicMock(name="webhook-endpoints"),
         "webhook-deliveries": MagicMock(name="webhook-deliveries"),
+        "safety_verdicts": MagicMock(name="safety_verdicts"),
+        "safety_feed_domains": MagicMock(name="safety_feed_domains"),
         "scheduled_tasks": MagicMock(name="scheduled_tasks"),
     }
     app.state.http_client = MagicMock()

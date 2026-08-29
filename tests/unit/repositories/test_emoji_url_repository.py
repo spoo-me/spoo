@@ -134,3 +134,53 @@ class TestEmojiUrlRepository:
         cursor = col.aggregate.return_value
         cursor.to_list = AsyncMock(return_value=[])
         assert await self._repo(col).aggregate([]) is None
+
+
+class TestCountByDestHost:
+    @pytest.mark.asyncio
+    async def test_filters_on_stamped_dest_host(self):
+        from repositories.legacy.emoji_url_repository import EmojiUrlRepository
+
+        col = AsyncMock()
+        col.name = "emojis"
+        col.count_documents = AsyncMock(return_value=3)
+        repo = EmojiUrlRepository(col)
+        assert await repo.count_by_dest_host("evil.com") == 3
+        col.count_documents.assert_awaited_once_with({"dest.host": "evil.com"})
+
+
+class TestEmojiSafetyBlockSurface:
+    """The emoji repo deliberately does not inherit LegacyUrlRepository —
+    these pins keep its hand-mirrored safety surface from drifting."""
+
+    def _repo(self, col):
+        from repositories.legacy.emoji_url_repository import EmojiUrlRepository
+
+        col.name = "emojis"
+        return EmojiUrlRepository(col)
+
+    @pytest.mark.asyncio
+    async def test_block_by_dest_host_mirrors_legacy(self):
+        col = make_collection()
+        col.update_many = AsyncMock(return_value=MagicMock(modified_count=2))
+        assert await self._repo(col).block_by_dest_host("evil.com", reason="phish") == 2
+        flt, ops = col.update_many.await_args.args
+        assert flt == {"dest.host": "evil.com", "blocked": {"$ne": True}}
+        assert ops["$set"]["blocked_reason"] == "phish"
+
+    @pytest.mark.asyncio
+    async def test_list_by_dest_host_is_status_blind(self):
+        col = make_collection()
+        col.find.return_value.to_list = AsyncMock(
+            return_value=[{"_id": "⭐️🎉", "url": "https://evil.com/a"}]
+        )
+        assert await self._repo(col).list_by_dest_host("evil.com") == [
+            ("⭐️🎉", "https://evil.com/a")
+        ]
+        assert col.find.call_args.args[0] == {"dest.host": "evil.com"}
+
+    @pytest.mark.asyncio
+    async def test_unblock(self):
+        col = make_collection()
+        col.update_one = AsyncMock(return_value=MagicMock(modified_count=0))
+        assert await self._repo(col).unblock("⭐") is False

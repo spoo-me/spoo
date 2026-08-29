@@ -158,6 +158,14 @@ def _make_v2_doc(alias: str, domain: str = _DOMAIN) -> UrlV2Doc:
     )
 
 
+class _CapturingSafetySink:
+    def __init__(self) -> None:
+        self.events: list[Any] = []
+
+    async def emit(self, event: Any) -> None:
+        self.events.append(event)
+
+
 def _build_service(
     *,
     v2_docs: list[UrlV2Doc] | None = None,
@@ -165,6 +173,7 @@ def _build_service(
     emoji_docs: dict[str, dict[str, Any]] | None = None,
     captcha: _FakeCaptcha | None = None,
     notifier: _FakeNotifier | None = None,
+    safety_sink: _CapturingSafetySink | None = None,
 ) -> tuple[ReportIntakeService, _FakeReportsCollection, _FakeSubmissionsCollection]:
     reports_col = _FakeReportsCollection()
     submissions_col = _FakeSubmissionsCollection()
@@ -183,6 +192,7 @@ def _build_service(
         captcha if captcha is not None else _FakeCaptcha(),
         notifier if notifier is not None else _FakeNotifier(),
         system_default_domain=_DOMAIN,
+        safety_sink=safety_sink,
     )
     return service, reports_col, submissions_col
 
@@ -660,3 +670,49 @@ def test_anonymous_rate_limit_smoke():
     # REPORTS_ANON = "5 per minute; 40 per day" — the 6th submission trips.
     assert statuses[:5] == [200] * 5
     assert statuses[5] == 429
+
+
+# ── Safety enqueue ────────────────────────────────────────────────────────────
+
+
+def test_accepted_reports_enqueue_safety_analysis_deduped_by_host():
+    """Each accepted report enqueues one analysis request per distinct
+    destination host, with reasons and reported codes merged."""
+    doc_a = _make_v2_doc("aaa1234")
+    doc_a.long_url = "https://kit.evil.com/login1"
+    doc_b = _make_v2_doc("bbb1234")
+    doc_b.long_url = "https://kit.evil.com/login2"
+    doc_c = _make_v2_doc("ccc1234")
+    doc_c.long_url = "https://other.scam.net/x"
+    sink = _CapturingSafetySink()
+    service, _, _ = _build_service(v2_docs=[doc_a, doc_b, doc_c], safety_sink=sink)
+
+    with _client(service) as c:
+        resp = c.post(
+            _URL,
+            json={
+                "items": [
+                    {"code_or_url": "aaa1234", "reason": "phishing"},
+                    {"code_or_url": "bbb1234", "reason": "malware"},
+                    {"code_or_url": "ccc1234", "reason": "phishing"},
+                ]
+            },
+        )
+    assert resp.status_code == 200
+    assert resp.json()["accepted"] == 3
+
+    by_host = {e.host: e for e in sink.events}
+    assert set(by_host) == {"kit.evil.com", "other.scam.net"}
+    merged = by_host["kit.evil.com"]
+    assert merged.registrable_domain == "evil.com"
+    assert merged.trigger == "report"
+    assert set(merged.context["reasons"]) == {"phishing", "malware"}
+    assert len(merged.context["reported_codes"]) == 2
+
+
+def test_safety_sink_absent_means_no_enqueue_and_no_failure():
+    service, reports_col, _ = _build_service(v2_docs=[_make_v2_doc("abc1234")])
+    with _client(service) as c:
+        resp = c.post(_URL, json={"items": _items("abc1234")})
+    assert resp.status_code == 200
+    assert len(reports_col.update_calls) == 1

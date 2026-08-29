@@ -52,17 +52,13 @@ class TaskScheduler:
                 log.info("task_scheduler_stopped")
                 raise
             except Exception as exc:
-                # Transient Mongo trouble at boot (or losing the ensure_task
-                # upsert race) must not kill the scheduler for the process
-                # lifetime — log and retry until cancelled.
+                # Transient boot trouble must not kill the scheduler for good.
                 log.error(
                     "task_registry_sync_failed",
                     error=str(exc),
                     error_type=type(exc).__name__,
                 )
                 await asyncio.sleep(self._poll_interval)
-        # Registrations are fixed before run() starts, so the claim scope
-        # is computed once.
         names = tuple(t.name for t in self._registry.all())
         log.info(
             "task_scheduler_started",
@@ -122,10 +118,8 @@ class TaskScheduler:
         name = row.id or ""
         task = self._registry.get(name)
         if task is None:
-            # Defensive only — claim_due is scoped to registered names, so
-            # this should be unreachable. Never finish_run here: consuming
-            # the occurrence would swallow a run that belongs to a process
-            # WITH the handler; letting the lease expire self-heals.
+            # Unreachable (claim_due is names-scoped). Never finish_run here:
+            # that would swallow a run belonging to a process WITH the handler.
             log.warning("task_unknown", task=name)
             return
 

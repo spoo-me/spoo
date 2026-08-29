@@ -19,6 +19,8 @@ async def ensure_indexes(
 ) -> None:
     users_col = db["users"]
     urls_v2_col = db["urlsV2"]
+    urls_legacy_col = db["urls"]
+    emojis_col = db["emojis"]
     clicks_col = db["clicks"]
     api_keys_col = db["api-keys"]
     page_layouts_col = db["page-layouts"]
@@ -62,6 +64,29 @@ async def ensure_indexes(
         name="owner_claimed",
         partialFilterExpression={"claimed_at": {"$exists": True}},
     )
+
+    # ── safety_verdicts ────────────────────────────────────────────────────
+    # One verdict per destination host; sweeps pivot on registrable domain.
+    verdicts_col = db["safety_verdicts"]
+    await verdicts_col.create_index([("host", 1)], unique=True)
+    await verdicts_col.create_index([("registrable_domain", 1)])
+    await verdicts_col.create_index([("updated_at", -1)])
+
+    # ── safety_feed_domains ────────────────────────────────────────────────
+    # Membership checks ride _id ("<feed>:<domain>"); this index serves the
+    # per-feed stale purge on sync and per-feed counts.
+    feed_domains_col = db["safety_feed_domains"]
+    await feed_domains_col.create_index([("feed", 1), ("synced_at", 1)])
+
+    # ── destination decomposition (url-safety) ─────────────────────────────
+    # Sparse: unparseable destinations are `dest: null` (backfill) or absent
+    # (create/edit); neither yields the nested paths, so sparse excludes both.
+    for _url_col in (urls_v2_col, urls_legacy_col, emojis_col):
+        await _url_col.create_index(
+            [("dest.registrable_domain", 1)], name="dest_registrable", sparse=True
+        )
+        # Every enforcement query is an equality match on dest.host.
+        await _url_col.create_index([("dest.host", 1)], name="dest_host", sparse=True)
 
     # ── clicks (time-series) ───────────────────────────────────────────────
     # Create the time-series collection if it doesn't exist yet.

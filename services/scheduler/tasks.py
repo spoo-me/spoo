@@ -9,6 +9,8 @@ gate themselves on their own settings.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from infrastructure.logging import get_logger
 from services.scheduler.registry import ScheduledTask, TaskRegistry
 
@@ -25,9 +27,16 @@ async def _heartbeat() -> dict | None:
     return {}
 
 
-def build_task_registry() -> TaskRegistry:
+def build_task_registry(
+    extra: Sequence[ScheduledTask] = (),
+) -> TaskRegistry:
+    """Built-in tasks plus the caller's feature tasks. The caller (wiring
+    or the worker runtime) constructs feature tasks with their own
+    dependencies and passes them in — this module never imports features."""
     registry = TaskRegistry()
     registry.register(
         ScheduledTask(name=HEARTBEAT_TASK, fn=_heartbeat, schedule="0 * * * *")
     )
+    for task in extra:
+        registry.register(task)
     return registry

@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-import tldextract
 from bson import ObjectId
 from ua_parser import Result
 from ua_parser import parse as ua_parse
@@ -28,10 +27,9 @@ from schemas.models.click import ClickDoc, ClickMeta
 from services.click.bot_detection import get_bot_name, is_bot_request
 from services.click.protocol import ClickContext
 from services.events.protocol import DomainEventSink
+from shared.url_utils import registrable_domain
 
 log = get_logger(__name__)
-
-_tld_extractor = tldextract.TLDExtract(cache_dir=None)
 
 _DESKTOP_OS_FAMILIES = frozenset(
     {"Windows", "Mac OS X", "Linux", "Chrome OS", "Ubuntu", "Fedora"}
@@ -129,8 +127,7 @@ class V2ClickHandler:
         # Referrer sanitization (v2 style)
         sanitized_referrer: str | None = None
         if referrer:
-            ext = _tld_extractor(referrer)
-            domain = f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain
+            domain = registrable_domain(referrer)
             # Remove MongoDB-unsafe chars and control characters
             domain = re.sub(r"[$\x00-\x1F\x7F-\x9F]", "_", domain)
             sanitized_referrer = re.sub(r"[^a-zA-Z0-9.-]", "_", domain)
@@ -283,8 +280,7 @@ class LegacyClickHandler:
         # Referrer extraction (v1 style — less sanitization than v2)
         referrer_domain: str | None = None
         if referrer:
-            ext = _tld_extractor(referrer)
-            domain = f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain
+            domain = registrable_domain(referrer)
             referrer_domain = re.sub(r"[.$\x00-\x1F\x7F-\x9F]", "_", domain)
 
         # GeoIP

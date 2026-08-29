@@ -39,3 +39,21 @@ body {
     letter-spacing: 5px;
     margin: 20px 0;
 }
+.error-appeal {
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: 0;
+    color: rgba(255, 255, 255, 0.72);
+    margin: 4px 0 24px;
+}
+
+.error-appeal a {
+    color: #fff;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.error-appeal a:hover {
+    color: rgba(255, 255, 255, 0.8);
+}

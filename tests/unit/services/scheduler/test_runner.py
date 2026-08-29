@@ -95,8 +95,7 @@ class TestSyncRegistry:
 class TestRun:
     @pytest.mark.asyncio
     async def test_boot_sync_retries_until_success(self):
-        """A transient Mongo error during boot-time sync must not escape
-        run() and kill the scheduler — retry until it lands."""
+        """A transient boot-sync error must not kill the scheduler; retry."""
         repo = _repo()
         repo.ensure_task = AsyncMock(side_effect=[PyMongoError("boot flake"), None])
         repo.claim_due = AsyncMock(return_value=None)
@@ -108,8 +107,7 @@ class TestRun:
 
     @pytest.mark.asyncio
     async def test_claim_scoped_to_registered_names(self):
-        """A runner only ever claims tasks it has a handler for, so a
-        deploy-overlap process can't swallow another process's occurrence."""
+        """A runner only ever claims tasks it has a handler for."""
         repo = _repo()
         repo.claim_due = AsyncMock(return_value=None)
         sched = TaskScheduler(repo, _registry_with("feed-sync"), poll_interval=0.005)
@@ -178,9 +176,7 @@ class TestExecute:
 
     @pytest.mark.asyncio
     async def test_unknown_task_logged_not_finished(self):
-        """Defensive only — the names-scoped claim makes this unreachable.
-        Never finish_run: consuming the occurrence would swallow a run the
-        process WITH the handler should get; the lease expiry self-heals."""
+        """An unknown task is logged, never finished: the lease expiry self-heals."""
         repo = _repo()
         await TaskScheduler(repo, TaskRegistry())._execute(_row("ghost"))
 
@@ -188,8 +184,7 @@ class TestExecute:
 
     @pytest.mark.asyncio
     async def test_finish_is_fenced_to_claim_token(self):
-        """The claim token from claim_due is threaded through to finish_run
-        so a superseded run can't clobber the active claim."""
+        """The claim token is threaded from claim_due through to finish_run."""
         reg = _registry_with("feed-sync")
         repo = _repo()
 

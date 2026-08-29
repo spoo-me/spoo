@@ -53,8 +53,7 @@ class ScheduledTaskRepository(BaseRepository[ScheduledTaskDoc]):
                 upsert=True,
             )
         except DuplicateKeyError:
-            # Two processes raced the boot upsert on the unique _id and the
-            # other one won the insert. The doc exists — that's success.
+            # Lost the boot-upsert race; the doc exists — that's success.
             log.debug("scheduled_task_upsert_race", task=name)
 
     async def reconcile_schedule(
@@ -78,9 +77,7 @@ class ScheduledTaskRepository(BaseRepository[ScheduledTaskDoc]):
         self, *, names: Iterable[str], lease_seconds: int
     ) -> ScheduledTaskDoc | None:
         """Atomically claim one due task among *names*, or None when nothing
-        is due. Scoping to the caller's registered names means a runner never
-        claims (and consumes the occurrence of) a task it has no handler for
-        — e.g. an older process during a deploy overlap.
+        is due; a runner never claims a task it has no handler for.
 
         BSON type bracketing means a null ``next_run_at`` (manual-only,
         not invoked) never matches the ``$lte`` date comparison. A crashed
@@ -121,16 +118,9 @@ class ScheduledTaskRepository(BaseRepository[ScheduledTaskDoc]):
         next_run_at: datetime | None,
     ) -> bool:
         """Record the outcome, release the lease, arm the next occurrence.
-
-        Fenced to the claim that executed the run: when *claim_token* no
-        longer matches (the run outlived its lease and another runner
-        re-claimed), this is a no-op returning False — the superseded
-        finisher must not clear the active claim's lease or overwrite its
-        run state.
-
-        *next_run_at* was computed from *schedule*; a pipeline $cond only
-        applies it while the stored schedule still matches, so a deploy that
-        reconciled the doc mid-run keeps its reconciled next_run_at."""
+        Fenced on *claim_token*: a superseded finisher is a no-op returning
+        False. The $cond applies *next_run_at* only while the stored schedule
+        still matches, so a mid-run reconcile keeps its own next_run_at."""
         write = await self._col.update_one(
             {"_id": name, "claim_token": claim_token},
             [
@@ -165,9 +155,6 @@ class ScheduledTaskRepository(BaseRepository[ScheduledTaskDoc]):
             {"$set": {"next_run_at": datetime.now(timezone.utc)}},
         )
         return bool(result.modified_count)
-
-    async def find_by_name(self, name: str) -> ScheduledTaskDoc | None:
-        return await self._find_one({"_id": name})
 
     async def list_names(self) -> set[str]:
         docs = await self._col.find({}, {"_id": 1}).to_list(length=None)

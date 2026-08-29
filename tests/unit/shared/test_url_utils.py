@@ -2,7 +2,14 @@
 
 import pytest
 
-from shared.url_utils import extract_fqdn, extract_hostname, normalise_fqdn
+from shared.url_utils import (
+    extract_fqdn,
+    extract_hostname,
+    is_registrable_apex,
+    normalise_fqdn,
+    parse_destination,
+    registrable_domain,
+)
 
 
 class TestExtractHostname:
@@ -93,3 +100,78 @@ class TestNormaliseFqdn:
     def test_rejects_invalid_inputs(self, value):
         with pytest.raises(ValueError):
             normalise_fqdn(value)
+
+
+class TestParseDestination:
+    def test_simple_https_url(self):
+        parts = parse_destination("https://example.com/path?q=1")
+        assert parts == {
+            "scheme": "https",
+            "host": "example.com",
+            "subdomain": "",
+            "registrable_domain": "example.com",
+        }
+
+    def test_subdomain_split(self):
+        parts = parse_destination("http://a.b.example.co.uk/x")
+        assert parts["host"] == "a.b.example.co.uk"
+        assert parts["subdomain"] == "a.b"
+        assert parts["registrable_domain"] == "example.co.uk"
+
+    def test_userinfo_spoof_uses_real_host(self):
+        # https://www.instagram.com@spoo.me/x — the instagram part is
+        # userinfo, the real host is spoo.me. Observed in a live campaign.
+        parts = parse_destination("https://www.instagram.com@spoo.me/MrNpzIk")
+        assert parts["host"] == "spoo.me"
+        assert parts["registrable_domain"] == "spoo.me"
+
+    def test_ip_literal_is_its_own_key(self):
+        parts = parse_destination("http://93.184.216.34:8080/x")
+        assert parts["host"] == "93.184.216.34"
+        assert parts["registrable_domain"] == "93.184.216.34"
+        assert parts["subdomain"] == ""
+
+    def test_idn_normalised_to_punycode(self):
+        parts = parse_destination("https://münchen.de/x")
+        assert parts["host"] == "xn--mnchen-3ya.de"
+        assert parts["registrable_domain"] == "xn--mnchen-3ya.de"
+
+    def test_uppercase_and_trailing_dot_normalised(self):
+        parts = parse_destination("HTTPS://ExAmPle.COM./x")
+        assert parts["scheme"] == "https"
+        assert parts["host"] == "example.com"
+
+    def test_port_discarded(self):
+        assert parse_destination("https://example.com:8443/")["host"] == "example.com"
+
+    def test_unparseable_returns_none(self):
+        assert parse_destination("not a url") is None
+        assert parse_destination("") is None
+        assert parse_destination(None) is None
+        assert parse_destination("https://[::1") is None  # ValueError path
+
+    def test_no_suffix_host_falls_back_to_host(self):
+        parts = parse_destination("http://localhost:8000/x")
+        assert parts["registrable_domain"] == "localhost"
+
+
+class TestRegistrableDomain:
+    def test_url_input(self):
+        assert registrable_domain("https://a.b.example.com/x") == "example.com"
+
+    def test_bare_host(self):
+        assert registrable_domain("news.bbc.co.uk") == "bbc.co.uk"
+
+    def test_no_suffix_returns_domain_part(self):
+        assert registrable_domain("localhost") == "localhost"
+
+
+class TestIsRegistrableApex:
+    def test_apex(self):
+        assert is_registrable_apex("example.co.uk") is True
+
+    def test_subdomain_is_not_apex(self):
+        assert is_registrable_apex("go.example.co.uk") is False
+
+    def test_bare_label_is_not_apex(self):
+        assert is_registrable_apex("localhost") is False

@@ -27,6 +27,7 @@ from dependencies import (
     get_db,
     get_redis,
     get_settings,
+    get_url_policy,
     get_url_service,
 )
 from errors import NotFoundError
@@ -41,6 +42,21 @@ from tests.conftest import build_test_app
 _STATIC_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static"
 )
+
+
+def _make_gate(blocked_repo):
+    """Real L0 gate over a mocked pattern repo (ttl=0 = always fresh)."""
+    from services.safety.policy import UrlPolicyService
+    from services.safety.providers import BlockedPatternProvider
+
+    return UrlPolicyService(
+        [
+            BlockedPatternProvider(
+                blocked_repo, regex_timeout=0.2, patterns_ttl_seconds=0
+            )
+        ],
+        blocked_self_domains=["spoo.me"],
+    )
 
 
 def _mock_db():
@@ -166,11 +182,9 @@ def test_shorten_url_json_success():
 
     # Patch the BlockedUrlRepository.get_patterns and LegacyUrlRepository
     with (
-        patch("routes.legacy.url_shortener.BlockedUrlRepository") as MockBlockedRepo,
         patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
         patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
     ):
-        MockBlockedRepo.return_value.get_patterns = AsyncMock(return_value=[])
         MockLegacyRepo.return_value.check_exists = AsyncMock(return_value=False)
         MockLegacyRepo.return_value.insert = AsyncMock(return_value=None)
         MockUrlRepo.return_value.check_alias_exists = AsyncMock(return_value=False)
@@ -186,6 +200,47 @@ def test_shorten_url_json_success():
     assert "short_url" in data
     assert "original_url" in data
     assert data["original_url"] == "https://example.com"
+
+
+def test_shorten_url_stamps_destination_parts():
+    """v1 creates carry the same parsed dest subdoc as v2, so safety
+    sweeps and takedown pivots cover the legacy collection."""
+    db = _mock_db()
+    blocked_col = MagicMock()
+    blocked_col.find = MagicMock(return_value=MagicMock())
+    blocked_col.find.return_value.to_list = AsyncMock(return_value=[])
+    db.__getitem__ = MagicMock(return_value=blocked_col)
+
+    url_svc = _mock_url_service()
+    settings = _mock_settings()
+
+    app = build_test_app(
+        legacy_url_router,
+        overrides={
+            get_db: lambda: db,
+            get_settings: lambda: settings,
+            get_url_service: lambda: url_svc,
+        },
+    )
+
+    with (
+        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+    ):
+        MockLegacyRepo.return_value.check_exists = AsyncMock(return_value=False)
+        MockLegacyRepo.return_value.insert = AsyncMock(return_value=None)
+        MockUrlRepo.return_value.check_alias_exists = AsyncMock(return_value=False)
+
+        with TestClient(app) as client:
+            resp = client.post(
+                "/",
+                data={"url": "https://a.evil.co.uk/kit"},
+                headers={"Accept": "application/json"},
+            )
+        assert resp.status_code == 200
+        inserted = MockLegacyRepo.return_value.insert.await_args.args[1]
+    assert inserted["dest"]["registrable_domain"] == "evil.co.uk"
+    assert inserted["dest"]["host"] == "a.evil.co.uk"
 
 
 def test_shorten_url_html_success_redirects_to_result():
@@ -204,11 +259,9 @@ def test_shorten_url_html_success_redirects_to_result():
     )
 
     with (
-        patch("routes.legacy.url_shortener.BlockedUrlRepository") as MockBlockedRepo,
         patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
         patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
     ):
-        MockBlockedRepo.return_value.get_patterns = AsyncMock(return_value=[])
         MockLegacyRepo.return_value.check_exists = AsyncMock(return_value=False)
         MockLegacyRepo.return_value.insert = AsyncMock(return_value=None)
         MockUrlRepo.return_value.check_alias_exists = AsyncMock(return_value=False)
@@ -233,20 +286,64 @@ def test_shorten_url_blocked_url_returns_403():
         },
     )
 
-    with (
-        patch("routes.legacy.url_shortener.BlockedUrlRepository") as MockBlockedRepo,
-        patch("routes.legacy.url_shortener.validate_blocked_url", return_value=False),
-    ):
-        MockBlockedRepo.return_value.get_patterns = AsyncMock(return_value=["evil.com"])
+    blocked_repo = MagicMock()
+    blocked_repo.get_patterns = AsyncMock(return_value=[r"evil\.com"])
+    app.dependency_overrides[get_url_policy] = lambda: _make_gate(blocked_repo)
 
-        with TestClient(app) as client:
-            resp = client.post(
-                "/",
-                data={"url": "https://evil.com"},
-                headers={"Accept": "application/json"},
-            )
+    with TestClient(app) as client:
+        resp = client.post(
+            "/",
+            data={"url": "https://evil.com"},
+            headers={"Accept": "application/json"},
+        )
     assert resp.status_code == 403
     assert "BlockedUrlError" in resp.json()
+
+
+def test_shorten_url_published_policy_message_reaches_the_wire():
+    """The published shortener-refusal message survives the legacy route."""
+    from services.safety.feeds import SHORTENER_FEED
+    from services.safety.policy import UrlPolicyService
+    from services.safety.providers import FeedDomainProvider
+
+    db = _mock_db()
+    settings = _mock_settings()
+    url_svc = _mock_url_service()
+
+    app = build_test_app(
+        legacy_url_router,
+        overrides={
+            get_db: lambda: db,
+            get_settings: lambda: settings,
+            get_url_service: lambda: url_svc,
+        },
+    )
+
+    feed_repo = MagicMock()
+    feed_repo.contains = AsyncMock(return_value=True)
+    gate = UrlPolicyService(
+        [
+            FeedDomainProvider(
+                feed_repo, feed=SHORTENER_FEED, reason_label="a link shortener"
+            )
+        ],
+        blocked_self_domains=["spoo.me"],
+        public_messages={
+            f"feed_{SHORTENER_FEED}": "Links to other URL shorteners are not allowed"
+        },
+    )
+    app.dependency_overrides[get_url_policy] = lambda: gate
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/",
+            data={"url": "https://bit.ly/abc"},
+            headers={"Accept": "application/json"},
+        )
+    assert resp.status_code == 403
+    assert resp.json()["BlockedUrlError"] == (
+        "Links to other URL shorteners are not allowed"
+    )
 
 
 def test_shorten_url_invalid_alias_returns_400():
@@ -263,15 +360,12 @@ def test_shorten_url_invalid_alias_returns_400():
         },
     )
 
-    with patch("routes.legacy.url_shortener.BlockedUrlRepository") as MockBlockedRepo:
-        MockBlockedRepo.return_value.get_patterns = AsyncMock(return_value=[])
-
-        with TestClient(app) as client:
-            resp = client.post(
-                "/",
-                data={"url": "https://example.com", "alias": "bad alias!!!"},
-                headers={"Accept": "application/json"},
-            )
+    with TestClient(app) as client:
+        resp = client.post(
+            "/",
+            data={"url": "https://example.com", "alias": "bad alias!!!"},
+            headers={"Accept": "application/json"},
+        )
     assert resp.status_code == 400
     assert "AliasError" in resp.json()
 
@@ -291,15 +385,12 @@ def test_shorten_url_alias_already_exists_returns_400():
         },
     )
 
-    with patch("routes.legacy.url_shortener.BlockedUrlRepository") as MockBlockedRepo:
-        MockBlockedRepo.return_value.get_patterns = AsyncMock(return_value=[])
-
-        with TestClient(app) as client:
-            resp = client.post(
-                "/",
-                data={"url": "https://example.com", "alias": "taken"},
-                headers={"Accept": "application/json"},
-            )
+    with TestClient(app) as client:
+        resp = client.post(
+            "/",
+            data={"url": "https://example.com", "alias": "taken"},
+            headers={"Accept": "application/json"},
+        )
     assert resp.status_code == 400
     assert "AliasError" in resp.json()
 
@@ -319,11 +410,9 @@ def test_shorten_url_invalid_password_returns_400():
     )
 
     with (
-        patch("routes.legacy.url_shortener.BlockedUrlRepository") as MockBlockedRepo,
         patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
         patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
     ):
-        MockBlockedRepo.return_value.get_patterns = AsyncMock(return_value=[])
         MockLegacyRepo.return_value.check_exists = AsyncMock(return_value=False)
         MockUrlRepo.return_value.check_alias_exists = AsyncMock(return_value=False)
 
@@ -352,11 +441,9 @@ def test_shorten_url_invalid_max_clicks_returns_400():
     )
 
     with (
-        patch("routes.legacy.url_shortener.BlockedUrlRepository") as MockBlockedRepo,
         patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
         patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
     ):
-        MockBlockedRepo.return_value.get_patterns = AsyncMock(return_value=[])
         MockLegacyRepo.return_value.check_exists = AsyncMock(return_value=False)
         MockUrlRepo.return_value.check_alias_exists = AsyncMock(return_value=False)
 
@@ -419,10 +506,8 @@ def test_emoji_success_json():
     )
 
     with (
-        patch("routes.legacy.url_shortener.BlockedUrlRepository") as MockBlockedRepo,
         patch("routes.legacy.url_shortener.EmojiUrlRepository") as MockEmojiRepo,
     ):
-        MockBlockedRepo.return_value.get_patterns = AsyncMock(return_value=[])
         MockEmojiRepo.return_value.check_exists = AsyncMock(return_value=False)
         MockEmojiRepo.return_value.insert = AsyncMock(return_value=None)
 

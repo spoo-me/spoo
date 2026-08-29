@@ -7,7 +7,6 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
-import tldextract
 from bson import ObjectId
 from pymongo.errors import DuplicateKeyError
 
@@ -37,6 +36,7 @@ from services.edge_provisioner.protocol import EdgeProvisioner
 from services.registrar.protocol import HostnameRegistrar
 from services.tenant_resolver.protocol import TenantResolver
 from services.verifiers.protocol import DomainVerifier, VerificationResult
+from shared.url_utils import is_registrable_apex
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
@@ -45,15 +45,6 @@ if TYPE_CHECKING:
     from services.url_service import UrlService
 
 log = get_logger(__name__)
-
-_tld_extractor = tldextract.TLDExtract(cache_dir=None)
-
-
-def _is_apex(fqdn: str) -> bool:
-    """True when the fqdn is the registrable apex (no subdomain). Uses the
-    public suffix list via tldextract so multi-part TLDs like `co.uk` work."""
-    ext = _tld_extractor(fqdn.strip("."))
-    return bool(ext.domain) and bool(ext.suffix) and not ext.subdomain
 
 
 class CustomDomainService:
@@ -521,7 +512,7 @@ class CustomDomainService:
         a_record for apex, cname otherwise."""
         if VerificationMethod.CF_HTTP_DCV in self._verifiers:
             return VerificationMethod.CF_HTTP_DCV
-        if _is_apex(fqdn) and VerificationMethod.A_RECORD in self._verifiers:
+        if is_registrable_apex(fqdn) and VerificationMethod.A_RECORD in self._verifiers:
             return VerificationMethod.A_RECORD
         return VerificationMethod.CNAME
 

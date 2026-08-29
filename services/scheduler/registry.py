@@ -59,12 +59,26 @@ class TaskRegistry:
         if task.name in self._tasks:
             raise ValueError(f"task {task.name!r} already registered")
         if task.schedule is not None:
+            # CronSim also accepts six-field seconds-first syntax; reject it
+            # instead of scheduling something subtly different.
+            if len(task.schedule.split()) != 5:
+                raise ValueError(
+                    f"task {task.name!r} schedule {task.schedule!r} must have "
+                    "exactly 5 cron fields"
+                )
             try:
-                CronSim(task.schedule, datetime.now(timezone.utc))
+                # CronSim raises StopIteration after a 50-year search for
+                # valid-but-never schedules; make that a boot error.
+                next(CronSim(task.schedule, datetime.now(timezone.utc)))
             except CronSimError as exc:
                 raise ValueError(
                     f"task {task.name!r} has invalid cron {task.schedule!r}: {exc}"
                 ) from exc
+            except StopIteration:
+                raise ValueError(
+                    f"task {task.name!r} cron {task.schedule!r} has no "
+                    "occurrence within CronSim's search window"
+                ) from None
         self._tasks[task.name] = task
 
     def get(self, name: str) -> ScheduledTask | None:

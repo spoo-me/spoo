@@ -143,6 +143,22 @@ def make_repos():
     return url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache
 
 
+def make_policy(blocked_url_repo):
+    """A REAL L0 gate over the mocked pattern repo (ttl=0 so every check
+    reads the mock fresh) — blocked/self-link tests keep their semantics."""
+    from services.safety.policy import UrlPolicyService
+    from services.safety.providers import BlockedPatternProvider
+
+    return UrlPolicyService(
+        [
+            BlockedPatternProvider(
+                blocked_url_repo, regex_timeout=0.2, patterns_ttl_seconds=0
+            )
+        ],
+        blocked_self_domains=[SYSTEM_DEFAULT_DOMAIN],
+    )
+
+
 def make_service(
     url_repo,
     legacy_repo,
@@ -151,6 +167,7 @@ def make_service(
     url_cache,
     og_writethrough=None,
     edge_kv=None,
+    geo_rules_enabled=True,
 ):
     from services.url_service import UrlService
 
@@ -162,8 +179,10 @@ def make_service(
         url_cache=url_cache,
         blocked_self_domains=[SYSTEM_DEFAULT_DOMAIN],
         system_default_domain=SYSTEM_DEFAULT_DOMAIN,
+        url_policy=make_policy(blocked_url_repo),
         og_writethrough=og_writethrough,
         edge_kv=edge_kv,
+        geo_rules_enabled=geo_rules_enabled,
     )
 
 
@@ -212,6 +231,63 @@ class TestUrlServiceResolve:
 
         with pytest.raises(BlockedUrlError):
             await svc.resolve(ALIAS)
+
+    @pytest.mark.asyncio
+    async def test_blocked_v1_raises_451_error(self):
+        """v1 has no status machine — the safety ``blocked`` flag alone
+        must surface as the same BlockedUrlError (→451) as a v2 block."""
+        url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
+        svc = make_service(
+            url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache
+        )
+
+        url_cache.get.return_value = None
+        doc = make_legacy_doc(short_code="abcdef")
+        doc.blocked = True
+        legacy_repo.find_by_id.return_value = doc
+
+        with pytest.raises(BlockedUrlError):
+            await svc.resolve("abcdef")
+
+    @pytest.mark.asyncio
+    async def test_blocked_emoji_raises_451_error(self):
+        url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
+        svc = make_service(
+            url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache
+        )
+
+        url_cache.get.return_value = None
+        url_repo.find_by_alias.return_value = None
+        doc = make_emoji_doc()
+        doc.blocked = True
+        emoji_repo.find_by_id.return_value = doc
+
+        with pytest.raises(BlockedUrlError):
+            await svc.resolve("🐍🔥💎")
+
+    @pytest.mark.asyncio
+    async def test_cache_hit_blocked_v1_raises_451_error(self):
+        """The eviction on flip recaches the doc as BLOCKED — the cache-hit
+        path must honor a non-v2 BLOCKED status, not gate it on schema."""
+        url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
+        svc = make_service(
+            url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache
+        )
+
+        url_cache.get.return_value = UrlCacheData(
+            id="abcdef",
+            alias="abcdef",
+            long_url="",
+            block_bots=False,
+            password_hash=None,
+            expiration_time=None,
+            max_clicks=None,
+            url_status="BLOCKED",
+            schema_version="v1",
+            owner_id=None,
+        )
+        with pytest.raises(BlockedUrlError):
+            await svc.resolve("abcdef")
 
     @pytest.mark.asyncio
     async def test_cache_hit_expired_v2_raises_gone(self):
@@ -522,6 +598,28 @@ class TestUrlServiceCreate:
 
         assert result.long_url == "https://example.com"
         url_repo.insert.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_stamps_destination_parts(self):
+        url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
+        svc = make_service(
+            url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache
+        )
+
+        blocked_url_repo.get_patterns.return_value = []
+        url_repo.check_alias_exists.return_value = False
+        url_repo.insert.return_value = URL_OID
+
+        from schemas.dto.requests.url import CreateUrlRequest
+
+        req = CreateUrlRequest(long_url="https://a.evil.co.uk/kit?x=1")
+        await svc.create(req, owner_id=USER_OID, client_ip="1.2.3.4")
+
+        inserted = url_repo.insert.call_args.args[0]
+        assert inserted["dest"]["registrable_domain"] == "evil.co.uk"
+        assert inserted["dest"]["host"] == "a.evil.co.uk"
+        assert inserted["dest"]["subdomain"] == "a"
+        assert inserted["dest"]["scheme"] == "https"
 
     @pytest.mark.asyncio
     async def test_create_persists_created_via(self):
@@ -1006,6 +1104,53 @@ class TestUrlServiceUpdate:
         assert "$set" in update_doc
         assert "long_url" in update_doc["$set"]
         url_cache.invalidate.assert_called_once_with(ALIAS, SYSTEM_DEFAULT_DOMAIN)
+
+    @pytest.mark.asyncio
+    async def test_update_long_url_restamps_dest(self):
+        """A destination edit must re-stamp the parsed dest parts, or the
+        indexed decomposition silently drifts from long_url."""
+        url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
+        svc = make_service(
+            url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache
+        )
+
+        existing = make_url_v2_doc()
+        url_repo.find_by_id.return_value = existing
+        url_repo.update.return_value = True
+
+        from schemas.dto.requests.url import UpdateUrlRequest
+
+        req = UpdateUrlRequest(long_url="https://b.new-dest.com/x")
+        await svc.update(URL_OID, req, USER_OID)
+
+        written = url_repo.update.call_args[0][1]["$set"]
+        assert written["dest"]["registrable_domain"] == "new-dest.com"
+        assert written["dest"]["host"] == "b.new-dest.com"
+
+    @pytest.mark.asyncio
+    async def test_update_unparseable_long_url_unsets_dest(self, monkeypatch):
+        """An unparseable new long_url removes dest, never writes null."""
+        url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
+        svc = make_service(
+            url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache
+        )
+
+        existing = make_url_v2_doc()
+        url_repo.find_by_id.return_value = existing
+        url_repo.update.return_value = True
+
+        from schemas.dto.requests.url import UpdateUrlRequest
+
+        monkeypatch.setattr(
+            "services.url_service.UrlDestination.from_url",
+            classmethod(lambda cls, url: None),
+        )
+        req = UpdateUrlRequest(long_url="https://b.new-dest.com/x")
+        await svc.update(URL_OID, req, USER_OID)
+
+        written = url_repo.update.call_args[0][1]
+        assert "dest" not in written["$set"]
+        assert written["$unset"] == {"dest": ""}
 
     @pytest.mark.asyncio
     async def test_update_meta_tags_stamps_client_ip(self):
@@ -2073,6 +2218,31 @@ class TestUrlServiceListByOwnerDomainFilter:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+class TestGeoRulesFeatureGate:
+    @pytest.mark.asyncio
+    async def test_geo_rules_refused_while_the_feature_is_dark(self):
+        url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
+        svc = make_service(
+            url_repo,
+            legacy_repo,
+            emoji_repo,
+            blocked_url_repo,
+            url_cache,
+            geo_rules_enabled=False,
+        )
+        blocked_url_repo.get_patterns.return_value = []
+
+        from schemas.dto.requests.url import CreateUrlRequest
+
+        req = CreateUrlRequest(
+            long_url="https://example.com", geo_rules={"IN": "https://example.in/"}
+        )
+        with pytest.raises(ValidationError) as exc:
+            await svc.create(req, owner_id=USER_OID, client_ip="1.2.3.4")
+        assert exc.value.field == "geo_rules"
+        url_repo.insert.assert_not_awaited()
+
+
 class TestUrlServiceGeoRules:
     """Geo-targeting: create/update validation, persistence, cache projection."""
 
@@ -2147,19 +2317,13 @@ class TestUrlServiceGeoRules:
         max_emoji_alias_length."""
         import pycountry
 
-        from services.url_service import _validate_geo_rules
+        from services.url_service import _validate_geo_rules_shape
 
         codes = [c.alpha_2 for c in pycountry.countries][:51]
         rules = {code: "https://example.com/x" for code in codes}
 
         with pytest.raises(ValidationError) as exc:
-            _validate_geo_rules(
-                rules,
-                blocked_self_domains=(SYSTEM_DEFAULT_DOMAIN,),
-                patterns=[],
-                timeout=0.2,
-                max_countries=50,
-            )
+            _validate_geo_rules_shape(rules, max_countries=50)
         assert exc.value.field == "geo_rules"
 
     @pytest.mark.asyncio
@@ -2220,7 +2384,8 @@ class TestUrlServiceGeoRules:
             },
         )
         await svc.create(req, owner_id=USER_OID, client_ip="1.2.3.4")
-        blocked_url_repo.get_patterns.assert_awaited_once()
+        # One pattern fetch for long_url plus one per geo destination (ttl=0 here).
+        assert blocked_url_repo.get_patterns.await_count == 4
 
     @pytest.mark.asyncio
     async def test_update_sets_geo_rules(self):

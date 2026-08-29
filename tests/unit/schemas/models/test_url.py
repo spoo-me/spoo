@@ -11,6 +11,7 @@ from schemas.models.url import (
     EmojiUrlDoc,
     LegacyUrlDoc,
     LinkMetaTags,
+    UrlDestination,
     UrlStatus,
     UrlV2Doc,
 )
@@ -377,3 +378,40 @@ class TestUrlV2DocEffectiveStatus:
             "EXPIRED",
             "BLOCKED",
         }
+
+
+# ── UrlDestination ────────────────────────────────────────────────────────────
+
+
+class TestUrlDestination:
+    def test_from_url_parses(self):
+        dest = UrlDestination.from_url("https://a.example.co.uk/x")
+        assert dest.registrable_domain == "example.co.uk"
+        assert dest.host == "a.example.co.uk"
+        assert dest.subdomain == "a"
+        assert dest.scheme == "https"
+
+    def test_from_url_unparseable_is_none(self):
+        assert UrlDestination.from_url("garbage") is None
+        assert UrlDestination.from_url(None) is None
+
+    def test_v2_doc_defaults_dest_to_none(self):
+        # Additive optional field — old cache entries and pre-backfill docs
+        # deserialize without it.
+        doc = UrlV2Doc(
+            alias="abc",
+            domain="spoo.me",
+            created_at=now(),
+            long_url="https://example.com",
+        )
+        assert doc.dest is None
+
+    def test_v2_doc_accepts_dest_subdoc(self):
+        doc = UrlV2Doc(
+            alias="abc",
+            domain="spoo.me",
+            created_at=now(),
+            long_url="https://a.evil.com/kit",
+            dest=UrlDestination.from_url("https://a.evil.com/kit"),
+        )
+        assert doc.dest.registrable_domain == "evil.com"

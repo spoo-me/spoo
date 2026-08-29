@@ -99,6 +99,11 @@ class LinkExpiredPayload(_PayloadBase):
     reason: str  # "max_clicks_reached" | "time_expired"
 
 
+class LinkBlockedPayload(_PayloadBase):
+    link: LinkSnapshot
+    reason: str  # human-readable safety verdict reason
+
+
 class WebhookTestPayload(_PayloadBase):
     message: str
 
@@ -217,6 +222,20 @@ EVENT_REGISTRY: dict[str, EventTypeSpec] = {
             sample=lambda: {
                 "link": {**_sample_link(), "status": "EXPIRED", "max_clicks": 5000},
                 "reason": "max_clicks_reached",
+            },
+        ),
+        EventTypeSpec(
+            name="link.blocked",
+            category="link",
+            description=(
+                "A link was blocked by the safety system because its "
+                "destination was judged malicious."
+            ),
+            frequency="low",
+            payload_model=LinkBlockedPayload,
+            sample=lambda: {
+                "link": {**_sample_link(), "status": "BLOCKED"},
+                "reason": "destination matched a known phishing source",
             },
         ),
     )

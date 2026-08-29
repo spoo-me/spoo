@@ -121,6 +121,9 @@ def get_stats_pipeline(short_code):
         {
             "$project": {
                 "url": 1,
+                # Without this every consumer of the pipeline is structurally
+                # unable to honour a takedown.
+                "blocked": {"$ifNull": ["$blocked", False]},
                 "browser": {"$ifNull": ["$browser", {}]},
                 "os_name": {"$ifNull": ["$os_name", {}]},
                 "country": {"$ifNull": ["$country", {}]},

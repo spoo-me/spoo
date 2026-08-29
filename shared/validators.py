@@ -16,6 +16,10 @@ import emoji
 import regex
 import validators as _validators
 
+from infrastructure.logging import get_logger
+
+log = get_logger(__name__)
+
 _ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
 
 
@@ -31,9 +35,13 @@ def validate_url(
             URL marks it as self-referential. Defaults to ``("spoo.me",)``
             to prevent redirect loops.
     """
-    # Scheme allowlist defends against ftp/file/data/etc even if the
-    # validators package widens its accepted schemes upstream.
-    if urlparse(url).scheme not in _ALLOWED_URL_SCHEMES:
+    # Scheme allowlist defends against the validators package widening upstream;
+    # urlparse raises on malformed bracket hosts ("https://x]:80/") — not a 500.
+    try:
+        scheme = urlparse(url).scheme
+    except ValueError:
+        return False
+    if scheme not in _ALLOWED_URL_SCHEMES:
         return False
     if not _validators.url(url, skip_ipv4_addr=True, skip_ipv6_addr=True):
         return False
@@ -185,13 +193,41 @@ def validate_blocked_url(
     Returns:
         True if the URL is allowed (no pattern matched), False if blocked.
     """
+    return matching_blocked_pattern(url, patterns, timeout=timeout) is None
+
+
+def is_valid_pattern(pattern: str) -> bool:
+    """Whether *pattern* compiles. Model- and operator-supplied regexes are
+    never handed to the matcher unchecked: a bad one raises at enforcement
+    time, after the verdict is already stored."""
+    if not pattern:
+        return False
+    try:
+        regex.compile(pattern)
+    except Exception:
+        return False
+    return True
+
+
+def matching_blocked_pattern(
+    url: str, patterns: Sequence[str], timeout: float = 0.2
+) -> str | None:
+    """Return the first blocked pattern that matches *url*, or None; safety
+    enforcement scopes its action to that pattern."""
     for pattern in patterns:
         try:
             if regex.search(pattern, url, timeout=timeout):
-                return False
+                return pattern
+        except regex.error:
+            log.warning("blocked_pattern_invalid", pattern=pattern)
         except TimeoutError:
-            pass  # Treat timed-out patterns as non-matching (fail open)
-    return True
+            # Fail open (a pathological pattern must not take down link
+            # creation) but never silently: a timing-out pattern is an
+            # operator blocklist entry that has stopped enforcing.
+            log.warning(
+                "blocked_pattern_timeout", pattern=pattern, timeout_seconds=timeout
+            )
+    return None
 
 
 def validate_safe_redirect(url: str, fallback: str = "/dashboard") -> str:

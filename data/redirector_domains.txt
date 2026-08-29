@@ -1,0 +1,10 @@
+# Platform share wrappers users carry involuntarily. Never a refuse list:
+# creates are allowed and the chain's terminal destination is judged instead.
+t.co
+lnkd.in
+buff.ly
+fb.me
+l.facebook.com
+lm.facebook.com
+l.instagram.com
+t.umblr.com

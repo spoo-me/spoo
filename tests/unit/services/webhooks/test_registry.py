@@ -21,6 +21,7 @@ EXPECTED_EVENTS = {
     "link.deleted",
     "link.clicked",
     "link.expired",
+    "link.blocked",
 }
 
 

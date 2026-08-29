@@ -42,10 +42,19 @@ router = APIRouter()
 _TENANT_ERROR_COPY = {
     "404": ("Not found", "This URL doesn't exist on {fqdn}."),
     "410": ("Expired", "This URL has expired and no longer redirects."),
-    "451": ("Blocked", "This URL has been blocked for abuse."),
+    "451": (
+        "Blocked",
+        "This URL has been blocked for abuse. Blocks are reversible: contact "
+        "the operator of {fqdn} if you think this is a mistake.",
+    ),
     "403": ("Access denied", "You don't have permission to view this URL."),
 }
 _NOINDEX_HEADER = "noindex, nofollow, noarchive"
+
+# Blocks are reversible and sometimes wrong; a blocked page that offers no
+# route back is how a false positive becomes a complaint we never hear.
+_APPEAL_COPY = "Think this is a mistake? Blocks are reversible."
+_APPEAL_LINK = "Ask us to review it"
 
 # Machine-readable slugs for the system-default error page so the edge can
 # route on X-Error-Code. Only REDIRECT_EDGE_INTERCEPTED_STATUSES (defined
@@ -114,14 +123,21 @@ def _error_page(request: Request, code: str, message: str, status: int) -> Respo
         # the template render on the hot path.
         return Response(status_code=status, headers={"X-Error-Code": slug})
 
+    context = {
+        "error_code": code,
+        "error_message": message,
+        "host_url": str(request.base_url),
+    }
+    if status == 451:
+        context |= {
+            "error_appeal": _APPEAL_COPY,
+            "error_appeal_href": "/contact",
+            "error_appeal_link": _APPEAL_LINK,
+        }
     return templates.TemplateResponse(
         request,
         "error.html",
-        {
-            "error_code": code,
-            "error_message": message,
-            "host_url": str(request.base_url),
-        },
+        context,
         status_code=status,
         headers={"X-Error-Code": slug} if slug is not None else None,
     )
