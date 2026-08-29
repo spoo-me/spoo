@@ -56,6 +56,7 @@ from services.click import ClickService, LegacyClickHandler, V2ClickHandler
 from services.click.sinks import InlineSink, RedisStreamSink
 from services.contact_service import ContactService
 from services.custom_domain_service import CustomDomainService
+from services.domain_intel_service import DomainIntelService
 from services.edge_cache.og_writethrough import OgEdgeWritethrough
 from services.events.sinks import (
     InlineDomainEventSink,
@@ -79,6 +80,7 @@ from services.scheduler.tasks import build_task_registry
 from services.stats_service import StatsService
 from services.tenant_resolver import CachedMongoTenantResolver
 from services.token_factory import TokenFactory
+from services.url_expand_service import UrlExpandService
 from services.url_service import UrlService
 from services.webhooks import (
     DeliveryExecutor,
@@ -350,6 +352,18 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
         system_default_domain=settings.system_default_domain,
     )
     app.state.public_preview_service = PublicPreviewService(public_link_resolver)
+    app.state.url_expand_service = UrlExpandService(
+        blocked_url_repo,
+        MetaFetchCache(redis_client, prefix="url_expand"),
+        regex_timeout=settings.blocked_url_regex_timeout,
+        user_agent=settings.meta_tags.fetch_user_agent,
+        http_client=http_client,
+        web_risk_api_key=settings.web_risk.api_key,
+    )
+    app.state.domain_intel_service = DomainIntelService(
+        MetaFetchCache(redis_client, prefix="domain_intel", ttl_seconds=86_400),
+        http_client,
+    )
     app.state.public_stats_service = PublicStatsService(
         public_link_resolver,
         app.state.stats_service,

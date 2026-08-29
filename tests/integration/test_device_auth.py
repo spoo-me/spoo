@@ -290,7 +290,7 @@ def test_device_login_unauthenticated_redirects(
     )
     assert resp.status_code == 302
     loc = resp.headers["location"]
-    assert "/?next=" in loc
+    assert loc.startswith("/login?next=")
     assert "spoo-snap" in loc
     assert "abc" in loc
     # The PKCE challenge must survive the login round-trip

@@ -15,6 +15,10 @@ updates:
         patterns:
           - "*"
     open-pull-requests-limit: 5
+    ignore:
+      # redis-py 8.x is blocked for now (see pyproject.toml pin).
+      - dependency-name: "redis"
+        versions: [">=8"]
 
   - package-ecosystem: "docker"
     directory: "/"

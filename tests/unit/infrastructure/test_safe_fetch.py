@@ -9,8 +9,8 @@ import pytest
 from infrastructure.safe_fetch import (
     FetchHardError,
     _is_public,
-    _resolve_public_ip,
     fetch_public_image,
+    resolve_public_ip,
 )
 
 # ── _is_public matrix ─────────────────────────────────────────────────────────
@@ -50,11 +50,11 @@ class TestResolvePublicIp:
     @pytest.mark.asyncio
     async def test_literal_private_ip_rejected(self):
         with pytest.raises(FetchHardError):
-            await _resolve_public_ip("169.254.169.254")
+            await resolve_public_ip("169.254.169.254")
 
     @pytest.mark.asyncio
     async def test_literal_public_ip_accepted(self):
-        assert await _resolve_public_ip("93.184.216.34") == "93.184.216.34"
+        assert await resolve_public_ip("93.184.216.34") == "93.184.216.34"
 
     @pytest.mark.asyncio
     async def test_mixed_record_set_rejected(self):
@@ -78,7 +78,7 @@ class TestResolvePublicIp:
             ),
             pytest.raises(FetchHardError, match="non-public"),
         ):
-            await _resolve_public_ip("evil.example.com")
+            await resolve_public_ip("evil.example.com")
 
 
 # ── fetch-level guards (no network: fail before connecting) ─────────────────
@@ -122,7 +122,7 @@ class TestFetchGuards:
 
         with (
             patch(
-                "infrastructure.safe_fetch._resolve_public_ip",
+                "infrastructure.safe_fetch.resolve_public_ip",
                 new=AsyncMock(return_value="93.184.216.34"),
             ),
             patch("httpx.AsyncClient.send", new=_fake_send),

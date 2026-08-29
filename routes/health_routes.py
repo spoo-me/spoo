@@ -9,10 +9,10 @@ Rules:
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Request, Response
 
 from middleware.openapi import PUBLIC_SECURITY
+from schemas.dto.responses.common import HealthResponse
 
 router = APIRouter(tags=["System"])
 
@@ -22,8 +22,14 @@ router = APIRouter(tags=["System"])
     openapi_extra=PUBLIC_SECURITY,
     operation_id="healthCheck",
     summary="Health Check",
+    responses={
+        503: {
+            "description": "Unhealthy — MongoDB is unreachable",
+            "model": HealthResponse,
+        }
+    },
 )
-async def health_check(request: Request) -> JSONResponse:
+async def health_check(request: Request, response: Response) -> HealthResponse:
     """Check the health of the application and its dependencies.
 
     Pings MongoDB and Redis to determine overall system status:
@@ -63,12 +69,10 @@ async def health_check(request: Request) -> JSONResponse:
 
     settings = getattr(request.app.state, "settings", None)
 
-    status_code = 503 if overall == "unhealthy" else 200
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "status": overall,
-            "version": settings.app_version if settings else "dev",
-            "checks": checks,
-        },
+    if overall == "unhealthy":
+        response.status_code = 503
+    return HealthResponse(
+        status=overall,
+        version=settings.app_version if settings else "dev",
+        checks=checks,
     )

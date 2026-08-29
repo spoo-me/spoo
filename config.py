@@ -401,6 +401,29 @@ class MetaTagsSettings(BaseSettings):
     fetch_user_agent: str = "spoo.me-og-validator/1.0 (+https://spoo.me)"
 
 
+class WebRiskSettings(BaseSettings):
+    """Google Web Risk lookups for the URL expander's safety verdict.
+
+    Env vars are prefixed ``WEB_RISK_`` so a generic ``API_KEY`` set
+    elsewhere in the deploy environment can't configure this. Without a
+    key the check silently doesn't run and the verdict is absent — the
+    tool never shows a fabricated one.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore",
+        env_prefix="WEB_RISK_",
+    )
+
+    api_key: str = ""
+    timeout_seconds: float = Field(default=4.0, gt=0)
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.api_key)
+
+
 class WebhookSettings(BaseSettings):
     """Webhooks system — real-time event deliveries to subscriber URLs.
 
@@ -638,6 +661,7 @@ class AppSettings(BaseSettings):
     edge_cache: EdgeCacheSettings | None = None
     r2: R2StorageSettings | None = None
     meta_tags: MetaTagsSettings | None = None
+    web_risk: WebRiskSettings | None = None
     webhooks: WebhookSettings | None = None
     scheduler: SchedulerSettings | None = None
 
@@ -679,6 +703,8 @@ class AppSettings(BaseSettings):
             self.r2 = R2StorageSettings()
         if self.meta_tags is None:
             self.meta_tags = MetaTagsSettings()
+        if self.web_risk is None:
+            self.web_risk = WebRiskSettings()
         if self.webhooks is None:
             self.webhooks = WebhookSettings()
         if self.scheduler is None:

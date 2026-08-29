@@ -19,6 +19,13 @@ _PUBLIC_PREFIXES = ("/api/v1", "/auth/device", "/stats", "/export", "/metric")
 
 _ALLOWED_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
 _ALLOWED_HEADERS = "Authorization, Content-Type, Accept, X-Request-ID, X-Spoo-Client"
+# Response headers cross-origin JS may read. Retry-After is included because
+# only the CORS-safelisted set (Cache-Control, Content-Language, Content-Length,
+# Content-Type, Expires, Last-Modified, Pragma) is readable without it.
+_EXPOSED_HEADERS = (
+    "X-Request-ID, X-Error-Code, X-Spoo-Hint, X-RateLimit-Limit, "
+    "X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After"
+)
 
 
 def _classify_path(path: str) -> str:
@@ -83,9 +90,11 @@ class SplitCORSMiddleware(BaseHTTPMiddleware):
         """Set CORS headers based on route classification."""
         if classification == "public":
             response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Expose-Headers"] = _EXPOSED_HEADERS
         elif classification == "private" and origin in self._private_origins:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Expose-Headers"] = _EXPOSED_HEADERS
             response.headers["Vary"] = "Origin"
 
 

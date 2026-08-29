@@ -20,7 +20,20 @@ _CLIENT_TAG_RE = re.compile(r"^([a-z0-9_-]{1,32})(?:/([A-Za-z0-9._-]{1,16}))?$")
 # (created_via) accepts only members, so arbitrary header values can never
 # become permanent, unfilterable document history.
 FIRST_PARTY_CLIENTS = frozenset(
-    {"dashboard", "landing", "snap", "raycast", "cli", "bot"}
+    {
+        "dashboard",
+        "landing",
+        "snap",
+        "raycast",
+        "cli",
+        "bot",
+        "sdk-ts",
+        "sdk-py",
+        "sdk-go",
+        "sdk-rust",
+        "sdk-kotlin",
+        "app-android",
+    }
 )
 
 

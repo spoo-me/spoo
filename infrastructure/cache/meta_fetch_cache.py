@@ -25,14 +25,15 @@ class MetaFetchCache:
         *,
         ttl_seconds: int = 3600,
         negative_ttl_seconds: int = 300,
+        prefix: str = "meta_fetch",
     ) -> None:
         self._redis = redis_client
         self._ttl = ttl_seconds
         self._negative_ttl = negative_ttl_seconds
+        self._prefix = prefix
 
-    @staticmethod
-    def _key(url: str) -> str:
-        return f"meta_fetch:{hashlib.sha256(url.encode()).hexdigest()}"
+    def _key(self, url: str) -> str:
+        return f"{self._prefix}:{hashlib.sha256(url.encode()).hexdigest()}"
 
     async def get(self, url: str) -> dict | None:
         if self._redis is None:

@@ -6,8 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from dependencies import get_current_user, get_feature_flag_service
-from errors import ForbiddenError
+from dependencies import get_current_user
 from infrastructure.cache.meta_fetch_cache import MetaFetchCache
 from infrastructure.safe_fetch import FetchedBody, FetchHardError, FetchTransientError
 
@@ -19,56 +18,29 @@ HTML = b"""<html><head>
 </head><body></body></html>"""
 
 
-def _flag_svc(enabled: bool) -> AsyncMock:
-    svc = AsyncMock()
-    svc.is_enabled = AsyncMock(return_value=enabled)
-
-    async def _require(name: str, user, **_kw) -> None:
-        # Mirrors FeatureFlagService.require: raise 403 when disabled.
-        if not enabled:
-            feature = name.replace("_", " ").capitalize()
-            raise ForbiddenError(f"{feature} is not enabled for this account")
-
-    svc.require = AsyncMock(side_effect=_require)
-    return svc
-
-
-def _app(user=None, flag_enabled: bool = True):
-    app = _build_test_app(
-        {
-            get_current_user: lambda: user or _make_user(),
-            get_feature_flag_service: lambda: _flag_svc(flag_enabled),
-        }
-    )
+def _app(user=None):
+    app = _build_test_app({get_current_user: lambda: user})
     app.state.meta_fetch_cache = MetaFetchCache(None)  # no-op cache
     return app
 
 
-def test_metadata_requires_auth():
-    app = _build_test_app({get_current_user: lambda: None})
-    app.state.meta_fetch_cache = MetaFetchCache(None)
-    with TestClient(app, raise_server_exceptions=False) as client:
-        resp = client.get("/api/v1/metadata", params={"url": "https://dest.example"})
-    assert resp.status_code == 401
-
-
-def test_metadata_requires_flag():
-    # Same gate as the write paths this prefill feeds: no flag, no fetch.
-    fetch = AsyncMock()
+def test_metadata_works_anonymously():
+    # Auth is optional — the public preview checker calls this logged out.
+    body = FetchedBody(HTML, "text/html", "https://dest.example/final")
     with (
-        patch("routes.api_v1.metadata.fetch_public", new=fetch),
-        TestClient(_app(flag_enabled=False), raise_server_exceptions=False) as client,
+        patch("routes.api_v1.metadata.fetch_public", new=AsyncMock(return_value=body)),
+        TestClient(_app(user=None), raise_server_exceptions=True) as client,
     ):
-        resp = client.get("/api/v1/metadata", params={"url": "https://dest.example"})
-    assert resp.status_code == 403
-    fetch.assert_not_called()
+        resp = client.get("/api/v1/metadata", params={"url": "https://dest.example/a"})
+    assert resp.status_code == 200
+    assert resp.json()["title"] == "Dest Title"
 
 
 def test_metadata_parses_destination():
     body = FetchedBody(HTML, "text/html", "https://dest.example/final")
     with (
         patch("routes.api_v1.metadata.fetch_public", new=AsyncMock(return_value=body)),
-        TestClient(_app(), raise_server_exceptions=True) as client,
+        TestClient(_app(user=_make_user()), raise_server_exceptions=True) as client,
     ):
         resp = client.get("/api/v1/metadata", params={"url": "https://dest.example/a"})
     assert resp.status_code == 200
@@ -77,6 +49,25 @@ def test_metadata_parses_destination():
     assert data["image"] == "https://dest.example/og.png"  # resolved vs final_url
     assert data["final_url"] == "https://dest.example/final"
     assert data["og"]["title"] == "Dest Title"
+
+
+def test_metadata_carries_audit_fields():
+    page = b"""<html><head>
+    <title>HTML Title</title>
+    <meta name="description" content="HTML Desc">
+    <meta property="og:title" content="OG Title">
+    <link rel="icon" href="/fav.png" sizes="32x32">
+    </head><body></body></html>"""
+    body = FetchedBody(page, "text/html", "https://dest.example/final")
+    with (
+        patch("routes.api_v1.metadata.fetch_public", new=AsyncMock(return_value=body)),
+        TestClient(_app(), raise_server_exceptions=True) as client,
+    ):
+        resp = client.get("/api/v1/metadata", params={"url": "https://dest.example/a"})
+    data = resp.json()
+    assert data["html_title"] == "HTML Title"
+    assert data["html_description"] == "HTML Desc"
+    assert data["favicon"] == "https://dest.example/fav.png"
 
 
 def test_metadata_rejects_http_url():

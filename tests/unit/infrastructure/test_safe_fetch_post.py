@@ -60,7 +60,7 @@ class TestPostPublic:
     @pytest.mark.asyncio
     async def test_private_resolution_is_an_outcome_not_an_exception(self):
         with patch(
-            "infrastructure.safe_fetch._resolve_public_ip",
+            "infrastructure.safe_fetch.resolve_public_ip",
             AsyncMock(side_effect=FetchHardError("address is not public")),
         ):
             result = await post_public("https://internal.corp/hook", "{}", headers={})
@@ -72,7 +72,7 @@ class TestPostPublic:
         """A DNS timeout must land in the retry ladder as a recorded
         attempt, never escape as an exception that skips bookkeeping."""
         with patch(
-            "infrastructure.safe_fetch._resolve_public_ip",
+            "infrastructure.safe_fetch.resolve_public_ip",
             AsyncMock(side_effect=FetchTransientError("dns timeout")),
         ):
             result = await post_public("https://example.com/hook", "{}", headers={})
@@ -109,7 +109,7 @@ class TestPostPublic:
 
         with (
             patch(
-                "infrastructure.safe_fetch._resolve_public_ip",
+                "infrastructure.safe_fetch.resolve_public_ip",
                 AsyncMock(return_value="93.184.216.34"),
             ),
             patch("infrastructure.safe_fetch.httpx.AsyncClient", _FakeClient),

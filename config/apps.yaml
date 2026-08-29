@@ -56,8 +56,17 @@ apps:
     icon: spoo-mobile.svg
     description: Shorten links on the go
     verified: true
-    status: coming_soon
+    status: live
     type: device_auth
+    redirect_uris:
+      - spoo://oauth/callback
+    links:
+      github: https://github.com/spoo-me/spoo-android
+    scopes:
+      - shorten:create
+      - urls:read
+      - urls:manage
+      - stats:read
 
   spoo-telegram:
     name: Telegram Bot

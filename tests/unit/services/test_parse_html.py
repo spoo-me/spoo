@@ -89,3 +89,41 @@ def test_entities_decoded():
 def test_no_tags_page():
     p = parse_meta_tags("<html><head></head><body></body></html>", BASE)
     assert p.title is None and p.description is None and p.image is None
+
+
+def test_html_title_and_description_exposed_raw():
+    # The audit surface needs the raw <title>/<meta description> even when
+    # og tags exist and win the normalized picks.
+    html = """<head>
+    <title>HTML Title</title>
+    <meta name="description" content="HTML Desc">
+    <meta property="og:title" content="OG Title">
+    <meta property="og:description" content="OG Desc">
+    </head>"""
+    p = parse_meta_tags(html, BASE)
+    assert p.title == "OG Title"
+    assert p.html_title == "HTML Title"
+    assert p.html_description == "HTML Desc"
+
+
+def test_favicon_prefers_apple_touch_icon():
+    html = """<head>
+    <link rel="icon" href="/favicon.ico" sizes="16x16">
+    <link rel="apple-touch-icon" href="/apple-icon.png">
+    <link rel="shortcut icon" href="/legacy.ico">
+    </head>"""
+    p = parse_meta_tags(html, BASE)
+    assert p.favicon == "https://dest.example.com/apple-icon.png"
+
+
+def test_favicon_picks_largest_declared_size():
+    html = """<head>
+    <link rel="icon" href="/small.png" sizes="16x16">
+    <link rel="icon" href="/big.png" sizes="64x64">
+    </head>"""
+    assert parse_meta_tags(html, BASE).favicon == "https://dest.example.com/big.png"
+
+
+def test_favicon_defaults_to_convention_path():
+    p = parse_meta_tags("<head><title>T</title></head>", BASE)
+    assert p.favicon == "https://dest.example.com/favicon.ico"

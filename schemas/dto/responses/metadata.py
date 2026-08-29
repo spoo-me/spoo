@@ -24,6 +24,16 @@ class MetadataResponse(ResponseBase):
     image: str | None = Field(default=None, description="Absolute https URL.")
     color: str | None = Field(default=None, description="theme-color if #RRGGBB.")
     site_name: str | None = None
+    html_title: str | None = Field(
+        default=None, description="Raw <title> text, before og/twitter fallbacks."
+    )
+    html_description: str | None = Field(
+        default=None, description="Plain <meta name=description>, unnormalized."
+    )
+    favicon: str | None = Field(
+        default=None,
+        description="Best declared icon (or /favicon.ico); absolute https URL.",
+    )
     og: dict[str, str] = Field(default_factory=dict)
     twitter: dict[str, str] = Field(default_factory=dict)
     fetched_at: datetime

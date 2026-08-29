@@ -105,8 +105,14 @@ class Limits:
     # guessing is theater at 256 bits — this is belt-and-suspenders.
     URL_CLAIM = "30 per minute; 500 per day"
 
-    # Destination metadata fetch — outbound fetches on our dime; tight.
-    METADATA_FETCH = "20 per minute; 500 per day"
+    # Destination metadata fetch — outbound fetches on our dime, but the
+    # ~1h result cache means only novel URLs actually fetch.
+    METADATA_FETCH = "60 per minute; 2000 per day"
+
+    # Anonymous callers on GET /metadata (the link preview checker tool).
+    # Generous on purpose — it's a free tool — but still per-IP bounded:
+    # results cache ~1h, so only novel URLs cost an outbound fetch.
+    METADATA_ANON = "15 per minute; 300 per day"
 
     # Custom domains. Create counts FAILED attempts too (slowapi increments
     # at route entry), so the budget must absorb typos, blocked TLDs, and

@@ -90,7 +90,9 @@ class BulkUpdateExpiryRequest(BulkIdsRequest):
         examples=[1767225600],
     )
 
-    @field_validator("expire_after", mode="before")
+    @field_validator(
+        "expire_after", mode="before", json_schema_input_type=datetime | int | None
+    )
     @classmethod
     def _parse_expire_after(cls, v: str | int | None) -> datetime | None:
         # Same coercion as UpdateUrlRequest.expire_after — one parser for

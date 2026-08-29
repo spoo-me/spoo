@@ -31,7 +31,12 @@ class TestErrorResponse:
 
 class TestHealthResponse:
     def test_serialization(self):
-        r = HealthResponse(status="healthy", checks={"mongodb": "ok", "redis": "ok"})
+        r = HealthResponse(
+            status="healthy",
+            version="1.0.0",
+            checks={"mongodb": "ok", "redis": "ok"},
+        )
         d = r.model_dump()
         assert d["status"] == "healthy"
+        assert d["version"] == "1.0.0"
         assert d["checks"]["mongodb"] == "ok"

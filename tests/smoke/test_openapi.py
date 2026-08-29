@@ -66,6 +66,15 @@ def test_openapi_has_expected_paths(smoke_client: TestClient) -> None:
         assert path in paths, f"Missing path: {path}"
 
 
+def test_openapi_health_has_response_schema(smoke_client: TestClient) -> None:
+    """GET /health should document its response body, including the 503 case."""
+    data = smoke_client.get("/openapi.json").json()
+    responses = data["paths"]["/health"]["get"]["responses"]
+    for status in ("200", "503"):
+        schema = responses[status]["content"]["application/json"]["schema"]
+        assert schema["$ref"] == "#/components/schemas/HealthResponse"
+
+
 def test_openapi_has_components_schemas(smoke_client: TestClient) -> None:
     """OpenAPI spec should have response schemas defined in components."""
     data = smoke_client.get("/openapi.json").json()

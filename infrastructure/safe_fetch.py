@@ -78,7 +78,7 @@ def _is_public(ip: str) -> bool:
     return addr.is_global and not addr.is_multicast
 
 
-async def _resolve_public_ip(host: str) -> str:
+async def resolve_public_ip(host: str) -> str:
     """Resolve *host* and return one address, rejecting any private result."""
     # A literal IP address skips DNS entirely.
     try:
@@ -153,7 +153,7 @@ async def fetch_public(
         parsed = httpx.URL(url)
         if parsed.scheme != "https":
             raise FetchHardError("non-https URL")
-        ip = await _resolve_public_ip(parsed.host)
+        ip = await resolve_public_ip(parsed.host)
 
         # Pin the connection to the validated IP; keep name-based TLS via
         # sni_hostname and the Host header.
@@ -282,7 +282,7 @@ async def post_public(
         parsed = httpx.URL(url)
         if parsed.scheme != "https":
             return PostResult(None, "non-https URL", None)
-        ip = await _resolve_public_ip(parsed.host)
+        ip = await resolve_public_ip(parsed.host)
     except (FetchHardError, FetchTransientError, httpx.InvalidURL) as exc:
         # Transient DNS failures included: delivery outcomes are DATA for
         # the retry ladder, never exceptions that skip attempt recording.
@@ -328,4 +328,82 @@ async def validate_public_https_url(url: str) -> None:
     parsed = httpx.URL(url)
     if parsed.scheme != "https":
         raise FetchHardError("URL must be https")
-    await _resolve_public_ip(parsed.host)
+    await resolve_public_ip(parsed.host)
+
+
+@dataclass(frozen=True)
+class ChainHop:
+    url: str
+    status: int | None  # None: this hop never answered
+
+
+@dataclass(frozen=True)
+class ExpandedChain:
+    hops: list[ChainHop]
+    final_url: str
+    final_status: int | None
+    truncated: bool
+
+
+async def expand_public(
+    url: str,
+    *,
+    timeout: float = 5.0,
+    max_redirects: int = 10,
+    user_agent: str = DEFAULT_USER_AGENT,
+) -> ExpandedChain:
+    """Follow *url*'s redirect chain hop by hop and report every stop.
+
+    Unlike fetch_public this never reads bodies and allows plain-http
+    hops — real shortener chains bounce through http trackers, and only
+    headers ever ride the wire here. Every hop still gets the full SSRF
+    guard: public-DNS resolution, IP pinning, no auto-redirects.
+    """
+    hops: list[ChainHop] = []
+    for _hop in range(max_redirects + 1):
+        parsed = httpx.URL(url)
+        if parsed.scheme not in ("http", "https"):
+            raise FetchHardError("unsupported scheme")
+        try:
+            ip = await resolve_public_ip(parsed.host)
+        except FetchHardError:
+            if not hops:
+                raise
+            # Mid-chain dead end (NXDOMAIN, private space): report the
+            # chain up to it rather than erasing what we learned.
+            hops.append(ChainHop(url, None))
+            return ExpandedChain(hops, url, None, False)
+        pinned = parsed.copy_with(host=_bracket(ip))
+        async with httpx.AsyncClient(follow_redirects=False, timeout=timeout) as client:
+            request = client.build_request(
+                "GET",
+                pinned,
+                headers={
+                    "Host": parsed.host,
+                    "User-Agent": user_agent,
+                    "Accept-Encoding": "identity",
+                },
+                extensions=(
+                    {"sni_hostname": parsed.host} if parsed.scheme == "https" else {}
+                ),
+            )
+            try:
+                resp = await client.send(request, stream=True)
+            except (httpx.TimeoutException, httpx.TransportError) as exc:
+                if not hops:
+                    raise FetchTransientError(str(exc)) from exc
+                hops.append(ChainHop(url, None))
+                return ExpandedChain(hops, url, None, False)
+            try:
+                status = resp.status_code
+                hops.append(ChainHop(str(parsed), status))
+                if status in _REDIRECT_STATUSES:
+                    location = resp.headers.get("location")
+                    if not location:
+                        return ExpandedChain(hops, str(parsed), status, False)
+                    url = str(parsed.join(location))
+                    continue
+                return ExpandedChain(hops, str(parsed), status, False)
+            finally:
+                await resp.aclose()
+    return ExpandedChain(hops, url, None, True)

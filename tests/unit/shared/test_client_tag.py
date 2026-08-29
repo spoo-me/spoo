@@ -43,6 +43,12 @@ def test_parse_invalid_is_absent(value):
         ("dashboard", "dashboard"),
         ("snap/2.1.0", "snap"),
         ("cli", "cli"),
+        ("sdk-ts/1.0.0", "sdk-ts"),
+        ("sdk-py/1.0.0", "sdk-py"),
+        ("sdk-go/0.5.2", "sdk-go"),
+        ("sdk-kotlin/0.1.0", "sdk-kotlin"),
+        ("app-android/1.0.0", "app-android"),
+        ("sdk-rust/0.2.0", "sdk-rust"),
         # well-formed but not first-party: logged, never persisted
         ("whatever", None),
         ("curl/8.0", None),

@@ -245,6 +245,58 @@ def test_cors_private_route_disallowed_origin():
     assert "access-control-allow-origin" not in resp.headers
 
 
+def test_cors_public_route_exposes_headers():
+    app = _build_test_app(include_logging=False)
+    app.include_router(_test_router)
+    with TestClient(app) as c:
+        resp = c.get(
+            "/api/v1/test-404",
+            headers={"Origin": "https://example.com"},
+        )
+    assert resp.headers.get("access-control-expose-headers") == (
+        "X-Request-ID, X-Error-Code, X-Spoo-Hint, X-RateLimit-Limit, "
+        "X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After"
+    )
+
+
+def test_cors_private_route_exposes_headers():
+    app = _build_test_app(include_logging=False)
+    from middleware.security import SplitCORSMiddleware
+
+    for mw in app.user_middleware:
+        if mw.cls is SplitCORSMiddleware:
+            mw.kwargs["private_origins"] = ["https://spoo.me"]
+    app.include_router(_test_router)
+    with TestClient(app, base_url="http://testserver") as c:
+        resp = c.get(
+            "/auth/test-401",
+            headers={"Origin": "https://spoo.me"},
+        )
+    assert resp.headers.get("access-control-expose-headers") == (
+        "X-Request-ID, X-Error-Code, X-Spoo-Hint, X-RateLimit-Limit, "
+        "X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After"
+    )
+
+
+def test_cors_no_expose_headers_without_origin():
+    app = _build_test_app(include_logging=False)
+    app.include_router(_test_router)
+    with TestClient(app) as c:
+        resp = c.get("/api/v1/test-404")
+    assert "access-control-expose-headers" not in resp.headers
+
+
+def test_cors_no_expose_headers_for_disallowed_private_origin():
+    app = _build_test_app(include_logging=False)
+    app.include_router(_test_router)
+    with TestClient(app) as c:
+        resp = c.get(
+            "/auth/test-401",
+            headers={"Origin": "https://evil.com"},
+        )
+    assert "access-control-expose-headers" not in resp.headers
+
+
 def test_cors_unclassified_route_no_cors():
     app = _build_test_app(include_logging=False)
     app.include_router(_test_router)

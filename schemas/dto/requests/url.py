@@ -257,7 +257,9 @@ class CreateUrlRequest(RequestBase):
     def _alias_shape(cls, v: str | None) -> str | None:
         return _validate_alias_shape(v)
 
-    @field_validator("expire_after", mode="before")
+    @field_validator(
+        "expire_after", mode="before", json_schema_input_type=datetime | int | None
+    )
     @classmethod
     def _parse_expire_after(cls, v: str | int | None) -> datetime | None:
         if v is None:
@@ -368,7 +370,9 @@ class UpdateUrlRequest(RequestBase):
     def _alias_shape(cls, v: str | None) -> str | None:
         return _validate_alias_shape(v)
 
-    @field_validator("expire_after", mode="before")
+    @field_validator(
+        "expire_after", mode="before", json_schema_input_type=datetime | int | None
+    )
     @classmethod
     def _parse_expire_after(cls, v: str | int | None) -> datetime | None:
         if v is None:

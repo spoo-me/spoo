@@ -34,6 +34,9 @@ class ParsedMeta:
     image: str | None
     color: str | None
     site_name: str | None
+    html_title: str | None
+    html_description: str | None
+    favicon: str | None
     og: dict[str, str]
     twitter: dict[str, str]
 
@@ -47,6 +50,7 @@ class _MetaCollector(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.meta: dict[str, str] = {}
         self.title_parts: list[str] = []
+        self.icons: list[tuple[str, str, str]] = []  # (rel, href, sizes)
         self._in_title = False
 
     def handle_starttag(self, tag: str, attrs: list) -> None:
@@ -54,6 +58,17 @@ class _MetaCollector(HTMLParser):
             raise _StopParsing
         if tag == "title":
             self._in_title = True
+            return
+        if tag == "link":
+            attr = dict(attrs)
+            rel = (attr.get("rel") or "").strip().lower()
+            href = (attr.get("href") or "").strip()
+            tokens = rel.split()
+            if href and (
+                "icon" in tokens
+                or any(t.startswith("apple-touch-icon") for t in tokens)
+            ):
+                self.icons.append((rel, href, (attr.get("sizes") or "").strip()))
             return
         if tag != "meta":
             return
@@ -111,6 +126,24 @@ def parse_meta_tags(html: str, base_url: str) -> ParsedMeta:
         image=image,
         color=color.strip() if color else None,
         site_name=og.get("site_name"),
+        html_title=html_title,
+        html_description=meta.get("description"),
+        favicon=_pick_favicon(collector.icons, base_url),
         og=og,
         twitter=twitter,
     )
+
+
+def _pick_favicon(icons: list[tuple[str, str, str]], base_url: str) -> str | None:
+    """Best declared icon, else the /favicon.ico convention; https only."""
+
+    def score(icon: tuple[str, str, str]) -> int:
+        rel, _href, sizes = icon
+        if "apple-touch-icon" in rel:
+            return 180
+        m = re.match(r"(\d+)", sizes)
+        return int(m.group(1)) if m else 16
+
+    href = max(icons, key=score)[1] if icons else "/favicon.ico"
+    resolved = urljoin(base_url, href)
+    return resolved if resolved.startswith("https://") else None

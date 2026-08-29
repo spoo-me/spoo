@@ -131,7 +131,8 @@ async def device_login(
         if redirect_uri:
             params["redirect_uri"] = redirect_uri
         next_url = f"/auth/device/login?{urlencode(params)}"
-        return RedirectResponse(f"/?next={quote(next_url)}", status_code=302)
+        # /login is the only frontend surface that resumes ?next= after auth.
+        return RedirectResponse(f"/login?next={quote(next_url)}", status_code=302)
 
     # Check for existing active grant (auto-approve)
     grant = await grant_repo.find_active_grant(user.user_id, app_id)

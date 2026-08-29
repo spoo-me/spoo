@@ -1,19 +1,21 @@
 import {
   createExecutionContext,
   env,
-  fetchMock,
   waitOnExecutionContext,
 } from "cloudflare:test";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { HttpResponse, http } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import fixtures from "../contract/fixtures.json";
 import worker, { lookupKey } from "../src/index";
 
-beforeAll(() => {
-  fetchMock.activate();
-  fetchMock.disableNetConnect();
-});
-afterEach(() => fetchMock.assertNoPendingInterceptors());
+// onUnhandledRequest: "error" is the disableNetConnect() of MSW — any
+// outbound fetch a test didn't arm via expectOriginFetch fails loudly.
+const server = setupServer();
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
 
 /** Stub the next passthrough to origin and tag it so tests can assert
  * "this request reached origin" unambiguously. */
@@ -22,7 +24,21 @@ function expectOriginFetch(
   path: string | RegExp = /.*/,
   method = "GET",
 ) {
-  fetchMock.get(host).intercept({ path, method }).reply(200, "origin-served");
+  server.use(
+    http.all(
+      `${host}/*`,
+      ({ request }) => {
+        const url = new URL(request.url);
+        const pathMatches =
+          typeof path === "string"
+            ? url.pathname === path
+            : path.test(url.pathname);
+        if (request.method !== method || !pathMatches) return undefined;
+        return HttpResponse.text("origin-served");
+      },
+      { once: true },
+    ),
+  );
 }
 
 // The handler is typed for edge-ingress requests (IncomingRequestCfProperties);

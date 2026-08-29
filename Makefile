@@ -27,10 +27,15 @@ docker-up:          ## Start full stack (MongoDB + Redis + app)
 docker-down:        ## Stop full stack
 	docker-compose down
 
+# Pinned env so the artifact is reproducible: the servers block comes from
+# APP_URL, and settings refuse to load without MONGODB_URI. Writing through a
+# temp file keeps a failed export from truncating the committed spec.
 openapi:            ## Export OpenAPI spec to openapi.json
+	MONGODB_URI="mongodb://localhost:27017/" APP_URL="https://spoo.me" \
 	uv run python -c \
 		"from app import create_app; import json; app = create_app(); \
-		print(json.dumps(app.openapi(), indent=2))" > openapi.json
+		print(json.dumps(app.openapi(), indent=2))" > openapi.json.tmp
+	mv openapi.json.tmp openapi.json
 
 docs:               ## Open API docs in browser (requires running server)
 	open http://localhost:8000/docs

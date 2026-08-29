@@ -1,11 +1,13 @@
 """GET /api/v1/metadata — fetch & parse a destination's existing meta tags.
 
-The prefill companion to custom meta-tags (Dub precedent: api.dub.co/
-metatags): clients call this to pre-populate title/description/image from
-the destination before customizing. Auth-required — an anonymous version
-would be a free fetch-proxy for the whole internet — and gated on the same
-``custom_meta_tags`` flag as the write paths it feeds, with its own tight
-rate limit, SSRF-guarded fetching, and Redis caching (1h / 5m negative).
+Two consumers, one route: the custom meta-tags editor prefills
+title/description/image from here before customizing, and the public
+link preview checker at spoo.me/tools/link-preview shows how a page
+unfurls. Auth is optional — the fetch-proxy
+concern is held by rate limits, not login: authenticated callers spend a
+per-account budget, anonymous callers a tighter per-IP one. Fetching
+is SSRF-guarded and Redis-cached (1h / 5m negative), and the response
+exposes only parsed tags, never page content.
 """
 
 from __future__ import annotations
@@ -18,9 +20,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from dependencies import (
     URL_READ_SCOPES,
     CurrentUser,
-    FeatureFlagSvc,
     Settings,
-    require_scopes,
+    optional_scopes,
 )
 from errors import AppError, ValidationError
 from infrastructure.logging import get_logger
@@ -29,10 +30,9 @@ from infrastructure.safe_fetch import (
     FetchTransientError,
     fetch_public,
 )
-from middleware.openapi import AUTH_RESPONSES
-from middleware.rate_limiter import Limits, limiter
+from middleware.openapi import ERROR_RESPONSES, OPTIONAL_AUTH_SECURITY
+from middleware.rate_limiter import Limits, dynamic_limit, limiter
 from schemas.dto.responses.metadata import MetadataResponse
-from services.feature_flag_service import META_TAGS_FLAG
 from services.meta_tags.parse_html import parse_meta_tags
 
 log = get_logger(__name__)
@@ -41,6 +41,10 @@ router = APIRouter(tags=["Metadata"])
 
 _FETCH_MAX_BYTES = 524_288  # tags must be in the head; 512KB is generous
 _FETCH_TIMEOUT = 5.0
+
+_metadata_limit, _metadata_key = dynamic_limit(
+    Limits.METADATA_FETCH, Limits.METADATA_ANON
+)
 
 
 class UpstreamUnfetchableError(AppError):
@@ -57,11 +61,12 @@ class UpstreamTimeoutError(AppError):
 
 @router.get(
     "/metadata",
-    responses=AUTH_RESPONSES,
+    responses=ERROR_RESPONSES,
+    openapi_extra=OPTIONAL_AUTH_SECURITY,
     operation_id="getUrlMetadata",
     summary="Fetch Destination Meta Tags",
 )
-@limiter.limit(Limits.METADATA_FETCH)
+@limiter.limit(_metadata_limit, key_func=_metadata_key)
 async def get_metadata(
     request: Request,
     url: Annotated[
@@ -73,30 +78,24 @@ async def get_metadata(
         ),
     ],
     settings: Settings,
-    flag_svc: FeatureFlagSvc,
-    user: CurrentUser = Depends(require_scopes(URL_READ_SCOPES)),  # noqa: B008
+    user: CurrentUser | None = Depends(optional_scopes(URL_READ_SCOPES)),  # noqa: B008
 ) -> MetadataResponse:
     """Fetch a destination page and return its existing meta tags.
 
     Use this to prefill ``meta_tags`` before customizing a link's social
-    preview. Returns normalized best-pick fields (og → twitter → html
-    fallbacks) plus the raw ``og``/``twitter`` tag families.
+    preview, or to check how a page will unfurl. Returns normalized
+    best-pick fields (og → twitter → html fallbacks) plus the raw
+    ``og``/``twitter`` tag families.
 
-    **Authentication**: Required. **API Key Scope**: `urls:read`,
-    `urls:manage`, or `admin:all`.
+    **Authentication**: Optional. Authenticated callers get the higher
+    per-account limit; anonymous calls are limited per IP. **API Key
+    Scope** (when authenticating): `urls:read`, `urls:manage`, or
+    `admin:all`.
 
-    **Feature gate**: `custom_meta_tags` must be enabled for the calling
-    account — this endpoint only exists to feed that feature.
-
-    **Rate Limits**: 20/min, 500/day — results are cached ~1h server-side,
-    so repeat calls for the same URL are cheap and don't refetch.
+    **Rate Limits**: 60/min, 2,000/day authenticated; 15/min, 300/day
+    anonymous — results are cached ~1h server-side, so repeat calls for
+    the same URL are cheap and don't refetch.
     """
-    # Same gate as the write paths that consume this prefill (POST /shorten,
-    # PATCH /urls/{id}). 403 rather than a hiding 404: those siblings already
-    # answer 403 for the same flag and the endpoint is in the public OpenAPI
-    # spec, so there is no existence left to conceal.
-    await flag_svc.require(META_TAGS_FLAG, user)
-
     if not url.startswith("https://"):
         raise ValidationError("url must be https", field="url")
 
@@ -138,6 +137,9 @@ async def get_metadata(
         "image": parsed.image,
         "color": parsed.color,
         "site_name": parsed.site_name,
+        "html_title": parsed.html_title,
+        "html_description": parsed.html_description,
+        "favicon": parsed.favicon,
         "og": parsed.og,
         "twitter": parsed.twitter,
         "fetched_at": datetime.now(timezone.utc).isoformat(),

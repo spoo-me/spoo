@@ -12,9 +12,10 @@
     "check": "wrangler types --check --strict-vars=false && tsc --noEmit && vitest run"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.9.12",
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "msw": "^2.15.0",
     "typescript": "^5.9.0",
-    "vitest": "^3.2.0",
-    "wrangler": "^4.30.0"
+    "vitest": "^4.1.11",
+    "wrangler": "^4.124.0"
   }
 }
