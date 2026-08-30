@@ -50,3 +50,25 @@ class TestClickDoc:
         restored = ClickDoc.from_mongo(doc.to_mongo())
         assert restored.referrer == "google.com"
         assert restored.redirect_ms == doc.redirect_ms
+
+    def test_to_mongo_omits_none_fields(self):
+        data = self._make().to_mongo()
+        for field in (
+            "referrer",
+            "bot_name",
+            "device",
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+        ):
+            assert field not in data
+        assert "domain" not in data["meta"]
+
+    def test_to_mongo_keeps_populated_fields(self):
+        data = self._make(
+            referrer="google.com", device="mobile", utm_source="tw"
+        ).to_mongo()
+        assert data["referrer"] == "google.com"
+        assert data["device"] == "mobile"
+        assert data["utm_source"] == "tw"
+        assert data["redirect_ms"] == 42

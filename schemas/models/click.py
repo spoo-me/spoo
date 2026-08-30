@@ -6,7 +6,7 @@ Maps to the `clicks` MongoDB time-series collection.
 Time-series schema:
   timeField  = "clicked_at"
   metaField  = "meta"
-  granularity = "seconds"
+  granularity = "hours"
 
 The `meta` subdocument groups clicks by URL for efficient range queries.
 owner_id always holds an ObjectId — anonymous clicks use ANONYMOUS_OWNER_ID
@@ -60,3 +60,8 @@ class ClickDoc(MongoBaseModel):
     utm_source: str | None = None
     utm_medium: str | None = None
     utm_campaign: str | None = None
+
+    def to_mongo(self) -> dict:
+        # None must be absent, not null: null↔string type flips hard-close
+        # time-series buckets (schema-change rollover).
+        return self.model_dump(by_alias=True, exclude_none=True)
