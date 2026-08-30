@@ -122,7 +122,9 @@ async def ensure_indexes(
             timeseries={
                 "timeField": "clicked_at",
                 "metaField": "meta",
-                "granularity": "seconds",
+                # "hours" matches prod (collMod'd from "seconds"): sparse
+                # per-link series need the 30-day bucket span to pack.
+                "granularity": "hours",
             },
         )
     except (CollectionInvalid, OperationFailure) as e:
