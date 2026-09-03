@@ -181,6 +181,36 @@ def test_terms_of_service_alias():
     assert "text/html" in resp.headers["content-type"]
 
 
+def test_refund_policy_renders():
+    app = _build_test_app()
+    with TestClient(app) as c:
+        resp = c.get("/refund")
+    assert resp.status_code == 200
+    assert "Paddle is our Merchant of Record" in resp.text
+
+
+def test_refund_policy_alias():
+    app = _build_test_app()
+    with TestClient(app) as c:
+        resp = c.get("/legal/refund-policy")
+    assert resp.status_code == 200
+
+
+def test_acceptable_use_policy_renders():
+    app = _build_test_app()
+    with TestClient(app) as c:
+        resp = c.get("/acceptable-use")
+    assert resp.status_code == 200
+    assert "Every destination is checked" in resp.text
+
+
+def test_acceptable_use_policy_alias():
+    app = _build_test_app()
+    with TestClient(app) as c:
+        resp = c.get("/aup")
+    assert resp.status_code == 200
+
+
 # ── Contact ──────────────────────────────────────────────────────────────────
 
 

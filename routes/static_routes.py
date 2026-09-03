@@ -116,6 +116,33 @@ async def terms_of_service(request: Request) -> Response:
     )
 
 
+@router.get("/docs/refund-policy")
+@router.get("/legal/refund-policy")
+@router.get("/refund-policy")
+@router.get("/refund")
+@limiter.exempt
+async def refund_policy(request: Request) -> Response:
+    return templates.TemplateResponse(
+        request,
+        "legal/refund-policy.html",
+        {"host_url": str(request.base_url)},
+    )
+
+
+@router.get("/docs/acceptable-use-policy")
+@router.get("/legal/acceptable-use-policy")
+@router.get("/acceptable-use-policy")
+@router.get("/acceptable-use")
+@router.get("/aup")
+@limiter.exempt
+async def acceptable_use_policy(request: Request) -> Response:
+    return templates.TemplateResponse(
+        request,
+        "legal/acceptable-use-policy.html",
+        {"host_url": str(request.base_url)},
+    )
+
+
 @router.get("/docs/{path:path}")
 @limiter.exempt
 async def docs_wildcard(path: str, request: Request) -> Response:

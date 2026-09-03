@@ -17,8 +17,11 @@ from __future__ import annotations
 RESERVED_ALIASES: frozenset[str] = frozenset(
     {
         "about",
+        "acceptable-use",
+        "acceptable-use-policy",
         "api",
         "apps",
+        "aup",
         "auth",
         "billing",
         "blog",
@@ -59,6 +62,8 @@ RESERVED_ALIASES: frozenset[str] = frozenset(
         "profile",
         "profile-pictures",
         "public",
+        "refund",
+        "refund-policy",
         "register",
         "restore-account",
         "relay",
