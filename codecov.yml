@@ -1,0 +1,4 @@
+# The probe browser is a separate service with its own runtime (Playwright);
+# it is exercised against live pages, not by the app's test suite.
+ignore:
+  - "browser/**"

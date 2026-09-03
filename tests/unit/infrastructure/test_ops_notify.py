@@ -1,7 +1,10 @@
 """Unit tests for DiscordOpsNotifier — delivery semantics, channel
 routing, and embed formatting (owned here, not by the calling services)."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from infrastructure.ops_notify import DiscordOpsNotifier
 
@@ -190,3 +193,22 @@ class TestSendEmbed:
         from infrastructure.ops_notify import _bound_field
 
         assert _bound_field("```ok```") == "```ok```"
+
+
+@pytest.mark.asyncio
+async def test_attachment_name_and_type_follow_the_image_bytes():
+    """The probe browser sends JPEG; the old code named everything .webp,
+    which Discord then refused to render inline."""
+    notifier, http = _make()
+    jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 16
+    await notifier.send_embed(
+        channel="report",
+        title="T",
+        color=1,
+        fields=[{"name": "Host", "value": "x"}],
+        image=jpeg,
+    )
+    kw = http.post.call_args.kwargs
+    assert kw["files"]["files[0]"] == ("evidence.jpg", jpeg, "image/jpeg")
+    payload = json.loads(kw["data"]["payload_json"])
+    assert payload["embeds"][0]["image"] == {"url": "attachment://evidence.jpg"}

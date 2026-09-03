@@ -47,6 +47,7 @@ from pymongo.asynchronous.mongo_client import AsyncMongoClient
 
 from config import AppSettings, ClickEventsSettings
 from dependencies.wiring import build_account_erasure_service, build_click_service
+from infrastructure.browser_probe import BrowserProbeClient
 from infrastructure.cache.redis_client import create_redis_client
 from infrastructure.cache.url_cache import UrlCache
 from infrastructure.cloudflare_kv import CloudflareKVClient
@@ -476,6 +477,15 @@ async def _build_runtime(
                         runtime.http_client,
                         account_id=edge.cf_account_id,
                         api_token=edge.cf_api_token,
+                    ),
+                    probe=(
+                        BrowserProbeClient(
+                            runtime.http_client,
+                            base_url=sf.browser_probe_url,
+                            timeout_seconds=sf.browser_probe_timeout_seconds,
+                        )
+                        if sf.browser_probe_url
+                        else None
                     ),
                     http=runtime.http_client,
                     feed_repo=worker_feed_repo,

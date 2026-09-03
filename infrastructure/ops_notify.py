@@ -25,11 +25,20 @@ from typing import Any, Literal, Protocol
 
 from infrastructure.http_client import HttpClient
 from infrastructure.logging import get_logger
+from shared.image_sniff import EXT, MIME, sniff_image
 
 log = get_logger(__name__)
 
-_IMAGE_NAME = "evidence.webp"
 Channel = Literal["report", "contact"]
+
+
+def _attachment(image: bytes) -> tuple[str, str]:
+    """Discord renders the embed image only when name and type match the bytes."""
+    info = sniff_image(image)
+    fmt = info.format if info else "webp"
+    return f"evidence.{EXT[fmt]}", MIME[fmt]
+
+
 _CHANNELS = frozenset(("report", "contact"))
 # Discord's per-field cap; the fences count.
 _FIELD_MAX = 1024
@@ -278,11 +287,12 @@ class DiscordOpsNotifier:
             if image:
                 # Discord webhooks take the image as a multipart file; the
                 # embed refers to it by attachment name.
-                payload["embeds"][0]["image"] = {"url": f"attachment://{_IMAGE_NAME}"}
+                name, mime = _attachment(image)
+                payload["embeds"][0]["image"] = {"url": f"attachment://{name}"}
                 response = await self._http.post(
                     url,
                     data={"payload_json": json.dumps(payload)},
-                    files={"files[0]": (_IMAGE_NAME, image, "image/webp")},
+                    files={"files[0]": (name, image, mime)},
                     follow_redirects=False,
                 )
             else:

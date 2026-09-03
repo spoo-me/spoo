@@ -105,6 +105,8 @@ services:
       - CLICK_EVENTS_SINK=stream
       - CLICK_EVENTS_QUEUE_REDIS_URI=redis://redis-queue:6379/0
       - CLICK_EVENTS_HOTNESS_ENABLED=true
+      - SAFETY_BROWSER_PROBE_URL=http://browser:8011
+    networks: [default, probenet]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]
       interval: 15s
@@ -112,7 +114,28 @@ services:
       retries: 3
       start_period: 15s
 
+  # Scripted browser probe for the safety deep tier: loads a destination,
+  # clicks its prominent controls, reports what happened. Own network in
+  # prod so a hostile page cannot reach the other services.
+  browser:
+    build: ./browser
+    container_name: spoo_browser
+    profiles: ["click-events"]
+    networks: [probenet]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8011/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
 volumes:
   mongo-data:
   mongo-config:
   redis-queue-data:
+
+networks:
+  # The probe browser renders hostile pages: it only ever shares a network
+  # with the worker that calls it. See infrastructure/probenet-egress.sh.
+  probenet:
+    driver: bridge
