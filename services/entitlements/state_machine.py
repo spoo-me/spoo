@@ -77,3 +77,9 @@ def next_status(current: S | None, event: E) -> S:
             f"event {event.value!r} cannot apply to status "
             f"{current.value if current else 'none'!r}"
         ) from None
+
+
+def is_noop(current: S | None, event: E) -> bool:
+    """True when the event is legal here but leaves the status unchanged."""
+    key = (current, event)
+    return key in _TRANSITIONS and _TRANSITIONS[key] == current

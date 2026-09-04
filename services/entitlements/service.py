@@ -164,6 +164,8 @@ class EntitlementService:
         after_status = next_status(before.status if before else None, event)
         if after_status is SubscriptionStatus.GRACE and "grace_until" not in fields:
             raise ValueError("a transition to grace needs grace_until")
+        if after_status is SubscriptionStatus.LAPSED:
+            fields["founding_streak_ok"] = False
         after = await self._subs.write_transition(
             user_id,
             before=before,

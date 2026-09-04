@@ -178,6 +178,19 @@ def test_unset_billing_provider_refused_in_production(with_mongo, env, should_bo
             AppSettings()
 
 
+def test_sandbox_paddle_refused_in_production(with_mongo):
+    with_mongo.setenv("ENV", "production")
+    with_mongo.setenv("BILLING_PROVIDER", "paddle")
+    with_mongo.setenv("BILLING_PADDLE_API_KEY", "pdl_live_x")
+    with_mongo.setenv("BILLING_PADDLE_WEBHOOK_SECRET", "s")
+    with_mongo.setenv("BILLING_PADDLE_PRICE_PRO_MONTHLY", "pri_m")
+    with_mongo.setenv("BILLING_PADDLE_PRICE_PRO_YEAR", "pri_y")
+    with pytest.raises(PydanticValidationError, match="BILLING_PADDLE_ENV"):
+        AppSettings()
+    with_mongo.setenv("BILLING_PADDLE_ENV", "production")
+    assert AppSettings().billing.paddle_env == "production"
+
+
 def test_explicit_billing_provider_boots_in_production(with_mongo):
     with_mongo.setenv("ENV", "production")
     with_mongo.setenv("BILLING_PROVIDER", "none")

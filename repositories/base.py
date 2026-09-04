@@ -67,6 +67,34 @@ class BaseRepository(Generic[T]):
             )
             raise
 
+    async def _find_many(
+        self,
+        query: dict,
+        *,
+        sort: list[tuple[str, int]] | None = None,
+        limit: int | None = 500,
+    ) -> list[T]:
+        """Find matching documents and convert each via ``T.from_mongo()``.
+        ``limit=None`` returns them all."""
+        try:
+            cursor = self._col.find(query)
+            if sort:
+                cursor = cursor.sort(sort)
+            if limit is not None:
+                cursor = cursor.limit(limit)
+            docs = await cursor.to_list(length=limit)
+            model_cls = self._resolve_model()
+            return [model_cls.from_mongo(d) for d in docs]  # type: ignore[union-attr]
+        except PyMongoError as exc:
+            log.error(
+                "repo_find_many_failed",
+                collection=self._collection_name,
+                query_keys=list(query.keys()),
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
+            raise
+
     async def _find_one_raw(
         self, query: dict, projection: dict | None = None
     ) -> dict | None:

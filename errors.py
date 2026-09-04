@@ -212,6 +212,14 @@ class NotConfiguredError(AppError):
     error_code = "not_configured"
 
 
+class BillingProviderError(AppError):
+    """The billing provider answered with an error or not at all; the caller
+    retries or fails loudly, never guesses a plan state."""
+
+    status_code = 502
+    error_code = "billing_provider_error"
+
+
 class R2StorageError(AppError):
     """R2 object PUT failed — the user write that needed it must fail
     loudly rather than store a broken image URL."""

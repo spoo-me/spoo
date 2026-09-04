@@ -23,6 +23,7 @@ from services.auth.credentials import CredentialService
 from services.auth.device import DeviceAuthService
 from services.auth.password import PasswordService
 from services.auth.verification import EmailVerificationService
+from services.billing.service import BillingService
 from services.bulk_url_service import BulkUrlService
 from services.click import ClickService
 from services.click.sinks import ClickEventSink
@@ -43,6 +44,10 @@ from services.tag_service import TagService
 from services.url_expand_service import UrlExpandService
 from services.url_service import UrlService
 from services.webhooks.service import WebhookService
+
+
+def get_billing_service(request: Request) -> BillingService:
+    return request.app.state.billing_service
 
 
 def get_url_service(request: Request) -> UrlService:
@@ -172,6 +177,7 @@ def get_webhook_service(request: Request) -> WebhookService:
 # ── Annotated type aliases — Depends shortcuts for route signatures ──────────
 
 UrlSvc = Annotated[UrlService, Depends(get_url_service)]
+BillingSvc = Annotated[BillingService, Depends(get_billing_service)]
 UrlPolicy = Annotated[UrlPolicyService, Depends(get_url_policy)]
 BulkUrlSvc = Annotated[BulkUrlService, Depends(get_bulk_url_service)]
 TagSvc = Annotated[TagService, Depends(get_tag_service)]
