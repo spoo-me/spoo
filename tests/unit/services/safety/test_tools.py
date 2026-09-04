@@ -11,6 +11,8 @@ from infrastructure.browser_run import BrowserRunClient, RenderResult
 from services.safety.tools import (
     InvestigationToolDeps,
     build_investigation_tools,
+    last_render_screenshot,
+    reset_last_render,
     resolve_chain_impl,
     trim_html,
 )
@@ -630,3 +632,150 @@ class TestLastRenderStash:
 
         assert last_render_screenshot() == b""
         assert last_render_screenshot("https://x.example/p") == b""
+
+
+class TestFetchPageProbe:
+    """With the probe browser, fetch_page reports what the page DID and
+    attaches both renders; without it, or when it fails, the one-shot
+    Cloudflare snapshot still answers."""
+
+    def _probe_result(self, **over):
+        from infrastructure.browser_probe import ProbeResult
+
+        base = dict(
+            url="https://x.example",
+            final_url="https://x.example/",
+            html="<title>Watch</title>",
+            screenshot=b"\xff\xd8\xffbefore",
+            screenshot_after=b"\xff\xd8\xffafter",
+            media_type="image/jpeg",
+            observations="click 1: video 'Play' → opened pop-up https://ads.example/x [cross-domain]",
+        )
+        base.update(over)
+        return ProbeResult(**base)
+
+    @pytest.mark.asyncio
+    async def test_observations_and_both_shots_reach_the_model(self):
+        probe = AsyncMock()
+        probe.probe = AsyncMock(return_value=self._probe_result())
+        deps = _deps(probe=probe)
+        fetch_page = next(
+            t for t in build_investigation_tools(deps) if t.__name__ == "fetch_page"
+        )
+        reset_last_render()
+        out = await fetch_page("https://x.example")
+        assert "## Observed behaviour" in out.return_value
+        assert "opened pop-up https://ads.example/x" in out.return_value
+        assert "rendered via our own browser" in out.return_value
+        assert [c.data for c in out.content] == [
+            b"\xff\xd8\xffbefore",
+            b"\xff\xd8\xffafter",
+        ]
+        assert all(c.media_type == "image/jpeg" for c in out.content)
+        # The embed shows what a visitor sees first, not the post-click state.
+        assert last_render_screenshot("https://x.example") == b"\xff\xd8\xffbefore"
+        deps.browser.snapshot.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_dead_probe_falls_back_to_snapshot(self):
+        probe = AsyncMock()
+        probe.probe = AsyncMock(return_value=None)
+        deps = _deps(probe=probe)
+        deps.browser.snapshot = AsyncMock(
+            return_value=RenderResult(
+                url="https://x.example", html="<title>Hi</title>", screenshot=b""
+            )
+        )
+        fetch_page = next(
+            t for t in build_investigation_tools(deps) if t.__name__ == "fetch_page"
+        )
+        out = await fetch_page("https://x.example")
+        assert "rendered via cloudflare datacenter" in out.lower()
+        assert "Observed behaviour" not in out
+
+    @pytest.mark.asyncio
+    async def test_identical_after_shot_is_not_attached_twice(self):
+        probe = AsyncMock()
+        probe.probe = AsyncMock(return_value=self._probe_result(screenshot_after=b""))
+        deps = _deps(probe=probe)
+        fetch_page = next(
+            t for t in build_investigation_tools(deps) if t.__name__ == "fetch_page"
+        )
+        reset_last_render()
+        out = await fetch_page("https://x.example")
+        assert len(out.content) == 1
+        assert "screenshot: attached" in out.return_value
+
+
+class TestTerminalUrl:
+    @pytest.mark.asyncio
+    async def test_returns_where_the_chain_ends(self):
+        from services.safety.tools import terminal_url_impl
+
+        responses = [
+            SimpleNamespace(
+                status_code=302,
+                is_redirect=True,
+                headers={"location": "https://final-dest.net/page"},
+            ),
+            SimpleNamespace(
+                status_code=200,
+                is_redirect=False,
+                headers={"content-type": "text/html"},
+            ),
+        ]
+        client = AsyncMock()
+        client.head = AsyncMock(side_effect=responses)
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+        with (
+            patch(
+                "services.safety.tools.resolve_public_ip",
+                AsyncMock(return_value="93.184.216.34"),
+            ),
+            patch("services.safety.tools.httpx.AsyncClient", return_value=client),
+        ):
+            assert (
+                await terminal_url_impl("https://start-src.com/r")
+                == "https://final-dest.net/page"
+            )
+
+    @pytest.mark.asyncio
+    async def test_refused_or_failed_chain_is_none(self):
+        from infrastructure.safe_fetch import FetchHardError
+        from services.safety.tools import terminal_url_impl
+
+        with patch(
+            "services.safety.tools.resolve_public_ip",
+            AsyncMock(side_effect=FetchHardError("not public")),
+        ):
+            assert await terminal_url_impl("https://internal.example/x") is None
+
+
+class TestFetchPageLandedUrl:
+    @pytest.mark.asyncio
+    async def test_redirected_probe_names_the_page_it_landed_on(self):
+        from infrastructure.browser_probe import ProbeResult
+
+        probe = AsyncMock()
+        probe.probe = AsyncMock(
+            return_value=ProbeResult(
+                url="https://short.example/x",
+                final_url="https://landing.example/kit",
+                html="<title>Kit</title>",
+                screenshot=b"",
+                screenshot_after=b"",
+                media_type="image/jpeg",
+                observations="loaded: ...",
+            )
+        )
+        deps = _deps(probe=probe)
+        fetch_page = next(
+            t for t in build_investigation_tools(deps) if t.__name__ == "fetch_page"
+        )
+        out = await fetch_page("https://short.example/x")
+        assert "url: https://short.example/x" in out
+        assert (
+            "landed on: https://landing.example/kit (everything below is that page)"
+            in out
+        )

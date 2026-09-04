@@ -594,6 +594,10 @@ class SafetySettings(BaseSettings):
     deep_report_daily_budget: int = Field(default=200, ge=1)
     deep_daily_budget: int = Field(default=200, ge=1)
     deep_admit_sweeps: bool = False
+    # L2 render egress: the scripted-browser probe (browser/probe.py) that
+    # clicks the page. Empty = one-shot Cloudflare snapshot only.
+    browser_probe_url: str = ""
+    browser_probe_timeout_seconds: float = Field(default=75.0, ge=5.0)
     # Auto-block policy for a model toxic verdict:
     #   corroborated — a hard source (report, feed, Web Risk) must agree
     #                  (default; the model alone goes to review)

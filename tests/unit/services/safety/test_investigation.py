@@ -799,3 +799,125 @@ class TestEnactCarriesScopeAndScreenshot:
         await inv.investigate(_event())
 
         assert notifier.safety_action.await_args.kwargs["screenshot"] is None
+
+
+class TestSiblingLinks:
+    """A small host's other links, resolved, go into the bundle: campaign
+    shape the model cannot see from one render. A shared platform's links
+    belong to strangers, so past the cap nothing is listed."""
+
+    def _event(self):
+        return SafetyAnalyzeEvent(
+            url="https://ourl.jp/EJTQX",
+            host="ourl.jp",
+            registrable_domain="ourl.jp",
+            trigger="sweep",
+            context={},
+        )
+
+    def _repo(self, link_count, siblings):
+        from unittest.mock import AsyncMock
+
+        repo = AsyncMock()
+        repo.destination_history = AsyncMock(
+            return_value={
+                "link_count": link_count,
+                "anon_count": link_count,
+                "owned_count": 0,
+                "distinct_owners": 0,
+                "total_clicks": 3,
+                "first_seen": None,
+                "edited_count": 0,
+            }
+        )
+        repo.list_recent_by_dest_host = AsyncMock(return_value=siblings)
+        return repo
+
+    @pytest.mark.asyncio
+    async def test_small_host_lists_every_sibling_and_where_it_ends(self):
+        from datetime import datetime, timezone
+
+        from services.safety.investigation import build_evidence_bundle
+
+        t0 = datetime(2026, 9, 3, 10, 41, tzinfo=timezone.utc)
+        siblings = [
+            {
+                "alias": "a",
+                "long_url": "https://ourl.jp/EJTQX",
+                "anonymous": True,
+                "created_at": t0,
+            },
+            {
+                "alias": "b",
+                "long_url": "https://ourl.jp/9Bdpv",
+                "anonymous": True,
+                "created_at": t0,
+            },
+            {
+                "alias": "c",
+                "long_url": "https://ourl.jp/dead",
+                "anonymous": False,
+                "created_at": t0,
+            },
+        ]
+        ends = {
+            "https://ourl.jp/EJTQX": "https://aceuimg.pages.dev/",
+            "https://ourl.jp/9Bdpv": "https://x.github.io/k5/",
+            "https://ourl.jp/dead": None,
+        }
+
+        async def resolve(url):
+            return ends[url]
+
+        text = await build_evidence_bundle(
+            self._event(), self._repo(3, siblings), resolve
+        )
+        assert "## Sibling links on this host" in text
+        assert "3 links, 2 anonymous, 1 from accounts" in text
+        assert (
+            "- https://ourl.jp/EJTQX → https://aceuimg.pages.dev/  [the link under investigation]"
+            in text
+        )
+        assert "- https://ourl.jp/dead → unreachable" in text
+        assert (
+            "destination hosts: 1x aceuimg.pages.dev, 1x x.github.io, 1x unreachable"
+            in text
+        )
+        # Section order: siblings sit between history and the trigger.
+        assert (
+            text.index("## First-party history")
+            < text.index("## Sibling links")
+            < text.index("## Why this reached you")
+        )
+
+    @pytest.mark.asyncio
+    async def test_shared_platform_is_not_listed(self):
+        from services.safety.investigation import build_evidence_bundle
+
+        repo = self._repo(380, [])
+        text = await build_evidence_bundle(self._event(), repo, AsyncMock())
+        assert "Sibling links" not in text
+        repo.list_recent_by_dest_host.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_resolver_blowing_up_does_not_kill_the_bundle(self):
+        from datetime import datetime, timezone
+
+        from services.safety.investigation import build_evidence_bundle
+
+        siblings = [
+            {
+                "alias": "a",
+                "long_url": "https://ourl.jp/EJTQX",
+                "anonymous": True,
+                "created_at": datetime(2026, 9, 3, tzinfo=timezone.utc),
+            },
+        ]
+
+        async def resolve(url):
+            raise RuntimeError("dns down")
+
+        text = await build_evidence_bundle(
+            self._event(), self._repo(1, siblings), resolve
+        )
+        assert "- https://ourl.jp/EJTQX → unreachable" in text

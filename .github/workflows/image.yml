@@ -74,3 +74,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+
+      # The safety tier's probe browser ships beside the app under the same
+      # tags, so one IMAGE_TAG names a working pair.
+      - name: Extract metadata (browser)
+        id: meta_browser
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-browser
+          tags: |
+            type=raw,value=edge,enable=${{ github.event_name == 'push' }}
+            type=sha,prefix=,format=short
+
+      - name: Build and push (browser)
+        uses: docker/build-push-action@v7
+        with:
+          context: browser
+          push: true
+          tags: ${{ steps.meta_browser.outputs.tags }}
+          labels: ${{ steps.meta_browser.outputs.labels }}
+          cache-from: type=gha,scope=browser
+          cache-to: type=gha,mode=max,scope=browser
+          platforms: linux/amd64

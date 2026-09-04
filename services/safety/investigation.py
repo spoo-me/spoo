@@ -19,10 +19,13 @@ label — not by trusting the model up front.
 
 from __future__ import annotations
 
+import asyncio
+from collections import Counter
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 
@@ -41,6 +44,7 @@ from services.safety.tools import (
     reset_hard_hit,
     reset_last_render,
     saw_hard_hit,
+    terminal_url_impl,
 )
 from shared.validators import is_valid_pattern, matching_blocked_pattern
 
@@ -214,14 +218,67 @@ def build_investigate_task(prompt_dir: str = "", tools=()) -> LlmTask:
     )
 
 
+# Sibling links are listed only for a host this small: on a shared platform
+# (a site builder, a big shortener) they belong to strangers and say nothing.
+SIBLING_CAP = 15
+_SIBLING_BUDGET_S = 12.0
+
+
+async def sibling_section(
+    event: SafetyAnalyzeEvent, url_repo: UrlRepository, resolve=terminal_url_impl
+) -> list[str]:
+    """Every link we hold on this host and where each one ends up over
+    HTTP: nine links from one anonymous creator in three minutes, all to
+    fake players, is campaign shape no single render shows."""
+    try:
+        siblings = list(
+            await url_repo.list_recent_by_dest_host(event.host, limit=SIBLING_CAP)
+        )
+    except Exception as exc:
+        log.warning("siblings_unavailable", host=event.host, error=str(exc))
+        return []
+    if not siblings:
+        return []
+    try:
+        targets = await asyncio.wait_for(
+            asyncio.gather(
+                *(resolve(s["long_url"]) for s in siblings), return_exceptions=True
+            ),
+            timeout=_SIBLING_BUDGET_S,
+        )
+    except (asyncio.TimeoutError, TimeoutError):
+        targets = [None] * len(siblings)
+    anon = sum(1 for s in siblings if s.get("anonymous"))
+    stamps = sorted(s["created_at"] for s in siblings if s.get("created_at"))
+    lines = [
+        "## Sibling links on this host (every link we hold; HTTP redirects followed)",
+        f"{len(siblings)} links, {anon} anonymous, {len(siblings) - anon} from accounts",
+    ]
+    if stamps:
+        lines.append(
+            f"created between {stamps[0]:%Y-%m-%d %H:%M} and {stamps[-1]:%Y-%m-%d %H:%M} UTC"
+        )
+    hosts: Counter[str] = Counter()
+    for s, t in zip(siblings, targets, strict=True):
+        dest = t if isinstance(t, str) and t else None
+        mark = "  [the link under investigation]" if s["long_url"] == event.url else ""
+        lines.append(f"- {s['long_url']} → {dest or 'unreachable'}{mark}")
+        hosts[urlparse(dest).hostname or "unreachable" if dest else "unreachable"] += 1
+    lines.append(
+        "destination hosts: " + ", ".join(f"{n}x {h}" for h, n in hosts.most_common())
+    )
+    lines.append("")
+    return lines
+
+
 async def build_evidence_bundle(
-    event: SafetyAnalyzeEvent, url_repo: UrlRepository
+    event: SafetyAnalyzeEvent, url_repo: UrlRepository, resolve=terminal_url_impl
 ) -> str:
     """Everything free goes in the prompt: the URL, its decomposition,
-    first-party history, the report text, and why it was queued. NEVER our
-    own prior system verdicts — that would make the store an echo chamber.
-    Human verdicts on siblings would go here too (deferred: needs a
-    registrable-scoped human-verdict read)."""
+    first-party history, sibling links on a small host, the report text,
+    and why it was queued. NEVER our own prior system verdicts — that would
+    make the store an echo chamber. Human verdicts on siblings would go
+    here too (deferred: needs a registrable-scoped human-verdict read)."""
     history = await url_repo.destination_history(event.host)
     ctx = event.context or {}
     lines = [
@@ -238,6 +295,10 @@ async def build_evidence_bundle(
         f"first seen: {history['first_seen'] or 'unknown'}",
         f"links edited after creation: {history['edited_count']}",
         "",
+    ]
+    if 0 < history["link_count"] <= SIBLING_CAP:
+        lines += await sibling_section(event, url_repo, resolve)
+    lines += [
         "## Why this reached you",
         f"trigger: {event.trigger}",
     ]

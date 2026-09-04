@@ -491,6 +491,32 @@ class UrlRepository(BaseRepository[UrlV2Doc]):
             )
         return [(d["alias"], d.get("domain", ""), d.get("long_url", "")) for d in docs]
 
+    async def list_recent_by_dest_host(
+        self, host: str, *, limit: int = 15
+    ) -> list[dict]:
+        """The newest links pointing at *host*, with who made each and when:
+        the campaign shape of a small host, for the investigation bundle."""
+        cursor = (
+            self._col.find(
+                {"dest.host": host},
+                {"alias": 1, "domain": 1, "long_url": 1, "owner_id": 1, "status": 1},
+            )
+            .sort("_id", -1)
+            .limit(limit)
+        )
+        docs = await cursor.to_list(length=limit)
+        return [
+            {
+                "alias": d.get("alias", ""),
+                "domain": d.get("domain", ""),
+                "long_url": d.get("long_url", ""),
+                "anonymous": d.get("owner_id") in (None, ANONYMOUS_OWNER_ID),
+                "status": d.get("status", ""),
+                "created_at": d["_id"].generation_time,
+            }
+            for d in docs
+        ]
+
     async def unblock_by_dest_host(self, host: str) -> int:
         """Flip BLOCKED links pointing at *host* back to ACTIVE, scoped to
         docs carrying ``blocked_reason`` so a manual operator ban is never

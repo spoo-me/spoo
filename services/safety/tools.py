@@ -8,8 +8,9 @@ absent piece of evidence ("unavailable"), never an exception into the
 agent loop.
 
 Egress rules:
-- ``fetch_page`` renders via Cloudflare Browser Run — the destination
-  sees a Cloudflare IP, never ours, and the result says so.
+- ``fetch_page`` renders via our own scripted-browser probe when one is
+  configured (it also clicks the page and reports what happened), else
+  via Cloudflare Browser Run. The result names its egress either way.
 - ``resolve_chain`` sends bodyless HEAD/GET hops from this process with
   redirects OFF and an SSRF guard: every hop's host is resolved first
   and private/loopback/link-local/reserved addresses are refused, so a
@@ -40,6 +41,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from pydantic_ai.messages import BinaryContent, ToolReturn
 
+from infrastructure.browser_probe import BrowserProbeClient
 from infrastructure.browser_run import BrowserRunClient
 from infrastructure.http_client import HttpClient
 from infrastructure.logging import get_logger
@@ -146,74 +148,79 @@ _RDAP_TIMEOUT = 8.0
 _TLS_TIMEOUT = 5.0
 
 
+async def _walk_hops(url: str, lines: list[str]) -> tuple[str, bool]:
+    """Follow HTTP redirects with the SSRF guard on every hop. Returns the
+    last URL reached and whether it answered with a final status."""
+    current = url
+    ended = False
+    async with httpx.AsyncClient(
+        follow_redirects=False, timeout=_HOP_TIMEOUT
+    ) as client:
+        for hop in range(1, _MAX_HOPS + 1):
+            parsed = urlparse(current)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname:
+                lines.append(f"hop {hop}: {current} — unsupported URL, stop")
+                break
+            # safe_fetch is the one SSRF guard; the connection is
+            # pinned to the vetted IP so DNS cannot rebind after it.
+            try:
+                hop_ip = await resolve_public_ip(parsed.hostname)
+            except (FetchHardError, FetchTransientError):
+                lines.append(
+                    f"hop {hop}: {current} — resolves to a private or "
+                    "unresolvable address, refused"
+                )
+                break
+            pinned = httpx.URL(current).copy_with(host=bracket_ip(hop_ip))
+            hop_headers = {"Host": parsed.hostname}
+            hop_ext = {"sni_hostname": parsed.hostname}
+            try:
+                response = await client.head(
+                    pinned, headers=hop_headers, extensions=hop_ext
+                )
+                if response.status_code in (405, 501):
+                    # Bodyless by contract: stream and close before
+                    # any body bytes are read.
+                    get_req = client.build_request(
+                        "GET", pinned, headers=hop_headers, extensions=hop_ext
+                    )
+                    response = await client.send(get_req, stream=True)
+                    await response.aclose()
+            except httpx.HTTPError as exc:
+                lines.append(
+                    f"hop {hop}: {current} — request failed ({type(exc).__name__})"
+                )
+                break
+            location = response.headers.get("location")
+            if response.is_redirect and location:
+                nxt = urljoin(current, location)
+                cross = registrable_domain(parsed.hostname or "") != registrable_domain(
+                    urlparse(nxt).hostname or ""
+                )
+                lines.append(
+                    f"hop {hop}: {current} → {response.status_code} → "
+                    f"{nxt}{' [cross-domain]' if cross else ''}"
+                )
+                current = nxt
+                continue
+            lines.append(
+                f"final: {current} → HTTP {response.status_code} "
+                f"(content-type: {response.headers.get('content-type', '?')})"
+            )
+            ended = True
+            break
+        else:
+            lines.append(f"stopped: exceeded {_MAX_HOPS} hops")
+    return current, ended
+
+
 async def resolve_chain_impl(url: str) -> str:
     """Walk redirects hop by hop (redirects OFF, max 10, bodyless)."""
     lines: list[str] = []
-    current = url
-
-    async def _walk() -> None:
-        nonlocal current
-        async with httpx.AsyncClient(
-            follow_redirects=False, timeout=_HOP_TIMEOUT
-        ) as client:
-            for hop in range(1, _MAX_HOPS + 1):
-                parsed = urlparse(current)
-                if parsed.scheme not in ("http", "https") or not parsed.hostname:
-                    lines.append(f"hop {hop}: {current} — unsupported URL, stop")
-                    break
-                # safe_fetch is the one SSRF guard; the connection is
-                # pinned to the vetted IP so DNS cannot rebind after it.
-                try:
-                    hop_ip = await resolve_public_ip(parsed.hostname)
-                except (FetchHardError, FetchTransientError):
-                    lines.append(
-                        f"hop {hop}: {current} — resolves to a private or "
-                        "unresolvable address, refused"
-                    )
-                    break
-                pinned = httpx.URL(current).copy_with(host=bracket_ip(hop_ip))
-                hop_headers = {"Host": parsed.hostname}
-                hop_ext = {"sni_hostname": parsed.hostname}
-                try:
-                    response = await client.head(
-                        pinned, headers=hop_headers, extensions=hop_ext
-                    )
-                    if response.status_code in (405, 501):
-                        # Bodyless by contract: stream and close before
-                        # any body bytes are read.
-                        get_req = client.build_request(
-                            "GET", pinned, headers=hop_headers, extensions=hop_ext
-                        )
-                        response = await client.send(get_req, stream=True)
-                        await response.aclose()
-                except httpx.HTTPError as exc:
-                    lines.append(
-                        f"hop {hop}: {current} — request failed ({type(exc).__name__})"
-                    )
-                    break
-                location = response.headers.get("location")
-                if response.is_redirect and location:
-                    nxt = urljoin(current, location)
-                    cross = registrable_domain(
-                        parsed.hostname or ""
-                    ) != registrable_domain(urlparse(nxt).hostname or "")
-                    lines.append(
-                        f"hop {hop}: {current} → {response.status_code} → "
-                        f"{nxt}{' [cross-domain]' if cross else ''}"
-                    )
-                    current = nxt
-                    continue
-                lines.append(
-                    f"final: {current} → HTTP {response.status_code} "
-                    f"(content-type: {response.headers.get('content-type', '?')})"
-                )
-                break
-            else:
-                lines.append(f"stopped: exceeded {_MAX_HOPS} hops")
 
     # wait_for, not asyncio.timeout: 3.10 support (see safe_fetch).
     try:
-        await asyncio.wait_for(_walk(), timeout=_CHAIN_TIMEOUT)
+        await asyncio.wait_for(_walk_hops(url, lines), timeout=_CHAIN_TIMEOUT)
     except (asyncio.TimeoutError, TimeoutError):
         lines.append("stopped: chain resolution timed out")
     lines.append(
@@ -221,6 +228,16 @@ async def resolve_chain_impl(url: str) -> str:
         "here; fetch_page sees where the browser actually lands."
     )
     return "\n".join(lines)
+
+
+async def terminal_url_impl(url: str, *, timeout: float = 8.0) -> str | None:
+    """Where the HTTP chain ends, or None when it never answered."""
+    lines: list[str] = []
+    try:
+        final, ended = await asyncio.wait_for(_walk_hops(url, lines), timeout=timeout)
+    except (asyncio.TimeoutError, TimeoutError):
+        return None
+    return final if ended else None
 
 
 def _one_line(value: str, cap: int) -> str:
@@ -465,6 +482,8 @@ class InvestigationToolDeps:
     browser: BrowserRunClient
     http: HttpClient
     feed_repo: FeedDomainRepository
+    # Preferred render path: clicks the page too. None = snapshot only.
+    probe: BrowserProbeClient | None = None
     web_risk: WebRiskProvider | None = None
     url_repo: UrlRepository | None = None
     # fetch_page refuses these: a hostile page must not steer the loop into spoo.
@@ -529,21 +548,73 @@ def build_investigation_tools(deps: InvestigationToolDeps) -> list[Callable]:
         where a real browser lands."""
         return await resolve_chain_impl(url)
 
+    def _render_return(
+        url: str,
+        egress: str,
+        html: str,
+        shots: list[tuple[bytes, str]],
+        observations: str,
+        final_url: str = "",
+    ) -> str | ToolReturn:
+        text = f"rendered via {egress}\nurl: {url}"
+        if final_url and final_url != url:
+            text += f"\nlanded on: {final_url} (everything below is that page)"
+        text += f"\n{trim_html(html)}"
+        if observations:
+            text = f"{text}\n\n## Observed behaviour\n{observations}"
+        images = [(data, media) for data, media in shots if data]
+        if not images:
+            return text
+        held = _last_render.get()
+        if held is not None:
+            # The first shot is what a visitor sees; that is the evidence image.
+            held.shots.append((url, images[0][0]))
+        note = (
+            "screenshot: attached"
+            if len(images) == 1
+            else "screenshots: attached (as loaded, then after the clicks)"
+        )
+        return ToolReturn(
+            return_value=f"{text}\n{note}",
+            content=[BinaryContent(data=d, media_type=m) for d, m in images],
+        )
+
     async def fetch_page(url: str) -> str | ToolReturn:
-        """Render the URL in a sandboxed browser (egress: Cloudflare
-        datacenter IP — a cloaking page may serve scanners a clean
-        version) and return the page's trimmed content plus a SCREENSHOT
-        of what the browser saw: title, meta description, every form with
-        its fields and action, external script hosts, any frame or
-        meta-refresh target, and the visible text. Read the screenshot
-        when the text is thin — a page can be a single image, and a brand
-        imitation is visual before it is textual. Fetch the destination page
-        AND, separately, the domain root (https://<host>/) — the root is
-        what separates a real business with one compromised path from a
-        parked or purpose-built domain."""
+        """Render the URL in a sandboxed browser and return the page's
+        trimmed content plus a SCREENSHOT of what the browser saw: title,
+        meta description, every form with its fields and action, external
+        script hosts, any frame or meta-refresh target, and the visible
+        text. When our own probe browser is available it ALSO clicks the
+        page's most prominent controls and reports, under
+        `## Observed behaviour`, exactly what each click caused: pop-ups,
+        navigations, downloads, dialogs, clipboard writes, notification
+        prompts, and what appeared on the page (a modal's text, new form
+        fields). That section is the only source of truth for what a
+        button does; markup and script hosts are not. Egress is named in
+        the result (a cloaking page may serve datacenter IPs a clean
+        version). Read the screenshot when the text is thin — a page can
+        be a single image, and a brand imitation is visual before it is
+        textual. Fetch the destination page AND, separately, the domain
+        root (https://<host>/) — the root is what separates a real
+        business with one compromised path from a parked or purpose-built
+        domain."""
         refusal = _fetch_refusal(url)
         if refusal is not None:
             return refusal
+        if deps.probe is not None:
+            probed = await deps.probe.probe(url)
+            if probed is not None:
+                return _render_return(
+                    url,
+                    probed.egress,
+                    probed.html,
+                    [
+                        (probed.screenshot, probed.media_type),
+                        (probed.screenshot_after, probed.media_type),
+                    ],
+                    probed.observations,
+                    final_url=probed.final_url,
+                )
         result = await deps.browser.snapshot(url)
         if result is None:
             return (
@@ -551,16 +622,8 @@ def build_investigation_tools(deps: InvestigationToolDeps) -> list[Callable]:
                 "unreachable, every wait condition tried) — do NOT retry it; "
                 "treat as missing evidence, not as evidence of being clean"
             )
-        trimmed = trim_html(result.html)
-        text = f"rendered via {result.egress}\nurl: {url}\n{trimmed}"
-        if not result.screenshot:
-            return text
-        held = _last_render.get()
-        if held is not None:
-            held.shots.append((url, result.screenshot))
-        return ToolReturn(
-            return_value=f"{text}\nscreenshot: attached",
-            content=[BinaryContent(data=result.screenshot, media_type="image/webp")],
+        return _render_return(
+            url, result.egress, result.html, [(result.screenshot, "image/webp")], ""
         )
 
     async def domain_intel(host: str) -> str:

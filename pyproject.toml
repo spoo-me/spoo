@@ -61,6 +61,8 @@ omit = [
     "*/conftest.py",
     ".venv/*",
     "main.py",
+    # Separate service with its own runtime (Playwright); not importable here.
+    "browser/*",
 ]
 
 [tool.coverage.report]
