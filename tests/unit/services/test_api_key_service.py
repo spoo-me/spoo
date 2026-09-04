@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 from bson import ObjectId
 
-from errors import EmailNotVerifiedError, ValidationError
+from errors import EmailNotVerifiedError, LimitReachedError
 from schemas.models.api_key import ApiKeyDoc
 
 USER_OID = ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")
@@ -57,6 +57,7 @@ class TestApiKeyServiceCreate:
             scopes=["urls:read"],
             user_id=USER_OID,
             email_verified=True,
+            max_keys=20,
         )
 
         assert isinstance(doc, ApiKeyDoc)
@@ -74,20 +75,22 @@ class TestApiKeyServiceCreate:
                 scopes=[],
                 user_id=USER_OID,
                 email_verified=False,
+                max_keys=20,
             )
 
     @pytest.mark.asyncio
     async def test_create_raises_when_at_max_limit(self):
         repo = make_repo()
-        repo.count_by_user = AsyncMock(return_value=20)  # default max_active_keys
+        repo.count_by_user = AsyncMock(return_value=20)
         svc = make_service(repo)
 
-        with pytest.raises(ValidationError, match="maximum"):
+        with pytest.raises(LimitReachedError):
             await svc.create(
                 name="Key",
                 scopes=[],
                 user_id=USER_OID,
                 email_verified=True,
+                max_keys=20,
             )
 
     @pytest.mark.asyncio
@@ -101,6 +104,7 @@ class TestApiKeyServiceCreate:
             scopes=["urls:manage"],
             user_id=USER_OID,
             email_verified=True,
+            max_keys=20,
             description="My description",
             expires_at=expires,
         )

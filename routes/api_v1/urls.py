@@ -36,6 +36,7 @@ from dependencies import (
     URL_READ_SCOPES,
     CurrentUser,
     CustomDomainSvc,
+    Entitled,
     Settings,
     TagSvc,
     UrlSvc,
@@ -43,7 +44,7 @@ from dependencies import (
 )
 from errors import NotFoundError, ValidationError
 from middleware.openapi import AUTH_RESPONSES, ERROR_RESPONSES
-from middleware.rate_limiter import Limits, limiter
+from middleware.rate_limiter import Limits, limiter, plan_scaled
 from routes.api_v1._helpers import parse_url_id
 from schemas.dto.requests.url import ListUrlsQuery
 from schemas.dto.responses.url import (
@@ -63,9 +64,10 @@ router = APIRouter(tags=["Link Management"])
     operation_id="listUrls",
     summary="List Your URLs",
 )
-@limiter.limit(Limits.API_AUTHED)
+@limiter.limit(plan_scaled(Limits.API_AUTHED))
 async def list_urls_v1(
     request: Request,
+    entitlements: Entitled,
     query: Annotated[ListUrlsQuery, Query()],
     url_service: UrlSvc,
     tag_service: TagSvc,
@@ -106,9 +108,10 @@ async def list_urls_v1(
     operation_id="getUrl",
     summary="Get URL by ID",
 )
-@limiter.limit(Limits.API_AUTHED)
+@limiter.limit(plan_scaled(Limits.API_AUTHED))
 async def get_url_v1(
     request: Request,
+    entitlements: Entitled,
     url_id: Annotated[
         str,
         Path(description="Unique identifier of the URL (MongoDB ObjectId)."),
@@ -167,9 +170,10 @@ def _resolve_lookup_domain(raw: str, system_default_domain: str) -> str:
     operation_id="getUrlByAddress",
     summary="Get URL by Domain and Alias",
 )
-@limiter.limit(Limits.API_AUTHED)
+@limiter.limit(plan_scaled(Limits.API_AUTHED))
 async def get_url_by_address_v1(
     request: Request,
+    entitlements: Entitled,
     domain: Annotated[
         str,
         Path(

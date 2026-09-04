@@ -6724,7 +6724,7 @@
           "Custom Domains"
         ],
         "summary": "Register Custom Domain",
-        "description": "Register a new custom domain for branded short links.\n\nThe domain is born in `PENDING` state. The user must publish the DNS\nrecords returned in `dns_records` at their DNS provider, then call\n`POST /custom-domains/{id}/verify` to trigger verification. Cloudflare\nauto-verifies via HTTP DCV once the CNAME is live and propagated.\n\n**Authentication**: Required (JWT Bearer or API key with `domains:manage`).\n\n**Email verification**: Required (applies to API key callers too).\n\n**Feature gate**: Must be enabled for the calling user.\n\n**Rate Limits**: 10/hour (route, failed attempts count) + `max_per_user`\nowned domains (service quota, any status).",
+        "description": "Register a new custom domain for branded short links.\n\nThe domain is born in `PENDING` state. The user must publish the DNS\nrecords returned in `dns_records` at their DNS provider, then call\n`POST /custom-domains/{id}/verify` to trigger verification. Cloudflare\nauto-verifies via HTTP DCV once the CNAME is live and propagated.\n\n**Authentication**: Required (JWT Bearer or API key with `domains:manage`).\n\n**Email verification**: Required (applies to API key callers too).\n\n**Feature gate**: Must be enabled for the calling user.\n\n**Rate Limits**: 10/hour (route, failed attempts count). Owned domains\n(any status) count against the plan's `custom_domains_max`; a full\nlimit answers 403 `limit_reached`.",
         "operationId": "createCustomDomain",
         "requestBody": {
           "required": true,
@@ -7130,7 +7130,7 @@
           "Custom Domains"
         ],
         "summary": "Update Custom Domain Routing",
-        "description": "Update the per-domain routing config.\n\nPartial update \u2014 send only the fields you want to change. Omit a field to\nleave it untouched. Send explicit `null` to clear a stored value. The\nconfig takes effect only when the domain is `ACTIVE`; non-ACTIVE domains\nreturn 422.\n\n**Configurable fields**:\n- `root_redirect` \u2014 destination for `GET /` (302).\n- `not_found_redirect` \u2014 fallback for any path that doesn't match an alias.\n- `custom_robots_txt` \u2014 body served at `/robots.txt` (\u22644096 chars).\n\n**Authentication**: Required (JWT or API key with `domains:manage`).\n\n**Rate Limits**: 30/min.\n\n**Responses**:\n- 200 \u2014 updated; full domain response returned\n- 403 \u2014 caller does not own this domain\n- 404 \u2014 domain not found (or invalid id)\n- 422 \u2014 domain isn't ACTIVE, or body fails validation",
+        "description": "Update the per-domain routing config.\n\nPartial update \u2014 send only the fields you want to change. Omit a field to\nleave it untouched. Send explicit `null` to clear a stored value. The\nconfig takes effect only when the domain is `ACTIVE`; non-ACTIVE domains\nreturn 422.\n\n**Configurable fields**:\n- `root_redirect` \u2014 destination for `GET /` (302).\n- `not_found_redirect` \u2014 fallback for any path that doesn't match an alias.\n- `custom_robots_txt` \u2014 body served at `/robots.txt` (\u22644096 chars).\n\n**Authentication**: Required (JWT or API key with `domains:manage`).\n\n**Rate Limits**: 30/min.\n\n**Responses**:\n- 200 \u2014 updated; full domain response returned\n- 403 \u2014 caller does not own this domain, or the plan lacks domain polish\n- 404 \u2014 domain not found (or invalid id)\n- 422 \u2014 domain isn't ACTIVE, or body fails validation",
         "operationId": "updateCustomDomain",
         "parameters": [
           {
@@ -10665,10 +10665,10 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 100,
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Ids",
-            "description": "URL ids (MongoDB ObjectIds, as returned by the list endpoint). 1 to 100 per request; duplicates are deduplicated server-side (first occurrence wins). One malformed id rejects the whole request \u2014 nothing is attempted.",
+            "description": "URL ids (MongoDB ObjectIds, as returned by the list endpoint). 1 to 1000 per request; duplicates are deduplicated server-side (first occurrence wins). One malformed id rejects the whole request \u2014 nothing is attempted.",
             "examples": [
               [
                 "665f0c2f9e7a4b1d2c3d4e5f",
@@ -10727,10 +10727,10 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 100,
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Ids",
-            "description": "URL ids (MongoDB ObjectIds, as returned by the list endpoint). 1 to 100 per request; duplicates are deduplicated server-side (first occurrence wins). One malformed id rejects the whole request \u2014 nothing is attempted.",
+            "description": "URL ids (MongoDB ObjectIds, as returned by the list endpoint). 1 to 1000 per request; duplicates are deduplicated server-side (first occurrence wins). One malformed id rejects the whole request \u2014 nothing is attempted.",
             "examples": [
               [
                 "665f0c2f9e7a4b1d2c3d4e5f",
@@ -10797,10 +10797,10 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 100,
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Ids",
-            "description": "URL ids (MongoDB ObjectIds, as returned by the list endpoint). 1 to 100 per request; duplicates are deduplicated server-side (first occurrence wins). One malformed id rejects the whole request \u2014 nothing is attempted.",
+            "description": "URL ids (MongoDB ObjectIds, as returned by the list endpoint). 1 to 1000 per request; duplicates are deduplicated server-side (first occurrence wins). One malformed id rejects the whole request \u2014 nothing is attempted.",
             "examples": [
               [
                 "665f0c2f9e7a4b1d2c3d4e5f",
@@ -10850,10 +10850,10 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 100,
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Ids",
-            "description": "URL ids (MongoDB ObjectIds, as returned by the list endpoint). 1 to 100 per request; duplicates are deduplicated server-side (first occurrence wins). One malformed id rejects the whole request \u2014 nothing is attempted.",
+            "description": "URL ids (MongoDB ObjectIds, as returned by the list endpoint). 1 to 1000 per request; duplicates are deduplicated server-side (first occurrence wins). One malformed id rejects the whole request \u2014 nothing is attempted.",
             "examples": [
               [
                 "665f0c2f9e7a4b1d2c3d4e5f",
@@ -10896,10 +10896,10 @@
               "type": "string"
             },
             "type": "array",
-            "maxItems": 100,
+            "maxItems": 1000,
             "minItems": 1,
             "title": "Ids",
-            "description": "URL ids (MongoDB ObjectIds, as returned by the list endpoint). 1 to 100 per request; duplicates are deduplicated server-side (first occurrence wins). One malformed id rejects the whole request \u2014 nothing is attempted.",
+            "description": "URL ids (MongoDB ObjectIds, as returned by the list endpoint). 1 to 1000 per request; duplicates are deduplicated server-side (first occurrence wins). One malformed id rejects the whole request \u2014 nothing is attempted.",
             "examples": [
               [
                 "665f0c2f9e7a4b1d2c3d4e5f",
@@ -14010,6 +14010,11 @@
             "type": "string",
             "title": "Short Url"
           },
+          "whitelabel": {
+            "type": "boolean",
+            "title": "Whitelabel",
+            "default": false
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -14142,6 +14147,11 @@
           },
           "link": {
             "$ref": "#/components/schemas/PublicLinkFacts"
+          },
+          "whitelabel": {
+            "type": "boolean",
+            "title": "Whitelabel",
+            "default": false
           },
           "stats": {
             "additionalProperties": true,
@@ -14787,6 +14797,22 @@
               }
             ],
             "title": "End Date"
+          },
+          "clamped": {
+            "type": "boolean",
+            "title": "Clamped",
+            "default": false
+          },
+          "window_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Days"
           }
         },
         "type": "object",

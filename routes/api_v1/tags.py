@@ -19,11 +19,12 @@ from dependencies import (
     URL_MANAGEMENT_SCOPES,
     URL_READ_SCOPES,
     CurrentUser,
+    Entitled,
     TagSvc,
     require_scopes,
 )
 from middleware.openapi import ERROR_RESPONSES
-from middleware.rate_limiter import Limits, limiter
+from middleware.rate_limiter import Limits, limiter, plan_scaled
 from routes.api_v1._helpers import parse_object_id
 from schemas.dto.requests.tag import CreateTagRequest, UpdateTagRequest
 from schemas.dto.responses.tag import (
@@ -47,9 +48,10 @@ _TAG_ID_PATH = Path(
     operation_id="listTags",
     summary="List Your Tags",
 )
-@limiter.limit(Limits.API_AUTHED)
+@limiter.limit(plan_scaled(Limits.API_AUTHED))
 async def list_tags_v1(
     request: Request,
+    entitlements: Entitled,
     tag_service: TagSvc,
     user: CurrentUser = Depends(require_scopes(URL_READ_SCOPES)),  # noqa: B008
 ) -> TagListResponse:

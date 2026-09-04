@@ -19,6 +19,7 @@ from dependencies import (
     SHORTEN_SCOPES,
     CurrentUser,
     CustomDomainSvc,
+    Entitled,
     FeatureFlagSvc,
     Settings,
     TagSvc,
@@ -63,6 +64,7 @@ async def shorten_v1(
     custom_domain_service: CustomDomainSvc,
     settings: Settings,
     flag_svc: FeatureFlagSvc,
+    entitlements: Entitled,
     user: CurrentUser | None = Depends(optional_scopes_verified(SHORTEN_SCOPES)),  # noqa: B008
 ) -> UrlResponse:
     """Create a new shortened URL.
@@ -106,31 +108,31 @@ async def shorten_v1(
     if body.geo_rules:
         if user is None:
             raise AuthenticationError("Authentication required to set geo_rules")
-        await flag_svc.require(GEO_TARGETING_FLAG, user)
+        await flag_svc.require(GEO_TARGETING_FLAG, user, entitlements=entitlements)
 
     if body.ab_variants:
         if user is None:
             raise AuthenticationError("Authentication required to set ab_variants")
-        await flag_svc.require(AB_TESTING_FLAG, user)
+        await flag_svc.require(AB_TESTING_FLAG, user, entitlements=entitlements)
 
     if body.expired_redirect_url:
         if user is None:
             raise AuthenticationError(
                 "Authentication required to set expired_redirect_url"
             )
-        await flag_svc.require(EXPIRED_FALLBACK_FLAG, user)
+        await flag_svc.require(EXPIRED_FALLBACK_FLAG, user, entitlements=entitlements)
 
     # optional_scopes_verified already rejects unverified authenticated users,
     # so the flag is the only remaining gate here.
     if body.meta_tags is not None:
         if user is None:
             raise AuthenticationError("Authentication required to set meta_tags")
-        await flag_svc.require(META_TAGS_FLAG, user)
+        await flag_svc.require(META_TAGS_FLAG, user, entitlements=entitlements)
 
     if body.starts_at is not None or body.pre_start_url:
         if user is None:
             raise AuthenticationError("Authentication required to schedule a link")
-        await flag_svc.require(LINK_SCHEDULING_FLAG, user)
+        await flag_svc.require(LINK_SCHEDULING_FLAG, user, entitlements=entitlements)
 
     if body.domain and body.domain != settings.system_default_domain:
         if user is None:

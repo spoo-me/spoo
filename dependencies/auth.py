@@ -121,6 +121,16 @@ async def get_current_user(
                 )
                 return None
 
+            if key.paused_by_limit:
+                log.warning(
+                    "api_key_auth_failed",
+                    reason="paused_by_limit",
+                    key_prefix=key.token_prefix,
+                    key_id=str(key.id),
+                    user_id=str(key.user_id),
+                )
+                return None
+
             now = datetime.now(timezone.utc)
             exp = as_aware_utc(key.expires_at)
             if exp is not None and exp <= now:

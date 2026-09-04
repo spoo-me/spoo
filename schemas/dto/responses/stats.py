@@ -38,6 +38,9 @@ class StatsTimeRange(ResponseBase):
 
     start_date: datetime | None = None
     end_date: datetime | None = None
+    # True when start_date was pulled forward to fit the plan's window.
+    clamped: bool = False
+    window_days: int | None = None
 
 
 class ComputedMetrics(ResponseBase):

@@ -16,6 +16,8 @@ from fastapi.testclient import TestClient
 
 from dependencies.services import get_public_preview_service
 from schemas.models.url import UrlV2Doc
+from services.entitlements import for_plan
+from services.features.catalog import Plan
 from services.public_link_resolver import PublicLinkResolver
 from services.public_preview_service import PublicPreviewService
 
@@ -49,6 +51,8 @@ def _make_service(
     v2_docs: tuple[UrlV2Doc, ...] = (),
     v1_docs: dict[str, dict] | None = None,
     emoji_docs: dict[str, dict] | None = None,
+    plan: Plan = Plan.FREE,
+    flag_on: bool = False,
 ) -> PublicPreviewService:
     """Real service over dict-backed repo mocks (exact-match lookups)."""
     v2_by_key = {(d.alias, d.domain): d for d in v2_docs}
@@ -69,13 +73,19 @@ def _make_service(
         side_effect=lambda pipeline: emoji_map.get(pipeline[0]["$match"]["_id"])
     )
 
+    entitlements = AsyncMock()
+    entitlements.resolve_for = AsyncMock(return_value=for_plan(plan))
+    flags = AsyncMock()
+    flags.is_enabled_for_owner = AsyncMock(return_value=flag_on)
     return PublicPreviewService(
         PublicLinkResolver(
             url_repo,
             legacy_repo,
             emoji_repo,
             system_default_domain="spoo.me",
-        )
+        ),
+        entitlements,
+        flags,
     )
 
 
@@ -106,6 +116,7 @@ def test_v2_active_plain_full_body():
         "generation": "v2",
         "alias": "testme",
         "short_url": "https://spoo.me/testme",
+        "whitelabel": False,
         "status": "active",
         "created_at": "2024-01-01T00:00:00+00:00",
         "starts_at": None,
@@ -313,6 +324,7 @@ def test_v1_active_full_body():
         "generation": "v1",
         "alias": "abc123",
         "short_url": "https://spoo.me/abc123",
+        "whitelabel": False,
         "status": "active",
         "created_at": "2024-03-10T12:00:00+00:00",
         "starts_at": None,
@@ -483,3 +495,21 @@ def test_v2_started_reads_active_without_start():
     assert body["status"] == "active"
     assert body["starts_at"] is None
     assert body["destination"] is not None
+
+
+def test_whitelabel_needs_the_flag_and_the_entitlement():
+    doc = _make_v2()
+    assert (
+        _get(_make_service((doc,), plan=Plan.PRO), "testme").json()["whitelabel"]
+        is False
+    )
+    assert (
+        _get(_make_service((doc,), plan=Plan.PRO, flag_on=True), "testme").json()[
+            "whitelabel"
+        ]
+        is True
+    )
+    assert (
+        _get(_make_service((doc,), flag_on=True), "testme").json()["whitelabel"]
+        is False
+    )

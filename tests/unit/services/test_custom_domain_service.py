@@ -19,6 +19,7 @@ from errors import (
     FeatureDisabledError,
     ForbiddenError,
     InvalidDomainTransitionError,
+    LimitReachedError,
     NotFoundError,
 )
 from schemas.dto.requests.custom_domain import (
@@ -153,7 +154,7 @@ class TestEnabledGate:
         svc, _, _, _, _ = _build_service(enabled=False)
         req = CreateCustomDomainRequest(fqdn="links.acme.com")
         with pytest.raises(FeatureDisabledError):
-            await svc.create(req, _user())
+            await svc.create(req, _user(), max_domains=5)
 
     @pytest.mark.asyncio
     async def test_verify_refused_when_disabled(self):
@@ -185,7 +186,7 @@ class TestCreate:
         svc, repo, _, _, _ = _build_service()
         repo.find_by_id = AsyncMock(return_value=_doc(status=DomainStatus.PENDING))
         req = CreateCustomDomainRequest(fqdn="links.acme.com")
-        doc = await svc.create(req, _user())
+        doc = await svc.create(req, _user(), max_domains=5)
         assert doc.status == DomainStatus.PENDING
         repo.insert.assert_awaited_once()
         # Token always stamped — lets users switch backends later without re-registering.
@@ -196,7 +197,9 @@ class TestCreate:
     async def test_picker_chooses_cf_when_backend_wired(self):
         svc, repo, _, _, _ = _build_service()
         repo.find_by_id = AsyncMock(return_value=_doc(status=DomainStatus.PENDING))
-        await svc.create(CreateCustomDomainRequest(fqdn="links.acme.com"), _user())
+        await svc.create(
+            CreateCustomDomainRequest(fqdn="links.acme.com"), _user(), max_domains=5
+        )
         inserted = repo.insert.call_args.args[0]
         assert inserted["verification_method"] == VerificationMethod.CF_HTTP_DCV
 
@@ -207,7 +210,9 @@ class TestCreate:
         verifiers = {VerificationMethod.CNAME: cname}
         svc, repo, _, _, _ = _build_service(verifiers=verifiers)
         repo.find_by_id = AsyncMock(return_value=_doc(status=DomainStatus.PENDING))
-        await svc.create(CreateCustomDomainRequest(fqdn="links.acme.com"), _user())
+        await svc.create(
+            CreateCustomDomainRequest(fqdn="links.acme.com"), _user(), max_domains=5
+        )
         inserted = repo.insert.call_args.args[0]
         assert inserted["verification_method"] == VerificationMethod.CNAME
 
@@ -223,7 +228,9 @@ class TestCreate:
         }
         svc, repo, _, _, _ = _build_service(verifiers=verifiers)
         repo.find_by_id = AsyncMock(return_value=_doc(status=DomainStatus.PENDING))
-        await svc.create(CreateCustomDomainRequest(fqdn="acme.com"), _user())
+        await svc.create(
+            CreateCustomDomainRequest(fqdn="acme.com"), _user(), max_domains=5
+        )
         inserted = repo.insert.call_args.args[0]
         assert inserted["verification_method"] == VerificationMethod.A_RECORD
 
@@ -236,7 +243,7 @@ class TestCreate:
             DomainAlreadyRegisteredError,
             match="registered to another account",
         ):
-            await svc.create(req, _user())
+            await svc.create(req, _user(), max_domains=5)
 
     @pytest.mark.asyncio
     async def test_uniqueness_ignores_revoked_docs(self):
@@ -251,16 +258,27 @@ class TestCreate:
         repo.find_blocking_by_fqdn = AsyncMock(return_value=None)
         repo.find_by_id = AsyncMock(return_value=_doc(status=DomainStatus.PENDING))
         req = CreateCustomDomainRequest(fqdn="links.acme.com")
-        await svc.create(req, _user())  # must not raise
+        await svc.create(req, _user(), max_domains=5)  # must not raise
         repo.insert.assert_awaited()
 
     @pytest.mark.asyncio
     async def test_per_user_quota_enforced(self):
         svc, repo, _, _, _ = _build_service()
-        repo.count_by_owner = AsyncMock(return_value=2)  # at default cap
+        repo.count_by_owner = AsyncMock(return_value=2)
         req = CreateCustomDomainRequest(fqdn="links.acme.com")
-        with pytest.raises(DomainQuotaExceededError):
-            await svc.create(req, _user())
+        with pytest.raises(LimitReachedError) as exc:
+            await svc.create(req, _user(), max_domains=2)
+        assert exc.value.to_dict()["limit"] == "custom_domains_max"
+        assert exc.value.to_dict()["current"] == 2
+
+    @pytest.mark.asyncio
+    async def test_unlimited_plan_never_counts(self):
+        svc, repo, _, _, _ = _build_service()
+        repo.find_by_id = AsyncMock(return_value=_doc(status=DomainStatus.PENDING))
+        repo.count_by_owner = AsyncMock(return_value=900)
+        req = CreateCustomDomainRequest(fqdn="links.acme.com")
+        await svc.create(req, _user(), max_domains=-1)
+        repo.count_by_owner.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_blocklist_enforced_via_repo(self):
@@ -269,7 +287,7 @@ class TestCreate:
         svc, _, _, _, _ = _build_service(blocked_domain_repo=blocked)
         req = CreateCustomDomainRequest(fqdn="evil.com")
         with pytest.raises(DomainBlocklistedError):
-            await svc.create(req, _user())
+            await svc.create(req, _user(), max_domains=5)
         blocked.is_blocked.assert_awaited_once_with("evil.com")
 
     @pytest.mark.asyncio
@@ -282,7 +300,7 @@ class TestCreate:
         repo.find_by_id = AsyncMock(return_value=_doc(status=DomainStatus.PENDING))
         req = CreateCustomDomainRequest(fqdn="anything.example.com")
         # Must not raise — just skip the check.
-        await svc.create(req, _user())
+        await svc.create(req, _user(), max_domains=5)
 
     @pytest.mark.asyncio
     async def test_duplicate_key_during_race_translates_to_friendly_error(self):
@@ -296,7 +314,7 @@ class TestCreate:
         )
         req = CreateCustomDomainRequest(fqdn="links.acme.com")
         with pytest.raises(DomainAlreadyRegisteredError):
-            await svc.create(req, _user())
+            await svc.create(req, _user(), max_domains=5)
 
 
 class TestVerify:
@@ -746,7 +764,7 @@ class TestRegistrarIntegration:
         repo.find_by_id = AsyncMock(return_value=_doc(status=DomainStatus.PENDING))
         req = CreateCustomDomainRequest(fqdn="links.acme.com")
 
-        await svc.create(req, _user())
+        await svc.create(req, _user(), max_domains=5)
 
         registrar.register.assert_awaited_once()
         repo.update_edge_metadata.assert_awaited_once()
@@ -763,7 +781,7 @@ class TestRegistrarIntegration:
         req = CreateCustomDomainRequest(fqdn="links.acme.com")
 
         with pytest.raises(RuntimeError):
-            await svc.create(req, _user())
+            await svc.create(req, _user(), max_domains=5)
 
         # Doc inserted, then deleted because registration blew up.
         repo.insert.assert_awaited_once()
@@ -781,7 +799,7 @@ class TestRegistrarIntegration:
         req = CreateCustomDomainRequest(fqdn="links.acme.com")
 
         with pytest.raises(RuntimeError, match="CF down"):
-            await svc.create(req, _user())
+            await svc.create(req, _user(), max_domains=5)
 
         # Both attempted exactly once.
         repo.insert.assert_awaited_once()
@@ -807,7 +825,7 @@ class TestRegistrarIntegration:
         repo.find_by_id = AsyncMock(return_value=_doc(status=DomainStatus.PENDING))
         req = CreateCustomDomainRequest(fqdn="links.acme.com")
 
-        await svc.create(req, _user())
+        await svc.create(req, _user(), max_domains=5)
 
         kwargs = repo.update_edge_metadata.call_args.kwargs
         assert kwargs["dns_instructions"] == instructions
@@ -822,7 +840,7 @@ class TestRegistrarIntegration:
         repo.find_by_id = AsyncMock(return_value=_doc(status=DomainStatus.PENDING))
         req = CreateCustomDomainRequest(fqdn="links.acme.com")
 
-        await svc.create(req, _user())
+        await svc.create(req, _user(), max_domains=5)
 
         repo.update_edge_metadata.assert_not_called()
 

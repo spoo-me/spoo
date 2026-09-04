@@ -61,6 +61,9 @@ class UrlCacheData(BaseModel):
     # Entries cached before this field existed deserialize to None.
     start_time: int | None = None
     pre_start_url: str | None = None
+    # Owner entitlement version this entry was shaped under; None for
+    # unowned links and for entries written before the owner was consulted.
+    owner_ent_version: int | None = None
 
     @classmethod
     def from_v2_doc(cls, doc: UrlV2Doc) -> UrlCacheData:

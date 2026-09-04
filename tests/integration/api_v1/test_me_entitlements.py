@@ -26,6 +26,7 @@ from .test_me_features import _flag_svc
 def _app(user, resolved: Resolved, *, enabled: set[str] = frozenset(), used=None):
     ent_service = AsyncMock()
     ent_service.usage_for = AsyncMock(return_value=used or {})
+    ent_service.over_limit_for = AsyncMock(return_value={})
     return _build_test_app(
         {
             require_jwt: lambda: user,
@@ -105,6 +106,7 @@ def test_version_header_is_set_from_the_dependency():
     ent_service = AsyncMock()
     ent_service.resolve_for = AsyncMock(return_value=resolved)
     ent_service.usage_for = AsyncMock(return_value={})
+    ent_service.over_limit_for = AsyncMock(return_value={})
     app = _build_test_app(
         {
             require_jwt: lambda: user,
@@ -127,6 +129,7 @@ def test_dependency_passes_the_jwt_plan_hint():
     ent_service = AsyncMock()
     ent_service.resolve_for = AsyncMock(return_value=for_plan(Plan.FREE))
     ent_service.usage_for = AsyncMock(return_value={})
+    ent_service.over_limit_for = AsyncMock(return_value={})
     app = _build_test_app(
         {
             require_jwt: lambda: user,
@@ -153,3 +156,26 @@ def test_until_is_the_prepaid_end_for_an_active_prepaid():
     with TestClient(_app(user, resolved)) as client:
         body = client.get("/api/v1/me/entitlements").json()
     assert body["plan"]["until"] == end.isoformat()
+
+
+def test_over_limit_lists_paused_items_per_limit():
+    user = _make_user()
+    resolved = for_plan(Plan.FREE, version=4)
+    ent_service = AsyncMock()
+    ent_service.usage_for = AsyncMock(return_value={"webhook_endpoints_max": 3})
+    ent_service.over_limit_for = AsyncMock(
+        return_value={"webhook_endpoints_max": ["aaa", "bbb"]}
+    )
+    app = _build_test_app(
+        {
+            require_jwt: lambda: user,
+            get_current_user: lambda: user,
+            get_feature_flag_service: lambda: _flag_svc(set()),
+            get_entitlements: lambda: resolved,
+            get_entitlement_service: lambda: ent_service,
+        }
+    )
+    with TestClient(app) as client:
+        body = client.get("/api/v1/me/entitlements").json()
+    assert body["over_limit"] == {"webhook_endpoints_max": {"paused": ["aaa", "bbb"]}}
+    assert body["limits"]["webhook_endpoints_max"] == {"max": 1, "used": 3}

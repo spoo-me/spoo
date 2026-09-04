@@ -107,6 +107,7 @@ def build_test_app(
         )
         app.state.entitlement_service.usage_for = AsyncMock(return_value={})
         app.state.entitlement_service.plan_hint_for = AsyncMock(return_value="free")
+        app.state.entitlement_service.over_limit_for = AsyncMock(return_value={})
         app.state.tenant_resolver = AsyncMock()
         # A REAL permissive L0 gate (no providers): valid URLs pass,
         # invalid/self-links reject — matches the pre-gate route behavior.
@@ -126,6 +127,16 @@ def build_test_app(
     # Set outside the lifespan — some tests build TestClient without a `with`
     # block (no lifespan run) and the redirect route always resolves GeoIP.
     application.state.geoip = AsyncMock()
+    # Same reason for these three: the Entitled dependency and the auth
+    # dependency read them on every request, lifespan or not.
+    application.state.db = MagicMock()
+    application.state.settings = settings
+    application.state.entitlement_service = AsyncMock()
+    application.state.entitlement_service.resolve_for = AsyncMock(
+        return_value=for_plan(Plan.FREE)
+    )
+    application.state.entitlement_service.usage_for = AsyncMock(return_value={})
+    application.state.entitlement_service.over_limit_for = AsyncMock(return_value={})
     application.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     register_error_handlers(application)
 

@@ -53,6 +53,7 @@ class PublicPreviewResponse(ResponseBase):
     generation: Literal["v1", "v2"]
     alias: str
     short_url: str
+    whitelabel: bool = False
     status: Literal["active", "inactive", "expired", "blocked", "scheduled"]
     created_at: str | None
     # Unix seconds; present only while ``status`` is ``"scheduled"``.

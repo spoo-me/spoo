@@ -73,7 +73,11 @@ class TestCustomDomainRepository:
 
         await repo.find_active_by_fqdn("links.example.com")
         col.find_one.assert_awaited_once_with(
-            {"fqdn": "links.example.com", "status": DomainStatus.ACTIVE}
+            {
+                "fqdn": "links.example.com",
+                "status": DomainStatus.ACTIVE,
+                "paused_by_limit": {"$ne": True},
+            }
         )
 
     @pytest.mark.asyncio
