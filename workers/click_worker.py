@@ -46,10 +46,18 @@ from faststream.redis.annotations import Redis, RedisMessage
 from pymongo.asynchronous.mongo_client import AsyncMongoClient
 
 from config import AppSettings, ClickEventsSettings
-from dependencies.wiring import build_account_erasure_service, build_click_service
+from dependencies.wiring import (
+    build_account_erasure_service,
+    build_billing_provider,
+    build_click_service,
+    build_entitlement_service,
+    build_entitlement_store,
+    build_lifecycle_service,
+)
 from infrastructure.cache.redis_client import create_redis_client
 from infrastructure.cache.url_cache import UrlCache
 from infrastructure.cloudflare_kv import CloudflareKVClient
+from infrastructure.email.zeptomail import ZeptoMailProvider
 from infrastructure.geoip import GeoIPService
 from infrastructure.http_client import HttpClient
 from infrastructure.llm import LlmTaskRunner
@@ -77,6 +85,7 @@ from services.click.consumers import (
 from services.click.consumers.hotness import HotUrlAction
 from services.edge_cache import PromoteToEdgeCacheAction
 from services.edge_cache.og_writethrough import OgEdgeWritethrough
+from services.entitlements.lifecycle import lifecycle_tasks
 from services.events.contract import DOMAIN_EVENTS_STREAM
 from services.events.sinks import InlineDomainEventSink
 from services.meta_tags.validator import MetaImageValidator
@@ -580,6 +589,23 @@ async def _build_runtime(
             db, settings, runtime.http_client, runtime.cache_redis
         )
         feature_tasks.append(erasure_sweep_task(erasure_service))
+        ent_store = build_entitlement_store(db, runtime.cache_redis)
+        feature_tasks.extend(
+            lifecycle_tasks(
+                build_lifecycle_service(
+                    db,
+                    settings,
+                    store=ent_store,
+                    entitlements=build_entitlement_service(
+                        db, settings, runtime.cache_redis, store=ent_store
+                    ),
+                    provider=build_billing_provider(settings, runtime.http_client),
+                    mailer=ZeptoMailProvider(
+                        settings.email, runtime.http_client, app_url=settings.app_url
+                    ),
+                )
+            )
+        )
         scheduler = TaskScheduler(
             ScheduledTaskRepository(db["scheduled_tasks"]),
             build_task_registry(feature_tasks),

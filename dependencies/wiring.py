@@ -93,6 +93,7 @@ from services.custom_domain_service import CustomDomainService
 from services.domain_intel_service import DomainIntelService
 from services.edge_cache.og_writethrough import OgEdgeWritethrough
 from services.entitlements import EntitlementService
+from services.entitlements.lifecycle import LifecycleService, lifecycle_tasks
 from services.entitlements.over_limit import OverLimitService
 from services.events.sinks import (
     InlineDomainEventSink,
@@ -330,6 +331,18 @@ def build_entitlement_service(
     )
 
 
+def build_billing_provider(settings: AppSettings, http_client) -> BillingProvider:
+    billing = settings.billing
+    if billing.provider == "paddle":
+        return PaddleProvider(
+            http_client,
+            api_key=billing.paddle_api_key,
+            webhook_secret=billing.paddle_webhook_secret,
+            env=billing.paddle_env,
+        )
+    return NullBillingProvider()
+
+
 def build_billing_service(
     db,
     settings: AppSettings,
@@ -340,24 +353,40 @@ def build_billing_service(
     subscriptions: SubscriptionRepository,
 ) -> BillingService:
     billing = settings.billing
-    provider: BillingProvider
-    if billing.provider == "paddle":
-        provider = PaddleProvider(
-            http_client,
-            api_key=billing.paddle_api_key,
-            webhook_secret=billing.paddle_webhook_secret,
-            env=billing.paddle_env,
-        )
-    else:
-        provider = NullBillingProvider()
     return BillingService(
-        provider,
+        build_billing_provider(settings, http_client),
         entitlements,
         subscriptions,
         BillingEventRepository(db["billing_events"]),
         redis_client,
         billing,
         app_url=settings.app_url,
+    )
+
+
+def build_lifecycle_service(
+    db,
+    settings: AppSettings,
+    *,
+    store,
+    entitlements: EntitlementService,
+    provider: BillingProvider,
+    mailer,
+) -> LifecycleService:
+    """``store`` is the caller's entitlement store tuple. An unconfigured
+    mailer becomes None so the job never retries a send it cannot make."""
+    _, events, subscriptions, overrides = store
+    return LifecycleService(
+        entitlements,
+        subscriptions,
+        overrides,
+        events,
+        UserRepository(db["users"]),
+        CustomDomainRepository(db["custom_domains"]),
+        FeatureFlagRepository(db["feature_flags"]),
+        mailer if settings.email.zepto_api_token else None,
+        app_url=settings.app_url,
+        provider=provider,
     )
 
 
@@ -1178,6 +1207,16 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
                 ),
             ),
             erasure_sweep_task(account_erasure_service),
+            *lifecycle_tasks(
+                build_lifecycle_service(
+                    db,
+                    settings,
+                    store=ent_store,
+                    entitlements=app.state.entitlement_service,
+                    provider=build_billing_provider(settings, http_client),
+                    mailer=app.state.email_provider,
+                )
+            ),
         ]
     )
     app.state.task_scheduler = TaskScheduler(

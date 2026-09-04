@@ -78,6 +78,7 @@ class TestEnsureIndexes:
             [("user_id", 1), ("key", 1)], unique=True
         )
         ent_events_col.create_index.assert_any_await([("user_id", 1), ("at", -1)])
+        ent_events_col.create_index.assert_any_await([("kind", 1), ("at", -1)])
         # Erasure sweep: partial — holds only PENDING_DELETION/ERASING docs.
         users_col.create_index.assert_any_await(
             [("status", 1), ("purge_after", 1)],

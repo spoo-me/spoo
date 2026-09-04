@@ -57,6 +57,9 @@ class SubscriptionDoc(MongoBaseModel):
     grace_until: datetime | None = None
     founding: bool = False
     founding_streak_ok: bool = False
+    # The state-machine event that lapsed it; "ended" means a refund or a
+    # manual end, not a term running out.
+    lapsed_by: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

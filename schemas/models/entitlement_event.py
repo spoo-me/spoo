@@ -32,4 +32,6 @@ class EntitlementEventDoc(MongoBaseModel):
     reason: str
     before: dict[str, Any] | None = None
     after: dict[str, Any] | None = None
+    # Dedupe key for reminders: one email per (user, kind, period).
+    period: str | None = None
     at: datetime
