@@ -24,6 +24,8 @@ from dependencies import (
     AccountDeletionSvc,
     AuthUser,
     CredentialSvc,
+    Entitled,
+    EntitlementSvc,
     JwtConfig,
     JwtUser,
     PasswordSvc,
@@ -96,6 +98,7 @@ async def login(
     response: Response,
     body: LoginRequest,
     credential_service: CredentialSvc,
+    entitlement_service: EntitlementSvc,
     jwt_cfg: JwtConfig,
 ) -> LoginResponse:
     """Authenticate with email and password.
@@ -116,7 +119,9 @@ async def login(
     set_auth_cookies(response, result.access_token, result.refresh_token, jwt_cfg)
     return LoginResponse(
         access_token=result.access_token,
-        user=UserProfileResponse.from_user(result.user),
+        user=UserProfileResponse.from_user(
+            result.user, plan=await entitlement_service.plan_hint_for(result.user.id)
+        ),
     )
 
 
@@ -134,6 +139,7 @@ async def register(
     response: Response,
     body: RegisterRequest,
     credential_service: CredentialSvc,
+    entitlement_service: EntitlementSvc,
     jwt_cfg: JwtConfig,
 ) -> RegisterResponse:
     """Create a new user account with email and password.
@@ -158,7 +164,9 @@ async def register(
     set_auth_cookies(response, result.access_token, result.refresh_token, jwt_cfg)
     return RegisterResponse(
         access_token=result.access_token,
-        user=UserProfileResponse.from_user(result.user),
+        user=UserProfileResponse.from_user(
+            result.user, plan=await entitlement_service.plan_hint_for(result.user.id)
+        ),
         requires_verification=True,
         verification_sent=result.verification_sent,
     )
@@ -306,6 +314,7 @@ async def me(
     request: Request,
     user: AuthUser,
     user_repo: UserRepo,
+    entitlements: Entitled,
 ) -> MeResponse:
     """Return the authenticated user's full profile.
 
@@ -318,7 +327,9 @@ async def me(
     **Rate Limits**: 60/min
     """
     profile = await fetch_user_profile(user_repo, ObjectId(str(user.user_id)))
-    return MeResponse(user=UserProfileResponse.from_user(profile))
+    return MeResponse(
+        user=UserProfileResponse.from_user(profile, plan=entitlements.plan.value)
+    )
 
 
 @router.patch(
@@ -333,6 +344,7 @@ async def update_me(
     body: UpdateProfileRequest,
     user: JwtUser,
     profile_service: ProfilePictureSvc,
+    entitlements: Entitled,
 ) -> MeResponse:
     """Update the authenticated user's profile.
 
@@ -349,7 +361,9 @@ async def update_me(
     updated = await profile_service.update_user_name(
         ObjectId(str(user.user_id)), user_name
     )
-    return MeResponse(user=UserProfileResponse.from_user(updated))
+    return MeResponse(
+        user=UserProfileResponse.from_user(updated, plan=entitlements.plan.value)
+    )
 
 
 @router.post(

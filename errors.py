@@ -28,6 +28,10 @@ ErrorBody = TypedDict(  # noqa: UP013 — class syntax loses the markers here
         "details": NotRequired[Any],
         "message": NotRequired[str],
         "hint": NotRequired[str],
+        "feature": NotRequired[str],
+        "limit": NotRequired[str],
+        "max": NotRequired[int],
+        "current": NotRequired[int],
     },
 )
 
@@ -119,6 +123,12 @@ class NotFoundError(AppError):
 class ConflictError(AppError):
     status_code = 409
     error_code = "conflict"
+
+
+class InvalidTransitionError(ConflictError):
+    """A subscription event arrived in a status it cannot legally change."""
+
+    error_code = "invalid_transition"
 
 
 class BlockedUrlError(AppError):

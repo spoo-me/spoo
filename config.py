@@ -664,6 +664,31 @@ class SchedulerSettings(BaseSettings):
     lease_seconds: int = Field(default=600, ge=30)
 
 
+class BillingSettings(BaseSettings):
+    """Billing provider and the display prices the plans endpoint shows.
+
+    ``BILLING_PROVIDER=none`` is self-host: no billing, and the resolver hands
+    every account the ``selfhost`` plan. Production must set it explicitly so
+    the cloud can never fall into self-host by omission. Prices are display
+    values only; the provider owns what is charged.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_prefix="BILLING_", extra="ignore"
+    )
+
+    provider: Literal["none", "paddle"] = "none"
+    pro_monthly_usd: int = Field(default=15, ge=0)
+    pro_year_usd: int = Field(default=144, ge=0)
+    founding_monthly_usd: int = Field(default=9, ge=0)
+    founding_year_usd: int = Field(default=90, ge=0)
+    founding_seats: int = Field(default=100, ge=0)
+
+    @property
+    def selfhost(self) -> bool:
+        return self.provider == "none"
+
+
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -859,6 +884,7 @@ class AppSettings(BaseSettings):
     scheduler: SchedulerSettings | None = None
     llm: LlmSettings | None = None
     posthog_erasure: PostHogErasureSettings | None = None
+    billing: BillingSettings | None = None
 
     @model_validator(mode="after")
     def _populate_sub_configs_and_secret(self) -> AppSettings:
@@ -908,6 +934,8 @@ class AppSettings(BaseSettings):
             self.scheduler = SchedulerSettings()
         if self.posthog_erasure is None:
             self.posthog_erasure = PostHogErasureSettings()
+        if self.billing is None:
+            self.billing = BillingSettings()
         if self.webhooks.enabled and not self.secret_key:
             # Signing secrets are encrypted with a key derived from
             # SECRET_KEY; an empty master would mean a predictable key.
@@ -925,6 +953,13 @@ class AppSettings(BaseSettings):
         # that in production would void the restore window. Refuse to boot.
         if self.env == "production" and self.account_deletion_grace_days < 1:
             raise ValueError("ACCOUNT_DELETION_GRACE_DAYS must be >= 1 in production")
+
+        # Unset means self-host, which hands every account every feature.
+        if self.env == "production" and "provider" not in self.billing.model_fields_set:
+            raise ValueError(
+                "BILLING_PROVIDER must be set explicitly in production: "
+                "none for self-host, paddle for the cloud"
+            )
 
         return self
 

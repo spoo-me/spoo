@@ -1,20 +1,25 @@
 """
-Feature flag service.
+Feature flag service: the deployment-level evaluator.
 
-Public API is one method: ``is_enabled(name, user) -> bool``. Default-deny
-on every error path:
+Answers one question per catalog feature: is its rollout on in this
+deployment for this user. ``FEATURES[key].rollout`` names the
+``feature_flags`` document; ``None`` means the rollout is finished and the
+answer is always True. Default-deny on every error path:
 
+  - Key not in the catalog          → False
   - Doc missing                     → False (forces explicit registration)
   - Doc.enabled = False             → False
   - rollout_type = OFF              → False (kill switch)
   - user is None on a non-EVERYONE  → False
   - Cache + repo failure            → False (with logged error)
 
+Plans are not this service's business. ``states_for`` joins its answer with
+the entitlement resolver's: flag off is hidden, flag on and entitled is
+enabled, flag on and not entitled is locked.
+
 The service consults a read-through Redis cache (60s positive TTL, 30s
 negative TTL). Flag mutations happen via direct mongosh edits with no app
-event, so changes propagate within the cache TTL window. This is acceptable
-for non-emergency rollouts; admin scripts can call ``cache.invalidate(name)``
-for an immediate flush after a hot edit.
+event, so changes propagate within the cache TTL window.
 
 Stable hashing uses ``blake2b(salt=name + user_id)`` so the same user gets
 different positions in different flags' rollouts, enabling independent
@@ -39,6 +44,7 @@ from repositories.feature_flag_repository import FeatureFlagRepository
 from schemas.enums.feature_state import FeatureState
 from schemas.enums.rollout_type import RolloutType
 from schemas.models.feature_flag import FeatureFlagDoc
+from services.features.catalog import FEATURES, bool_features
 
 if TYPE_CHECKING:
     # CurrentUser lives in dependencies.auth which imports back through
@@ -46,33 +52,23 @@ if TYPE_CHECKING:
     # type only for type-checking. ``__future__ annotations`` makes the
     # runtime annotation a string so the import is never resolved at runtime.
     from dependencies.auth import CurrentUser
+    from services.entitlements.resolver import Resolved
 
 log = get_logger(__name__)
 
-# Known flag names. Flag docs are edited directly in Mongo, so these
-# constants are the closest thing to a registry — code references flags
-# through them, never through bare string literals at call sites.
+# Catalog keys referenced by routes. Code names features through these,
+# never through bare string literals at call sites.
 CUSTOM_DOMAINS_FLAG = "custom_domains"
 GEO_TARGETING_FLAG = "geo_targeting"
 META_TAGS_FLAG = "custom_meta_tags"
-AB_TESTING_FLAG = "ab_testing"
+AB_TESTING_FLAG = "ab_variants"
 WEBHOOKS_FLAG = "webhooks"
 EXPIRED_FALLBACK_FLAG = "expired_fallback"
 LINK_SCHEDULING_FLAG = "link_scheduling"
 
-# Flags whose per-user answer is exposed to clients via GET /api/v1/me/
-# features, so frontends can decide what to render. Enforcement stays on
-# the API endpoints — this list only mirrors those gates as data. A flag
-# absent here is invisible to clients even when it gates an endpoint.
-EXPOSED_FEATURES: tuple[str, ...] = (
-    CUSTOM_DOMAINS_FLAG,
-    GEO_TARGETING_FLAG,
-    META_TAGS_FLAG,
-    AB_TESTING_FLAG,
-    WEBHOOKS_FLAG,
-    EXPIRED_FALLBACK_FLAG,
-    LINK_SCHEDULING_FLAG,
-)
+# Every BOOL feature in the catalog is exposed to clients via
+# GET /api/v1/me/entitlements so frontends can decide what to render.
+EXPOSED_FEATURES: tuple[str, ...] = tuple(f.key for f in bool_features())
 
 
 def _stable_hash(user_id: ObjectId, salt: str) -> int:
@@ -103,12 +99,19 @@ class FeatureFlagService:
         self._repo = repo
         self._cache = cache
 
-    async def is_enabled(self, name: str, user: CurrentUser | None) -> bool:
-        """Return whether ``name`` is enabled for ``user``.
+    async def is_enabled(self, key: str, user: CurrentUser | None) -> bool:
+        """Return whether the catalog feature ``key`` is rolled out to ``user``.
 
-        Default-deny on any error or unregistered flag.
+        Default-deny on any error or unknown key.
         """
-        flag = await self._lookup(name)
+        feature = FEATURES.get(key)
+        if feature is None:
+            log.warning("feature_flag_unknown_key", key=key)
+            return False
+        if feature.rollout is None:
+            return True
+
+        flag = await self._lookup(feature.rollout)
         if flag is None or not flag.enabled:
             return False
 
@@ -133,42 +136,42 @@ class FeatureFlagService:
         if rollout == RolloutType.HEX_DIGIT:
             return _digit_bucket(user.user_id, salt=flag.name) in flag.enabled_digits
 
-        if rollout == RolloutType.TIER:
-            # Default-deny when flag.tier is unset — None == None would
-            # otherwise enable for every user with no tier attribute.
-            if flag.tier is None:
-                return False
-            return getattr(user, "tier", None) == flag.tier
-
         # Unreachable today — Pydantic validates rollout_type against the
         # RolloutType enum. Kept as default-deny if the field is ever widened.
-        log.warning("feature_flag_unknown_rollout", name=name, rollout=str(rollout))
+        log.warning(
+            "feature_flag_unknown_rollout", name=flag.name, rollout=str(rollout)
+        )
         return False
 
-    async def states_for(self, user: CurrentUser | None) -> dict[str, FeatureState]:
+    async def states_for(
+        self, user: CurrentUser | None, entitlements: Resolved
+    ) -> dict[str, FeatureState]:
         """Per-user state of every client-exposed feature.
 
-        Today the policy is binary: enabled → ENABLED, everything else →
-        HIDDEN (a gated feature simply doesn't exist for accounts without
-        it). LOCKED enters the policy when paid plans ship — non-entitled
-        accounts flip from HIDDEN to LOCKED server-side, and clients that
-        already render all three states need no deploy.
+        Flag off → HIDDEN (the feature does not exist here yet). Flag on and
+        entitled → ENABLED. Flag on and not entitled → LOCKED, so the client
+        renders the upsell instead of nothing.
 
         Inherits ``is_enabled``'s default-deny: unregistered flags, cache
         and repo failures all read as HIDDEN.
         """
         answers = await asyncio.gather(
-            *(self.is_enabled(name, user) for name in EXPOSED_FEATURES)
+            *(self.is_enabled(key, user) for key in EXPOSED_FEATURES)
         )
-        return {
-            name: FeatureState.ENABLED if enabled else FeatureState.HIDDEN
-            for name, enabled in zip(EXPOSED_FEATURES, answers, strict=True)
-        }
+        states: dict[str, FeatureState] = {}
+        for key, rolled_out in zip(EXPOSED_FEATURES, answers, strict=True):
+            if not rolled_out:
+                states[key] = FeatureState.HIDDEN
+            elif entitlements.has(key):
+                states[key] = FeatureState.ENABLED
+            else:
+                states[key] = FeatureState.LOCKED
+        return states
 
     async def require(
-        self, name: str, user: CurrentUser | None, *, hide: bool = False
+        self, key: str, user: CurrentUser | None, *, hide: bool = False
     ) -> None:
-        """Raise unless ``name`` is enabled for ``user``.
+        """Raise unless ``key`` is rolled out to ``user``.
 
         403 by default — the right signal for flag-gated FIELDS on shared
         endpoints, which appear in public OpenAPI docs and can't be
@@ -176,11 +179,11 @@ class FeatureFlagService:
         existence is itself gated (the custom-domains pattern): 404, so
         non-allowlisted callers can't tell the feature exists.
         """
-        if await self.is_enabled(name, user):
+        if await self.is_enabled(key, user):
             return
         if hide:
             raise NotFoundError("not found")
-        feature = name.replace("_", " ").capitalize()
+        feature = key.replace("_", " ").capitalize()
         raise ForbiddenError(f"{feature} is not enabled for this account")
 
     async def _lookup(self, name: str) -> FeatureFlagDoc | None:

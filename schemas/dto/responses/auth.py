@@ -70,7 +70,7 @@ class UserProfileResponse(ResponseBase):
     user_name: str | None = Field(
         default=None, description="Display name", examples=["Jane Doe"]
     )
-    plan: str = Field(description="Subscription plan", examples=["free"])
+    plan: str = Field(description="Effective plan", examples=["free"])
     password_set: bool = Field(description="Whether the user has set a password")
     onboarded_at: UtcDatetime | None = Field(
         default=None,
@@ -83,8 +83,8 @@ class UserProfileResponse(ResponseBase):
     )
 
     @classmethod
-    def from_user(cls, user: UserDoc) -> UserProfileResponse:
-        """Build a UserProfileResponse from a UserDoc.
+    def from_user(cls, user: UserDoc, *, plan: str) -> UserProfileResponse:
+        """Build a UserProfileResponse from a UserDoc and the resolved plan.
 
         This is the single authoritative place for the profile response shape,
         replacing the old AuthService.get_user_profile() static helper.
@@ -94,7 +94,7 @@ class UserProfileResponse(ResponseBase):
             email=user.email,
             email_verified=user.email_verified,
             user_name=user.user_name,
-            plan=user.plan,
+            plan=plan,
             password_set=user.password_set,
             onboarded_at=user.onboarded_at,
             auth_providers=[

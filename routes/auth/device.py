@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from dependencies import (
     AppGrantRepo,
     DeviceAuthSvc,
+    EntitlementSvc,
     JwtConfig,
     JwtUser,
     OptionalUser,
@@ -269,6 +270,7 @@ async def device_token(
     request: Request,
     body: DeviceTokenRequest,
     device_auth_service: DeviceAuthSvc,
+    entitlement_service: EntitlementSvc,
 ) -> DeviceTokenResponse:
     """Exchange a one-time device auth code for JWT tokens.
 
@@ -288,7 +290,9 @@ async def device_token(
     return DeviceTokenResponse(
         access_token=result.access_token,
         refresh_token=result.refresh_token,
-        user=UserProfileResponse.from_user(result.user),
+        user=UserProfileResponse.from_user(
+            result.user, plan=await entitlement_service.plan_hint_for(result.user.id)
+        ),
     )
 
 

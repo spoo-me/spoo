@@ -211,6 +211,9 @@ async def test_erase_retains_blocked_links_through_domain_cascade(
         "report_submissions": 0,
         "reports_pulled": 0,
         "feature_flags_pulled": 0,
+        "subscriptions": 0,
+        "entitlement_overrides": 0,
+        "entitlement_events": 0,
         "r2_objects": 0,
     }
 

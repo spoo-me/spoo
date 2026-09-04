@@ -35,6 +35,12 @@ from dependencies.auth import (
     require_session_or_scopes,
     require_verified_email,
 )
+from dependencies.entitlements import (
+    Entitled,
+    EntitlementSvc,
+    get_entitlement_service,
+    get_entitlements,
+)
 from dependencies.infra import (
     AppRegistryDep,
     GeoIP,
@@ -132,6 +138,8 @@ __all__ = [
     "CustomDomainSvc",
     "DeviceAuthSvc",
     "DomainIntelSvc",
+    "Entitled",
+    "EntitlementSvc",
     "ExportSvc",
     "FeatureFlagSvc",
     "GeoIP",
@@ -175,6 +183,8 @@ __all__ = [
     "get_db",
     "get_device_auth_service",
     "get_email_provider",
+    "get_entitlement_service",
+    "get_entitlements",
     "get_export_service",
     "get_feature_flag_service",
     "get_geoip_service",

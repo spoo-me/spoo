@@ -37,7 +37,6 @@ def _make_user_doc(pfp_url=None, providers=None, storage_prefix=None):
     doc.storage_prefix = storage_prefix
     doc.email_verified = True
     doc.user_name = "testuser"
-    doc.plan = "free"
     doc.password_set = True
     doc.auth_providers = providers or []
     if pfp_url:
@@ -94,7 +93,6 @@ async def test_get_dashboard_profile_returns_correct_shape():
     profile = await svc.get_dashboard_profile(user.id)
     assert profile["email"] == "user@example.com"
     assert profile["email_verified"] is True
-    assert profile["plan"] == "free"
     assert profile["password_set"] is True
     assert len(profile["auth_providers"]) == 1
     assert profile["auth_providers"][0]["provider"] == "google"

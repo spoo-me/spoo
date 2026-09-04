@@ -117,6 +117,7 @@ def test_jwt_use_rs256(monkeypatch, private_key, public_key, expected):
 )
 def test_is_production(with_mongo, env, expected):
     with_mongo.setenv("ENV", env)
+    with_mongo.setenv("BILLING_PROVIDER", "none")
     assert AppSettings().is_production is expected
 
 
@@ -156,8 +157,31 @@ def test_zero_grace_days_refused_in_production(with_mongo, env, should_boot):
 
 def test_positive_grace_days_boots_in_production(with_mongo):
     with_mongo.setenv("ENV", "production")
+    with_mongo.setenv("BILLING_PROVIDER", "none")
     with_mongo.setenv("ACCOUNT_DELETION_GRACE_DAYS", "7")
     assert AppSettings().account_deletion_grace_days == 7
+
+
+@pytest.mark.parametrize(
+    "env, should_boot",
+    [("production", False), ("development", True)],
+    ids=["production_refuses", "development_allows"],
+)
+def test_unset_billing_provider_refused_in_production(with_mongo, env, should_boot):
+    # The default is self-host, which hands every account every feature.
+    with_mongo.setenv("ENV", env)
+    with_mongo.delenv("BILLING_PROVIDER", raising=False)
+    if should_boot:
+        assert AppSettings().billing.selfhost is True
+    else:
+        with pytest.raises(PydanticValidationError, match="BILLING_PROVIDER"):
+            AppSettings()
+
+
+def test_explicit_billing_provider_boots_in_production(with_mongo):
+    with_mongo.setenv("ENV", "production")
+    with_mongo.setenv("BILLING_PROVIDER", "none")
+    assert AppSettings().billing.selfhost is True
 
 
 @pytest.mark.parametrize(

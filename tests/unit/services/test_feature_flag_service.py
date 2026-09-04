@@ -13,14 +13,34 @@ from infrastructure.cache.feature_flag_cache import NEGATIVE_MISS
 from schemas.enums.rollout_type import RolloutType
 from schemas.models.feature_flag import FeatureFlagDoc
 from services.feature_flag_service import (
+    FEATURES,
     FeatureFlagService,
     _digit_bucket,
     _stable_hash,
 )
+from services.features.catalog import Feature, Kind, Lapse, Plan
 
 USER_A = ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")
 USER_B = ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")
 USER_C = ObjectId("cccccccccccccccccccccccc")
+
+
+@pytest.fixture(autouse=True)
+def _test_flag_in_catalog(monkeypatch):
+    """Register ``test_flag`` as a catalog feature whose rollout is the
+    ``test_flag`` document, so the rollout strategies can be exercised
+    without touching a real feature's entry."""
+    monkeypatch.setitem(
+        FEATURES,
+        "test_flag",
+        Feature(
+            key="test_flag",
+            kind=Kind.BOOL,
+            rollout="test_flag",
+            plans={p: True for p in Plan},
+            lapse=Lapse.KEEP,
+        ),
+    )
 
 
 def _flag(**overrides) -> FeatureFlagDoc:
@@ -32,7 +52,6 @@ def _flag(**overrides) -> FeatureFlagDoc:
         "allowlist_emails": [],
         "percentage": 0,
         "enabled_digits": [],
-        "tier": None,
         "description": "",
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
@@ -41,13 +60,11 @@ def _flag(**overrides) -> FeatureFlagDoc:
     return FeatureFlagDoc.model_validate(base)
 
 
-def _user(
-    user_id: ObjectId = USER_A, email: str | None = None, tier: str | None = None
-):
+def _user(user_id: ObjectId = USER_A, email: str | None = None):
     """Build a stub CurrentUser-shaped object via SimpleNamespace.
 
-    The real ``CurrentUser`` carries ``user_id`` always; ``email`` and ``tier``
-    are accessed defensively via ``getattr``.
+    The real ``CurrentUser`` carries ``user_id`` always; ``email`` is
+    accessed defensively via ``getattr``.
     """
     from types import SimpleNamespace
 
@@ -59,8 +76,6 @@ def _user(
     }
     if email is not None:
         attrs["email"] = email
-    if tier is not None:
-        attrs["tier"] = tier
     return SimpleNamespace(**attrs)
 
 
@@ -86,8 +101,32 @@ class TestDefaultDeny:
     @pytest.mark.asyncio
     async def test_unregistered_flag_returns_false(self):
         service, _repo, cache = make_service(flag=None)
+        assert await service.is_enabled("test_flag", _user()) is False
+        cache.set_negative.assert_awaited_once_with("test_flag")
+
+    @pytest.mark.asyncio
+    async def test_key_outside_catalog_returns_false_without_lookup(self):
+        service, repo, cache = make_service(flag=_flag(rollout_type="everyone"))
         assert await service.is_enabled("missing", _user()) is False
-        cache.set_negative.assert_awaited_once_with("missing")
+        repo.find_by_name.assert_not_awaited()
+        cache.get.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_finished_rollout_is_always_on(self, monkeypatch):
+        monkeypatch.setitem(
+            FEATURES,
+            "done",
+            Feature(
+                key="done",
+                kind=Kind.BOOL,
+                rollout=None,
+                plans={p: True for p in Plan},
+                lapse=Lapse.KEEP,
+            ),
+        )
+        service, repo, _ = make_service(flag=None)
+        assert await service.is_enabled("done", None) is True
+        repo.find_by_name.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_disabled_flag_returns_false(self):
@@ -313,57 +352,6 @@ class TestRolloutHexDigit:
         assert await service.is_enabled("test_flag", _user(USER_A)) is False
 
 
-# ── TIER ─────────────────────────────────────────────────────────────────────
-
-
-class TestRolloutTier:
-    @pytest.mark.asyncio
-    async def test_user_without_tier_attr_blocked(self):
-        flag = _flag(rollout_type=RolloutType.TIER, tier="pro")
-        service, _, _ = make_service(flag=flag)
-        # _user() without tier kwarg omits the attribute.
-        assert await service.is_enabled("test_flag", _user()) is False
-
-    @pytest.mark.asyncio
-    async def test_user_with_matching_tier_allowed(self):
-        flag = _flag(rollout_type=RolloutType.TIER, tier="pro")
-        service, _, _ = make_service(flag=flag)
-        assert await service.is_enabled("test_flag", _user(tier="pro")) is True
-
-    @pytest.mark.asyncio
-    async def test_user_with_wrong_tier_blocked(self):
-        flag = _flag(rollout_type=RolloutType.TIER, tier="pro")
-        service, _, _ = make_service(flag=flag)
-        assert await service.is_enabled("test_flag", _user(tier="free")) is False
-
-    @pytest.mark.asyncio
-    async def test_unset_flag_tier_blocks_all(self):
-        # If the flag has rollout_type=TIER but tier=None, the gate must
-        # default-deny rather than match ``user.tier is None == flag.tier is None``.
-        flag = _flag(rollout_type=RolloutType.TIER, tier=None)
-        service, _, _ = make_service(flag=flag)
-        assert await service.is_enabled("test_flag", _user()) is False
-
-    @pytest.mark.asyncio
-    async def test_current_user_tier_field_flows_through(self):
-        """CurrentUser.tier (UserDoc.plan value) satisfies TIER rollouts —
-        flipping a flag ALLOWLIST→TIER at paid launch is a data change."""
-        from bson import ObjectId
-
-        from dependencies.auth import CurrentUser
-
-        flag = _flag(rollout_type=RolloutType.TIER, tier="PRO")
-        service, _, _ = make_service(flag=flag)
-        pro = CurrentUser(user_id=ObjectId(), email_verified=True, tier="PRO")
-        free = CurrentUser(user_id=ObjectId(), email_verified=True, tier="FREE")
-        anon_tier = CurrentUser(user_id=ObjectId(), email_verified=True)
-        assert await service.is_enabled("test_flag", pro) is True
-        assert await service.is_enabled("test_flag", free) is False
-        assert await service.is_enabled("test_flag", anon_tier) is False
-        assert await service.is_enabled("test_flag", _user(tier="pro")) is False
-        assert await service.is_enabled("test_flag", _user(tier="free")) is False
-
-
 # ── Caching behaviour ────────────────────────────────────────────────────────
 
 
@@ -395,8 +383,8 @@ class TestCaching:
     @pytest.mark.asyncio
     async def test_repo_miss_populates_negative_cache(self):
         service, _, cache = make_service(flag=None)
-        await service.is_enabled("missing", _user())
-        cache.set_negative.assert_awaited_once_with("missing")
+        await service.is_enabled("test_flag", _user())
+        cache.set_negative.assert_awaited_once_with("test_flag")
 
 
 # ── Stable hashing ───────────────────────────────────────────────────────────
