@@ -1,6 +1,7 @@
 """
 DELETE /api/v1/me                — request account deletion (grace period)
 GET    /api/v1/me/entitlements   — plan, feature states, limits, version
+POST   /api/v1/me/pro-onboarding — mark the Pro tour as seen
 GET    /api/v1/me/features       — the features map alone
 GET    /api/v1/me/layouts/{page} — fetch the saved dashboard layout (null = default)
 PUT    /api/v1/me/layouts/{page} — save the layout document verbatim
@@ -30,7 +31,9 @@ from dependencies import (
     JwtUser,
     PageLayoutSvc,
     ProfilePictureSvc,
+    UserRepo,
 )
+from errors import ForbiddenError
 from middleware.openapi import AUTH_RESPONSES
 from middleware.rate_limiter import Limits, limiter
 from schemas.dto.requests.account import DeleteAccountRequest
@@ -52,7 +55,7 @@ from schemas.dto.responses.profile_pictures import (
     AvailablePicturesResponse,
     ProfilePictureMessageResponse,
 )
-from services.features.catalog import int_features
+from services.features.catalog import Plan, int_features
 
 router = APIRouter(prefix="/me", tags=["Me"])
 
@@ -161,6 +164,7 @@ async def get_my_entitlements(
             status=entitlements.status.value if entitlements.status else None,
             until=entitlements.until,
             founding=entitlements.founding,
+            renews=entitlements.renews,
         ),
         features=features,
         limits={
@@ -169,6 +173,29 @@ async def get_my_entitlements(
         },
         over_limit={k: OverLimitBlock(paused=v) for k, v in paused.items()},
     )
+
+
+@router.post(
+    "/pro-onboarding",
+    status_code=204,
+    responses=AUTH_RESPONSES,
+    operation_id="completeProOnboarding",
+    summary="Complete Pro Onboarding",
+)
+@limiter.limit(Limits.DASHBOARD_WRITE)
+async def complete_pro_onboarding(
+    request: Request, user: JwtUser, user_repo: UserRepo, entitlements: Entitled
+) -> None:
+    """Record that this account has seen the Pro tour. Idempotent: the first
+    completion is kept, and it is read back as `user.pro_onboarded_at` on
+    `GET /auth/me`.
+
+    **Authentication**: Required. 403 on the free plan.
+    """
+    # Free is the only plan without the tour; self-host holds everything.
+    if entitlements.plan is Plan.FREE:
+        raise ForbiddenError("Pro plan required")
+    await user_repo.mark_pro_onboarded(user.user_id)
 
 
 # Closed set: every dashboard board the frontend actually renders. An

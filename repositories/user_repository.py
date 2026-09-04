@@ -48,6 +48,13 @@ class UserRepository(BaseRepository[UserDoc]):
         """Find a user by ObjectId."""
         return await self._find_one({"_id": user_id})
 
+    async def mark_pro_onboarded(self, user_id: ObjectId) -> bool:
+        """Stamp the first Pro tour completion; later calls change nothing."""
+        return await self._update_modified(
+            {"_id": user_id, "pro_onboarded_at": None},
+            {"$set": {"pro_onboarded_at": datetime.now(timezone.utc)}},
+        )
+
     async def find_by_oauth_provider(
         self, provider: str, provider_user_id: str
     ) -> UserDoc | None:

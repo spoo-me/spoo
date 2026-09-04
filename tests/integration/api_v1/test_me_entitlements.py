@@ -58,6 +58,7 @@ def test_free_shape():
         "status": None,
         "until": None,
         "founding": False,
+        "renews": False,
     }
     assert body["features"]["geo_targeting"] == "locked"
     assert set(body["limits"]) == {f.key for f in int_features()}
@@ -179,3 +180,45 @@ def test_over_limit_lists_paused_items_per_limit():
         body = client.get("/api/v1/me/entitlements").json()
     assert body["over_limit"] == {"webhook_endpoints_max": {"paused": ["aaa", "bbb"]}}
     assert body["limits"]["webhook_endpoints_max"] == {"max": 1, "used": 3}
+
+
+def _onboarding_client(plan: Plan) -> tuple[TestClient, AsyncMock]:
+    from dependencies import get_user_repo
+
+    user = _make_user()
+    repo = AsyncMock()
+    repo.mark_pro_onboarded = AsyncMock(return_value=True)
+    app = _build_test_app(
+        {
+            require_jwt: lambda: user,
+            get_current_user: lambda: user,
+            get_entitlements: lambda: for_plan(plan),
+            get_user_repo: lambda: repo,
+        }
+    )
+    return TestClient(app), repo
+
+
+def test_pro_account_marks_the_tour_seen():
+    client, repo = _onboarding_client(Plan.PRO)
+    with client:
+        resp = client.post("/api/v1/me/pro-onboarding")
+    assert resp.status_code == 204
+    assert resp.content == b""
+    repo.mark_pro_onboarded.assert_awaited_once()
+
+
+def test_free_account_cannot_stamp_the_pro_tour():
+    client, repo = _onboarding_client(Plan.FREE)
+    with client:
+        resp = client.post("/api/v1/me/pro-onboarding")
+    assert resp.status_code == 403
+    assert resp.json()["code"] == "forbidden"
+    repo.mark_pro_onboarded.assert_not_awaited()
+
+
+def test_selfhost_account_marks_the_tour_seen():
+    client, repo = _onboarding_client(Plan.SELFHOST)
+    with client:
+        assert client.post("/api/v1/me/pro-onboarding").status_code == 204
+    repo.mark_pro_onboarded.assert_awaited_once()
