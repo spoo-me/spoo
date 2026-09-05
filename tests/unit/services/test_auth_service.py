@@ -897,6 +897,7 @@ class TestGetUserProfile:
         profile = UserProfileResponse.from_user(user, plan="pro")
         assert profile.id == str(USER_OID)
         assert profile.plan == "pro"
+        assert profile.pro_onboarded_at is None
         assert profile.email == "test@example.com"
         assert profile.email_verified is True
         assert profile.user_name == "Test User"

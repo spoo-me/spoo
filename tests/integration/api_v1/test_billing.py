@@ -646,6 +646,7 @@ class TestWebhookFlows:
             "status": "active",
             "until": None,
             "founding": True,
+            "renews": True,
         }
 
         assert w.deliver("subscription_past_due").json()["outcome"] == "applied"
