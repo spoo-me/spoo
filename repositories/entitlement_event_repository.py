@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from bson import ObjectId
 
 from repositories.base import BaseRepository
@@ -19,6 +21,28 @@ class EntitlementEventRepository(BaseRepository[EntitlementEventDoc]):
         they hold. Reminder events are audit only and do not bump it."""
         return await self._count(
             {"user_id": user_id, "kind": {"$nin": list(_VERSIONLESS_KINDS)}}
+        )
+
+    async def has_reminder(
+        self, user_id: ObjectId, kind: EntitlementEventKind, period: str
+    ) -> bool:
+        doc = await self._find_one_raw(
+            {"user_id": user_id, "kind": kind.value, "period": period}, {"_id": 1}
+        )
+        return doc is not None
+
+    async def users_with_override_writes_since(self, since: datetime) -> list[ObjectId]:
+        return await self._col.distinct(
+            "user_id",
+            {
+                "kind": {
+                    "$in": [
+                        EntitlementEventKind.OVERRIDE_GRANTED.value,
+                        EntitlementEventKind.OVERRIDE_REVOKED.value,
+                    ]
+                },
+                "at": {"$gte": since},
+            },
         )
 
     async def delete_by_user(self, user_id: ObjectId) -> int:

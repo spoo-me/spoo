@@ -1,0 +1,14 @@
+{
+  "name": "Entitlements lifecycle job stalled",
+  "description": "The lifecycle job ticks every minute and logs entitlements_lifecycle_tick. No tick for five minutes means subscriptions freeze in the generous direction: nobody moves to grace or lapses, reminders stop. Check the click worker (or the embedded scheduler) and the scheduled_tasks lease.",
+  "type": "Threshold",
+  "intervalMinutes": 5,
+  "rangeMinutes": 5,
+  "aplQuery": "['spoo-prod'] | where event == \"entitlements_lifecycle_tick\" | summarize count() by bin(_time, 5m)",
+  "operator": "Below",
+  "threshold": 1,
+  "alertOnNoData": true,
+  "notifierIds": [
+    "xd9Sj0KGJ0e2TYPnl2"
+  ]
+}
