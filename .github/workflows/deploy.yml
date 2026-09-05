@@ -101,8 +101,13 @@ jobs:
             cd /opt/spoo
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+            # The shell copy would shadow .env for compose, so a rollback
+            # that rewrote .env still deployed the new image. Compose must
+            # only ever read the tag from .env.
+            TARGET_TAG="${IMAGE_TAG}"
+            unset IMAGE_TAG
             PREV_TAG=$(grep '^IMAGE_TAG=' .env | cut -d= -f2- || true)
-            echo "deploying ${IMAGE_TAG} (previous: ${PREV_TAG:-<none>})"
+            echo "deploying ${TARGET_TAG} (previous: ${PREV_TAG:-<none>})"
 
             set_tag() {
               grep -v '^IMAGE_TAG=' .env > .env.tmp 2>/dev/null || true
@@ -114,30 +119,36 @@ jobs:
             wait_healthy() {
               # Caddy keeps a connection pool to app:8000 with retries, so
               # users see a brief latency bump (not 502) during the swap.
+              # Budget: app startup (imports plus index creation, 35s seen)
+              # plus the 30s start_period plus one 15s probe interval.
               [ -n "$1" ] || { echo "::error::wait_healthy: missing container name"; return 1; }
               status=""
-              for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              for i in $(seq 1 40); do
                 status=$(docker inspect "$1" --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
-                [ "$status" = "healthy" ] && return 0
+                if [ "$status" = "healthy" ]; then
+                  running=$(docker inspect "$1" --format '{{.Config.Image}}' 2>/dev/null || true)
+                  case "$running" in *:"$2") return 0 ;; esac
+                  echo "::error::$1 is healthy on ${running}, expected tag $2"; return 1
+                fi
                 echo "$1 $status, retry $i"; sleep 3
               done
               return 1
             }
 
-            set_tag "${IMAGE_TAG}"
+            set_tag "${TARGET_TAG}"
             docker compose --env-file .env -f docker-compose.prod.yml pull app
             docker compose --env-file .env -f docker-compose.prod.yml up -d --no-deps app
 
-            if ! wait_healthy spoo_app; then
-              echo "::error::app failed to reach healthy on ${IMAGE_TAG} (last status: $status)"
+            if ! wait_healthy spoo_app "${TARGET_TAG}"; then
+              echo "::error::app failed to reach healthy on ${TARGET_TAG} (last status: $status)"
               # diagnostics must never abort the rollback below (set -e)
               docker compose --env-file .env -f docker-compose.prod.yml logs --tail=100 app || true
-              if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$IMAGE_TAG" ]; then
+              if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$TARGET_TAG" ]; then
                 echo "rolling back to ${PREV_TAG}"
                 set_tag "${PREV_TAG}"
                 docker compose --env-file .env -f docker-compose.prod.yml pull app || true
                 docker compose --env-file .env -f docker-compose.prod.yml up -d --no-deps app
-                if wait_healthy spoo_app; then
+                if wait_healthy spoo_app "${PREV_TAG}"; then
                   echo "::warning::rolled back — prod is healthy on previous image ${PREV_TAG}"
                 else
                   echo "::error::rollback to ${PREV_TAG} also unhealthy — manual intervention needed"
@@ -151,15 +162,15 @@ jobs:
             # an app rollback leaves the worker untouched on the old pair.
             docker compose --env-file .env -f docker-compose.prod.yml up -d --no-deps click-worker
 
-            if ! wait_healthy spoo_click_worker; then
-              echo "::error::click worker failed to reach healthy on ${IMAGE_TAG} (last status: $status)"
+            if ! wait_healthy spoo_click_worker "${TARGET_TAG}"; then
+              echo "::error::click worker failed to reach healthy on ${TARGET_TAG} (last status: $status)"
               docker compose --env-file .env -f docker-compose.prod.yml logs --tail=100 click-worker || true
-              if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$IMAGE_TAG" ]; then
+              if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$TARGET_TAG" ]; then
                 echo "rolling back app + worker to ${PREV_TAG}"
                 set_tag "${PREV_TAG}"
                 docker compose --env-file .env -f docker-compose.prod.yml pull app click-worker || true
                 docker compose --env-file .env -f docker-compose.prod.yml up -d --no-deps app click-worker
-                if wait_healthy spoo_app && wait_healthy spoo_click_worker; then
+                if wait_healthy spoo_app "${PREV_TAG}" && wait_healthy spoo_click_worker "${PREV_TAG}"; then
                   echo "::warning::rolled back — prod is healthy on previous image ${PREV_TAG}"
                 else
                   echo "::error::rollback to ${PREV_TAG} also unhealthy — manual intervention needed"
