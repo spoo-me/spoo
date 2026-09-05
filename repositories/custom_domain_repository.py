@@ -49,7 +49,11 @@ class CustomDomainRepository(BaseRepository[CustomDomainDoc]):
         currently-active domains.
         """
         return await self._find_one(
-            {"fqdn": _canonical(fqdn), "status": DomainStatus.ACTIVE}
+            {
+                "fqdn": _canonical(fqdn),
+                "status": DomainStatus.ACTIVE,
+                "paused_by_limit": {"$ne": True},
+            }
         )
 
     async def find_blocking_by_fqdn(self, fqdn: str) -> CustomDomainDoc | None:
@@ -88,6 +92,26 @@ class CustomDomainRepository(BaseRepository[CustomDomainDoc]):
                 error_type=type(exc).__name__,
             )
             raise
+
+    async def list_live_by_owner(self, owner_id: ObjectId) -> list[CustomDomainDoc]:
+        """Every non-revoked domain of *owner_id*, oldest first."""
+        cursor = self._col.find(
+            {"owner_id": owner_id, "status": {"$ne": DomainStatus.REVOKED.value}}
+        ).sort("created_at", 1)
+        docs = await cursor.to_list(length=None)
+        return [CustomDomainDoc.from_mongo(d) for d in docs]  # type: ignore[misc]
+
+    async def set_paused_by_limit(self, ids: list[ObjectId], paused: bool) -> int:
+        result = await self._col.update_many(
+            {"_id": {"$in": ids}},
+            {
+                "$set": {
+                    "paused_by_limit": paused,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
+        )
+        return result.modified_count
 
     async def count_by_owner(self, owner_id: ObjectId) -> int:
         """Count all domains owned by *owner_id* (any status)."""

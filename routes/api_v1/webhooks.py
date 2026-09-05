@@ -25,7 +25,7 @@ from typing import Annotated
 from bson import ObjectId
 from fastapi import APIRouter, Depends, Path, Query, Request
 
-from dependencies import FeatureFlagSvc, WebhookSvc
+from dependencies import Entitled, FeatureFlagSvc, WebhookSvc
 from dependencies.auth import (
     WEBHOOKS_MANAGE_SCOPES,
     WEBHOOKS_READ_SCOPES,
@@ -113,6 +113,7 @@ async def create_endpoint(
     user: ManageUser,
     webhook_service: WebhookSvc,
     flag_svc: FeatureFlagSvc,
+    entitlements: Entitled,
 ) -> WebhookEndpointCreatedResponse:
     """Register an HTTPS endpoint to receive event deliveries.
 
@@ -124,7 +125,7 @@ async def create_endpoint(
 
     **Rate Limits**: 10/hour
     """
-    await flag_svc.require(WEBHOOKS_FLAG, user)
+    await flag_svc.require(WEBHOOKS_FLAG, user, entitlements=entitlements)
     doc, secret = await webhook_service.create_endpoint(
         user.user_id,
         url=body.url,
@@ -132,6 +133,7 @@ async def create_endpoint(
         description=body.description,
         scope_links=body.scope_links,
         flavor=body.flavor,
+        max_endpoints=entitlements.limit("webhook_endpoints_max"),
     )
     base = WebhookEndpointResponse.from_doc(doc)
     return WebhookEndpointCreatedResponse(**base.model_dump(), signing_secret=secret)

@@ -13,7 +13,7 @@ from typing import Any
 
 from bson import ObjectId
 
-from errors import NotFoundError, ValidationError
+from errors import LimitReachedError, NotFoundError, ValidationError
 from infrastructure.crypto import decrypt_secret, encrypt_secret
 from infrastructure.logging import get_logger
 from infrastructure.safe_fetch import FetchHardError, validate_public_https_url
@@ -27,6 +27,7 @@ from schemas.models.webhook import (
     WebhookScope,
 )
 from services.events.contract import DomainEvent
+from services.features.catalog import UNLIMITED
 from services.webhooks.executor import SECRET_ENC_DOMAIN, DeliveryExecutor
 from services.webhooks.matcher import OwnerSubscriptionCache
 from services.webhooks.registry import (
@@ -54,7 +55,6 @@ class WebhookService:
         owner_cache: OwnerSubscriptionCache,
         *,
         master_secret: str,
-        max_endpoints: int = 5,
     ) -> None:
         self._endpoints = endpoint_repo
         self._deliveries = delivery_repo
@@ -62,7 +62,6 @@ class WebhookService:
         self._executor = executor
         self._cache = owner_cache
         self._master_secret = master_secret
-        self._max_endpoints = max_endpoints
 
     # ── CRUD ─────────────────────────────────────────────────────────────
 
@@ -75,15 +74,21 @@ class WebhookService:
         description: str | None,
         scope_links: list[str] | None,
         flavor: WebhookFlavor,
+        max_endpoints: int,
     ) -> tuple[WebhookEndpointDoc, str]:
-        """Returns (doc, raw signing secret). The secret's only appearance."""
+        """Returns (doc, raw signing secret). The secret's only appearance.
+
+        ``max_endpoints`` is the owner's plan limit (``-1`` unlimited); every
+        endpoint counts, paused and disabled ones included.
+        """
         await self._validate_url(url)
         validate_patterns(events)
-        if await self._endpoints.count_by_user(user_id) >= self._max_endpoints:
-            raise ValidationError(
-                f"Endpoint limit reached ({self._max_endpoints}). "
-                "Delete an endpoint to add a new one."
-            )
+        if max_endpoints != UNLIMITED:
+            current = await self._endpoints.count_by_user(user_id)
+            if current >= max_endpoints:
+                raise LimitReachedError(
+                    "webhook_endpoints_max", max_=max_endpoints, current=current
+                )
 
         secret = generate_signing_secret()
         now = datetime.now(timezone.utc)

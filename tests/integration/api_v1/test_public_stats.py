@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from unittest.mock import AsyncMock
 
 from bson import ObjectId
 from fastapi.testclient import TestClient
@@ -17,6 +18,8 @@ from dependencies import get_current_user
 from dependencies.services import get_public_stats_service
 from infrastructure.crypto import hash_password
 from schemas.models.url import UrlV2Doc
+from services.entitlements import for_plan
+from services.features.catalog import Plan
 from services.public_link_resolver import PublicLinkResolver
 from services.public_stats_service import PublicStatsService
 from services.stats_service import StatsService
@@ -122,16 +125,21 @@ def _build_service(
     v1_docs: dict[str, dict[str, Any]] | None = None,
     emoji_docs: dict[str, dict[str, Any]] | None = None,
     click_repo: _CapturingClickRepo | None = None,
+    flag_on: bool = False,
 ) -> tuple[PublicStatsService, _CapturingClickRepo]:
     click_repo = click_repo or _CapturingClickRepo()
-    stats_service = StatsService(click_repo, _DictUrlRepo(), max_date_range_days=90)
+    stats_service = StatsService(click_repo, _DictUrlRepo())
     resolver = PublicLinkResolver(
         _DictUrlRepo(v2_docs),
         _DictLegacyRepo(v1_docs),
         _DictLegacyRepo(emoji_docs),
         system_default_domain=_DOMAIN,
     )
-    service = PublicStatsService(resolver, stats_service, max_date_range_days=90)
+    entitlements = AsyncMock()
+    entitlements.resolve_for = AsyncMock(return_value=for_plan(Plan.FREE))
+    flags = AsyncMock()
+    flags.is_enabled_for_owner = AsyncMock(return_value=flag_on)
+    service = PublicStatsService(resolver, stats_service, entitlements, flags)
     return service, click_repo
 
 
@@ -837,3 +845,50 @@ def test_inverted_date_range_is_a_validation_error():
 
     assert resp.status_code == 400
     assert resp.json()["code"] == "validation_error"
+
+
+def _pro_service(doc: UrlV2Doc) -> tuple[PublicStatsService, _CapturingClickRepo]:
+    service, click_repo = _build_service(v2_docs=[doc])
+    service._entitlements.resolve_for = AsyncMock(return_value=for_plan(Plan.PRO))
+    return service, click_repo
+
+
+def _two_years_back() -> str:
+    start = datetime.now(timezone.utc) - timedelta(days=720)
+    return f"?start_date={start:%Y-%m-%dT%H:%M:%SZ}&timezone=UTC"
+
+
+def test_anonymous_visitor_is_clamped_to_the_free_window_on_a_pro_link():
+    doc = _make_v2_doc(alias="abc1234")
+    service, click_repo = _pro_service(doc)
+    with _client(service) as client:
+        resp = client.get(_url("abc1234", _two_years_back()))
+
+    assert resp.status_code == 200
+    since = click_repo.pipelines[0][0]["$match"]["clicked_at"]["$gte"]
+    assert datetime.now(timezone.utc) - since < timedelta(days=91)
+
+
+def test_owner_gets_the_plan_window_on_a_pro_link():
+    doc = _make_v2_doc(alias="abc1234")
+    service, click_repo = _pro_service(doc)
+    with _client(service, user=_make_user(user_id=doc.owner_id)) as client:
+        resp = client.get(_url("abc1234", _two_years_back()))
+
+    assert resp.status_code == 200
+    since = click_repo.pipelines[0][0]["$match"]["clicked_at"]["$gte"]
+    assert datetime.now(timezone.utc) - since > timedelta(days=700)
+
+
+def test_whitelabel_needs_the_flag_and_the_entitlement():
+    doc = _make_v2_doc(alias="abc1234")
+    service, _ = _pro_service(doc)
+    with _client(service) as client:
+        assert client.get(_url("abc1234")).json()["whitelabel"] is False
+    service, _ = _build_service(v2_docs=[doc], flag_on=True)
+    service._entitlements.resolve_for = AsyncMock(return_value=for_plan(Plan.PRO))
+    with _client(service) as client:
+        assert client.get(_url("abc1234")).json()["whitelabel"] is True
+    service, _ = _build_service(v2_docs=[doc], flag_on=True)
+    with _client(service) as client:
+        assert client.get(_url("abc1234")).json()["whitelabel"] is False

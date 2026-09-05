@@ -17,6 +17,7 @@ from dependencies import (
     URL_MANAGEMENT_SCOPES,
     CurrentUser,
     CustomDomainSvc,
+    Entitled,
     FeatureFlagSvc,
     Settings,
     TagSvc,
@@ -24,7 +25,7 @@ from dependencies import (
     require_scopes,
 )
 from middleware.openapi import AUTH_RESPONSES, ERROR_RESPONSES
-from middleware.rate_limiter import Limits, limiter
+from middleware.rate_limiter import Limits, limiter, plan_scaled
 from routes.api_v1._helpers import parse_url_id
 from schemas.dto.requests.url import (
     ClaimUrlsRequest,
@@ -94,7 +95,7 @@ async def claim_urls_v1(
     operation_id="updateUrl",
     summary="Update URL",
 )
-@limiter.limit(Limits.URL_MANAGE)
+@limiter.limit(plan_scaled(Limits.URL_MANAGE))
 async def update_url_v1(
     request: Request,
     url_id: Annotated[
@@ -112,6 +113,7 @@ async def update_url_v1(
     custom_domain_service: CustomDomainSvc,
     settings: Settings,
     flag_svc: FeatureFlagSvc,
+    entitlements: Entitled,
     user: CurrentUser = Depends(require_scopes(URL_MANAGEMENT_SCOPES)),  # noqa: B008
 ) -> UpdateUrlResponse:
     """Update an existing URL's properties.
@@ -149,17 +151,17 @@ async def update_url_v1(
     # Setting geo rules is flag-gated; clearing (null/{}) is always allowed so
     # de-allowlisted owners can remove their rules during rollback.
     if "geo_rules" in body.model_fields_set and body.geo_rules:
-        await flag_svc.require(GEO_TARGETING_FLAG, user)
+        await flag_svc.require(GEO_TARGETING_FLAG, user, entitlements=entitlements)
     if "ab_variants" in body.model_fields_set and body.ab_variants:
-        await flag_svc.require(AB_TESTING_FLAG, user)
+        await flag_svc.require(AB_TESTING_FLAG, user, entitlements=entitlements)
     if "expired_redirect_url" in body.model_fields_set and body.expired_redirect_url:
-        await flag_svc.require(EXPIRED_FALLBACK_FLAG, user)
+        await flag_svc.require(EXPIRED_FALLBACK_FLAG, user, entitlements=entitlements)
     # Same deal for meta_tags: setting/replacing is flag-gated, clearing
     # (null) never is.
     if "meta_tags" in body.model_fields_set and body.meta_tags is not None:
-        await flag_svc.require(META_TAGS_FLAG, user)
+        await flag_svc.require(META_TAGS_FLAG, user, entitlements=entitlements)
     if body.starts_at is not None or body.pre_start_url:
-        await flag_svc.require(LINK_SCHEDULING_FLAG, user)
+        await flag_svc.require(LINK_SCHEDULING_FLAG, user, entitlements=entitlements)
     # Verify domain ownership at the edge so the service can stay opaque about
     # tenancy. `domain` field-set with null means "move to system default" —
     # no ownership check needed for the default namespace.
@@ -178,7 +180,7 @@ async def update_url_v1(
     operation_id="updateUrlStatus",
     summary="Update URL Status",
 )
-@limiter.limit(Limits.URL_MANAGE)
+@limiter.limit(plan_scaled(Limits.URL_MANAGE))
 async def update_url_status_v1(
     request: Request,
     url_id: Annotated[
@@ -193,6 +195,7 @@ async def update_url_status_v1(
     body: UpdateUrlStatusRequest,
     url_service: UrlSvc,
     tag_service: TagSvc,
+    entitlements: Entitled,
     user: CurrentUser = Depends(require_scopes(URL_MANAGEMENT_SCOPES)),  # noqa: B008
 ) -> UpdateUrlResponse:
     """Update only the status of a URL (ACTIVE / INACTIVE).
@@ -237,7 +240,7 @@ async def update_url_status_v1(
     operation_id="deleteUrl",
     summary="Delete URL",
 )
-@limiter.limit(Limits.URL_DELETE)
+@limiter.limit(plan_scaled(Limits.URL_DELETE))
 async def delete_url_v1(
     request: Request,
     url_id: Annotated[
@@ -250,6 +253,7 @@ async def delete_url_v1(
         ),
     ],
     url_service: UrlSvc,
+    entitlements: Entitled,
     user: CurrentUser = Depends(require_scopes(URL_MANAGEMENT_SCOPES)),  # noqa: B008
 ) -> DeleteUrlResponse:
     """Delete a URL permanently.

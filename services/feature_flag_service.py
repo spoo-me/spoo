@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING
 
 from bson import ObjectId
 
-from errors import ForbiddenError, NotFoundError
+from errors import ForbiddenError, NotFoundError, PlanRequiredError
 from infrastructure.cache.feature_flag_cache import (
     NEGATIVE_MISS,
     FeatureFlagCache,
@@ -59,6 +59,7 @@ log = get_logger(__name__)
 # Catalog keys referenced by routes. Code names features through these,
 # never through bare string literals at call sites.
 CUSTOM_DOMAINS_FLAG = "custom_domains"
+DOMAIN_POLISH_FLAG = "domain_polish"
 GEO_TARGETING_FLAG = "geo_targeting"
 META_TAGS_FLAG = "custom_meta_tags"
 AB_TESTING_FLAG = "ab_variants"
@@ -104,6 +105,19 @@ class FeatureFlagService:
 
         Default-deny on any error or unknown key.
         """
+        if user is None:
+            return await self._rolled_out(key, None, None)
+        return await self._rolled_out(key, user.user_id, _email_of(user))
+
+    async def is_enabled_for_owner(self, key: str, owner_id: ObjectId) -> bool:
+        """``is_enabled`` for a link owner known only by id (public pages).
+        Allowlist this feature by user id, not email, or the pages disagree
+        with the owner's dashboard."""
+        return await self._rolled_out(key, owner_id, None)
+
+    async def _rolled_out(
+        self, key: str, user_id: ObjectId | None, email: str | None
+    ) -> bool:
         feature = FEATURES.get(key)
         if feature is None:
             log.warning("feature_flag_unknown_key", key=key)
@@ -124,17 +138,17 @@ class FeatureFlagService:
 
         # All non-EVERYONE rollouts require an authenticated user — anonymous
         # callers get default-deny.
-        if user is None:
+        if user_id is None:
             return False
 
         if rollout == RolloutType.ALLOWLIST:
-            return flag.is_user_in_allowlist(user.user_id, _email_of(user))
+            return flag.is_user_in_allowlist(user_id, email)
 
         if rollout == RolloutType.PERCENTAGE:
-            return _stable_hash(user.user_id, salt=flag.name) < flag.percentage
+            return _stable_hash(user_id, salt=flag.name) < flag.percentage
 
         if rollout == RolloutType.HEX_DIGIT:
-            return _digit_bucket(user.user_id, salt=flag.name) in flag.enabled_digits
+            return _digit_bucket(user_id, salt=flag.name) in flag.enabled_digits
 
         # Unreachable today — Pydantic validates rollout_type against the
         # RolloutType enum. Kept as default-deny if the field is ever widened.
@@ -169,22 +183,31 @@ class FeatureFlagService:
         return states
 
     async def require(
-        self, key: str, user: CurrentUser | None, *, hide: bool = False
+        self,
+        key: str,
+        user: CurrentUser | None,
+        *,
+        entitlements: Resolved | None = None,
+        hide: bool = False,
     ) -> None:
-        """Raise unless ``key`` is rolled out to ``user``.
+        """Raise unless ``key`` is rolled out to ``user`` and, when
+        ``entitlements`` is given, included in their plan.
 
-        403 by default — the right signal for flag-gated FIELDS on shared
-        endpoints, which appear in public OpenAPI docs and can't be
-        concealed. Pass ``hide=True`` for whole-endpoint features whose
-        existence is itself gated (the custom-domains pattern): 404, so
-        non-allowlisted callers can't tell the feature exists.
+        Flag off answers 403 by default — the right signal for flag-gated
+        FIELDS on shared endpoints, which appear in public OpenAPI docs and
+        can't be concealed. Pass ``hide=True`` for whole-endpoint features
+        whose existence is itself gated (the custom-domains pattern): 404,
+        so non-allowlisted callers can't tell the feature exists. Flag on
+        but plan without the feature answers 403 ``plan_required``, never
+        404: the LOCKED state already told the client the feature exists.
         """
-        if await self.is_enabled(key, user):
-            return
-        if hide:
-            raise NotFoundError("not found")
-        feature = key.replace("_", " ").capitalize()
-        raise ForbiddenError(f"{feature} is not enabled for this account")
+        if not await self.is_enabled(key, user):
+            if hide:
+                raise NotFoundError("not found")
+            feature = key.replace("_", " ").capitalize()
+            raise ForbiddenError(f"{feature} is not enabled for this account")
+        if entitlements is not None and not entitlements.has(key):
+            raise PlanRequiredError(key)
 
     async def _lookup(self, name: str) -> FeatureFlagDoc | None:
         """Fetch a flag through cache → repo, returning None for unregistered."""

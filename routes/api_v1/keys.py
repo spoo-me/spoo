@@ -19,6 +19,7 @@ from fastapi import APIRouter, Path, Query, Request
 
 from dependencies import (
     ApiKeySvc,
+    Entitled,
     JwtVerifiedUser,
     KeysAccessUser,
 )
@@ -50,6 +51,7 @@ async def create_api_key(
     body: CreateApiKeyRequest,
     user: JwtVerifiedUser,
     api_key_service: ApiKeySvc,
+    entitlements: Entitled,
 ) -> ApiKeyCreatedResponse:
     """Create a new API key for programmatic access.
 
@@ -94,6 +96,7 @@ async def create_api_key(
         email_verified=user.email_verified,
         description=body.description,
         expires_at=expires_at,
+        max_keys=entitlements.limit("api_keys_max"),
     )
 
     return ApiKeyCreatedResponse(

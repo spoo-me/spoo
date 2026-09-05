@@ -161,7 +161,7 @@ class CustomDomainSettings(BaseSettings):
     even when False so the rollout has a clean code path to flip.
 
     All env vars must be prefixed ``CUSTOM_DOMAINS_`` so generic names
-    like ``ENABLED`` or ``MAX_PER_USER`` set elsewhere in the deploy
+    like ``ENABLED`` or ``MOCK_DCV`` set elsewhere in the deploy
     environment don't accidentally configure this feature.
     """
 
@@ -186,7 +186,6 @@ class CustomDomainSettings(BaseSettings):
     # All counts must be >= 1 — a zero quota silently bricks the feature
     # (every create raises QuotaExceeded with no log signal that the cause
     # is config, not abuse). Validators below fail container startup instead.
-    max_per_user: int = Field(default=1, ge=1)
     # Generous because CF's own DCV cadence can take 5-15 min per probe;
     # legitimate users may poll many times during initial activation.
     verify_attempts_per_hour: int = Field(default=60, ge=1)
@@ -457,7 +456,6 @@ class WebhookSettings(BaseSettings):
     enabled: bool = False
     runtime: Literal["auto", "worker", "embedded", "off"] = "auto"
 
-    max_endpoints: int = Field(default=5, ge=1)
     delivery_timeout_seconds: float = Field(default=15.0, gt=0)
     max_payload_bytes: int = Field(default=20_480, ge=1024)
     max_consecutive_failures: int = Field(default=10, ge=1)
@@ -755,8 +753,6 @@ class AppSettings(BaseSettings):
     hcaptcha_sitekey: str = ""
 
     # Service limits (overridable by self-hosters via env vars)
-    max_active_api_keys: int = 20
-    max_date_range_days: int = 90
     http_client_timeout: float = 5.0
     # Account deletion (GDPR Art. 17): days between the deletion request
     # and the erasure sweep purging the account (0 = purge on the next
@@ -798,8 +794,6 @@ class AppSettings(BaseSettings):
     # ── Field validators for safety-critical config ────────────────────
 
     @field_validator(
-        "max_active_api_keys",
-        "max_date_range_days",
         "max_emoji_alias_length",
         "emoji_generated_alias_length",
         "geo_rules_max_countries",

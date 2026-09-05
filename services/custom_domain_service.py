@@ -20,6 +20,7 @@ from errors import (
     FeatureDisabledError,
     ForbiddenError,
     InvalidDomainTransitionError,
+    LimitReachedError,
     NotFoundError,
 )
 from infrastructure.logging import get_logger
@@ -34,6 +35,7 @@ from schemas.enums.domain_status import DomainStatus, VerificationMethod
 from schemas.models.custom_domain import LEGAL_TRANSITIONS, CustomDomainDoc
 from services.dns_preflight import check_cname, uses_cloudflare_dns
 from services.edge_provisioner.protocol import EdgeProvisioner
+from services.features.catalog import UNLIMITED
 from services.registrar.protocol import HostnameRegistrar
 from services.tenant_resolver.protocol import TenantResolver
 from services.verifiers.protocol import DomainVerifier, VerificationResult
@@ -86,13 +88,18 @@ class CustomDomainService:
         self,
         request: CreateCustomDomainRequest,
         user: CurrentUser,
+        *,
+        max_domains: int,
     ) -> CustomDomainDoc:
-        """Register a new custom domain. Doc is born in PENDING state."""
+        """Register a new custom domain. Doc is born in PENDING state.
+
+        ``max_domains`` is the caller's plan limit; ``-1`` means unlimited.
+        """
         self._require_enabled()
 
         await self._enforce_blocklist(request.fqdn)
         await self._enforce_uniqueness(request.fqdn)
-        await self._enforce_per_user_quota(user.user_id)
+        await self._enforce_per_user_quota(user.user_id, max_domains)
 
         method = self._pick_verification_method(request.fqdn)
         if method not in self._verifiers:
@@ -692,15 +699,15 @@ class CustomDomainService:
                 f"{fqdn} is registered to another account."
             )
 
-    async def _enforce_per_user_quota(self, owner_id: ObjectId) -> None:
+    async def _enforce_per_user_quota(
+        self, owner_id: ObjectId, max_domains: int
+    ) -> None:
+        if max_domains == UNLIMITED:
+            return
         current = await self._repo.count_by_owner(owner_id)
-        if current >= self._settings.max_per_user:
-            cap = self._settings.max_per_user
-            suffix = "domain" if cap == 1 else "domains"
-            raise DomainQuotaExceededError(
-                f"You already have {cap} custom {suffix} on this account. "
-                f"Remove a revoked one, or revoke an active one and then "
-                f"remove it, before adding another."
+        if current >= max_domains:
+            raise LimitReachedError(
+                "custom_domains_max", max_=max_domains, current=current
             )
 
     async def _enforce_verify_attempts_quota(self, domain_id: ObjectId) -> None:

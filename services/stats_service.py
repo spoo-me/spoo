@@ -41,6 +41,7 @@ from schemas.enums.stats import (
     StatsScope,
 )
 from schemas.models.url import UrlV2Doc
+from services.features.catalog import UNLIMITED
 from shared.aggregation_strategies import AggregationStrategyFactory
 from shared.datetime_utils import parse_datetime
 
@@ -102,17 +103,14 @@ class StatsService:
     Args:
         click_repo:         Repository for the ``clicks`` time-series collection.
         url_repo:           Repository for the ``urlsV2`` collection (claimed ids).
-        max_date_range_days: Maximum allowed date range in days (default 90).
     """
 
     def __init__(
         self,
         click_repo: ClickRepository,
         url_repo: UrlRepository,
-        max_date_range_days: int = 90,
         tag_service: TagService | None = None,
     ) -> None:
-        self._max_date_range_days = max_date_range_days
         self._click_repo = click_repo
         self._url_repo = url_repo
         self._tag_service = tag_service
@@ -157,15 +155,18 @@ class StatsService:
 
     # ── Private: date window ──────────────────────────────────────────────────
 
-    def _resolve_window(
+    def resolve_window(
         self,
         start_raw: str | None,
         end_raw: str | None,
-    ) -> tuple[datetime, datetime]:
-        """Parse, default, cap, and validate the date window.
+        window_days: int,
+    ) -> tuple[datetime, datetime, bool]:
+        """Parse, default, cap, and clamp the date window.
 
-        Shared by ``query()`` and ``query_link()``; mirrored by
-        PublicStatsService._resolve_window — the three must not drift.
+        ``window_days`` is the caller's plan retention window (``-1`` means
+        unlimited). A range reaching further back is clamped to the window
+        and the third value says so, so the response can name it. Shared by
+        ``query()``, ``query_link()`` and the public stats page.
         """
         start_date = parse_datetime(start_raw) if start_raw else None
         if start_raw and start_date is None:
@@ -191,12 +192,14 @@ class StatsService:
 
         if start_date > end_date:
             raise ValidationError("start_date must be before end_date")
-        if (end_date - start_date).days > self._max_date_range_days:
-            raise ValidationError(
-                f"date range cannot exceed {self._max_date_range_days} days"
-            )
+        clamped = False
+        if window_days != UNLIMITED and end_date - start_date > timedelta(
+            days=window_days
+        ):
+            start_date = end_date - timedelta(days=window_days)
+            clamped = True
 
-        return start_date, end_date
+        return start_date, end_date, clamped
 
     # ── Private: query building ───────────────────────────────────────────────
 
@@ -471,6 +474,8 @@ class StatsService:
         metrics: list[str],
         tz_name: str,
         aggregation_results: dict[str, list[dict[str, Any]]],
+        clamped: bool = False,
+        window_days: int | None = None,
     ) -> dict[str, Any]:
         """Format aggregation results into the API response structure.
 
@@ -490,6 +495,8 @@ class StatsService:
         response["time_range"] = {
             "start_date": self._fmt_tz(start_date, tz_name),
             "end_date": self._fmt_tz(end_date, tz_name),
+            "clamped": clamped,
+            "window_days": window_days,
         }
 
         # Add time bucket info when time aggregation is requested
@@ -596,6 +603,8 @@ class StatsService:
         metrics: list[str],
         tz_name: str,
         filters: dict[str, list[str]] | None = None,
+        clamped: bool = False,
+        window_days: int | None = None,
     ) -> dict[str, Any]:
         """Run a pre-built clicks ``$match`` and format the standard wire.
 
@@ -622,6 +631,8 @@ class StatsService:
             metrics,
             tz_name,
             aggregation_results,
+            clamped=clamped,
+            window_days=window_days,
         )
         response["summary"] = summary
         return self.add_metadata(response)
@@ -630,6 +641,8 @@ class StatsService:
         self,
         query: StatsQuery,
         owner_id: str | None,
+        *,
+        window_days: int,
     ) -> dict[str, Any]:
         """Execute an account-scoped stats query and return the enhanced response.
 
@@ -652,7 +665,9 @@ class StatsService:
 
         start_time = time.perf_counter()
 
-        start_date, end_date = self._resolve_window(query.start_date, query.end_date)
+        start_date, end_date, clamped = self.resolve_window(
+            query.start_date, query.end_date, window_days
+        )
         tz_name = self.normalize_timezone(query.timezone)
 
         if owner_id is None:
@@ -682,6 +697,8 @@ class StatsService:
             metrics=metrics,
             tz_name=tz_name,
             filters=filters,
+            clamped=clamped,
+            window_days=window_days,
         )
         summary = response.get("summary", {})
 
@@ -704,6 +721,8 @@ class StatsService:
         self,
         query: LinkStatsQuery,
         url: UrlV2Doc,
+        *,
+        window_days: int,
     ) -> dict[str, Any]:
         """Execute a per-link stats query for an already-resolved owned URL.
 
@@ -731,7 +750,9 @@ class StatsService:
 
         start_time = time.perf_counter()
 
-        start_date, end_date = self._resolve_window(query.start_date, query.end_date)
+        start_date, end_date, clamped = self.resolve_window(
+            query.start_date, query.end_date, window_days
+        )
         tz_name = self.normalize_timezone(query.timezone)
 
         click_query: dict[str, Any] = {
@@ -752,6 +773,8 @@ class StatsService:
             metrics=metrics,
             tz_name=tz_name,
             filters=filters,
+            clamped=clamped,
+            window_days=window_days,
         )
         response["url_id"] = str(url.id)
         response["alias"] = url.alias

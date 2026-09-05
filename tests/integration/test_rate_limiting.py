@@ -23,16 +23,22 @@ from slowapi.errors import RateLimitExceeded
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
 import pytest
+from bson import ObjectId
 
 from config import AppSettings
+from dependencies import Entitled, get_current_user
+from dependencies.auth import CurrentUser
 from middleware.error_handler import register_error_handlers
 from middleware.rate_limiter import (
     Limits,
     RateLimitHeadersMiddleware,
     limiter,
+    plan_scaled,
     rate_limit_key,
 )
 from routes.health_routes import router as health_router
+from services.entitlements import for_plan
+from services.features.catalog import Plan
 
 _STATIC_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static"
@@ -426,3 +432,51 @@ def test_response_endpoints_get_single_header_set():
         reset_values = resp.headers.get_list("X-RateLimit-Reset")
         assert len(reset_values) == 1 and reset_values[0].isdigit()
         assert "Retry-After" not in resp.headers
+
+
+# ── Plan multiplier ──────────────────────────────────────────────────────────
+
+
+_scaled_router = APIRouter(prefix="/api/v1")
+
+
+# Registered once: slowapi keys route limits by function name, so a second
+# decoration of the same name would count every request twice.
+@_scaled_router.get("/test-scaled")
+@limiter.limit(plan_scaled("2/minute"))
+async def _scaled(request: Request, entitlements: Entitled):
+    return {"plan": entitlements.plan.value}
+
+
+def _plan_scaled_app(plan):
+    app = _build_test_app(extra_routers=[_scaled_router])
+    user = CurrentUser(user_id=ObjectId(), email_verified=True)
+    app.dependency_overrides[get_current_user] = lambda: user
+    ent = AsyncMock()
+    ent.resolve_for = AsyncMock(return_value=for_plan(Plan(plan)))
+    app.state.entitlement_service = ent
+    return app
+
+
+def _hit(client, n: int, token: str) -> list[int]:
+    return [
+        client.get(
+            "/api/v1/test-scaled", headers={"Authorization": f"Bearer {token}"}
+        ).status_code
+        for _ in range(n)
+    ]
+
+
+def test_pro_multiplier_scales_the_route_limit_through_the_real_dependency():
+    _reset_limiter()
+    token = str(ObjectId())
+    with TestClient(_plan_scaled_app("pro")) as client:
+        assert _hit(client, 10, token) == [200] * 10
+        assert _hit(client, 1, token) == [429]
+
+
+def test_free_plan_keeps_the_base_limit():
+    _reset_limiter()
+    token = str(ObjectId())
+    with TestClient(_plan_scaled_app("free")) as client:
+        assert _hit(client, 3, token) == [200, 200, 429]

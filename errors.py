@@ -131,6 +131,41 @@ class InvalidTransitionError(ConflictError):
     error_code = "invalid_transition"
 
 
+class PlanRequiredError(ForbiddenError):
+    """The account's plan does not include the feature being written."""
+
+    error_code = "plan_required"
+
+    def __init__(self, feature: str) -> None:
+        super().__init__(f"{feature} is not included in your plan")
+        self.feature = feature
+
+    def to_dict(self) -> ErrorBody:
+        d = super().to_dict()
+        d["feature"] = self.feature
+        return d
+
+
+class LimitReachedError(ForbiddenError):
+    """A per-plan count limit is full; ``max`` and ``current`` let the UI
+    render the counter."""
+
+    error_code = "limit_reached"
+
+    def __init__(self, limit: str, *, max_: int, current: int) -> None:
+        super().__init__(f"{limit} limit reached ({current}/{max_})")
+        self.limit = limit
+        self.max = max_
+        self.current = current
+
+    def to_dict(self) -> ErrorBody:
+        d = super().to_dict()
+        d["limit"] = self.limit
+        d["max"] = self.max
+        d["current"] = self.current
+        return d
+
+
 class BlockedUrlError(AppError):
     status_code = 451
     error_code = "blocked"

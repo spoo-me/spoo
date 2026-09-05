@@ -86,6 +86,7 @@ from services.custom_domain_service import CustomDomainService
 from services.domain_intel_service import DomainIntelService
 from services.edge_cache.og_writethrough import OgEdgeWritethrough
 from services.entitlements import EntitlementService
+from services.entitlements.over_limit import OverLimitService
 from services.events.sinks import (
     InlineDomainEventSink,
     NullDomainEventSink,
@@ -291,6 +292,22 @@ def build_entitlement_service(
     cache, events, subscriptions, overrides = store or build_entitlement_store(
         db, redis_client
     )
+    domain_repo = CustomDomainRepository(db["custom_domains"])
+    endpoint_repo = WebhookEndpointRepository(db["webhook-endpoints"])
+    key_repo = ApiKeyRepository(db["api-keys"])
+    reconciler = OverLimitService(
+        endpoints=endpoint_repo,
+        domains=domain_repo,
+        keys=key_repo,
+        tenant_resolver=CachedMongoTenantResolver(
+            repo=domain_repo,
+            redis_client=redis_client,
+            system_default_domain=settings.system_default_domain,
+        ),
+        webhook_owner_cache=OwnerSubscriptionCache(
+            redis_client, ttl_seconds=settings.webhooks.matcher_cache_ttl_seconds
+        ),
+    )
     return EntitlementService(
         subscriptions,
         overrides,
@@ -298,14 +315,11 @@ def build_entitlement_service(
         cache,
         selfhost=settings.billing.selfhost,
         usage={
-            "custom_domains_max": CustomDomainRepository(
-                db["custom_domains"]
-            ).count_by_owner,
-            "webhook_endpoints_max": WebhookEndpointRepository(
-                db["webhook-endpoints"]
-            ).count_by_user,
-            "api_keys_max": ApiKeyRepository(db["api-keys"]).count_by_user,
+            "custom_domains_max": domain_repo.count_by_owner,
+            "webhook_endpoints_max": endpoint_repo.count_by_user,
+            "api_keys_max": key_repo.count_by_user,
         },
+        over_limit=reconciler,
     )
 
 
@@ -601,7 +615,6 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
         webhook_executor,
         webhook_owner_cache,
         master_secret=settings.secret_key,
-        max_endpoints=wh_settings.max_endpoints,
     )
 
     # ── Safety pipeline ──────────────────────────────────────────────
@@ -764,6 +777,7 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
         events=app.state.domain_event_sink,
         user_repo=user_repo,
         tag_service=app.state.tag_service,
+        entitlements=app.state.entitlement_service,
     )
     app.state.bulk_url_service = BulkUrlService(
         url_repo,
@@ -778,7 +792,6 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
     app.state.stats_service = StatsService(
         click_repo,
         url_repo,
-        max_date_range_days=settings.max_date_range_days,
         tag_service=app.state.tag_service,
     )
     # One resolver serves BOTH public read-only surfaces (preview + stats)
@@ -790,7 +803,15 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
         emoji_repo,
         system_default_domain=settings.system_default_domain,
     )
-    app.state.public_preview_service = PublicPreviewService(public_link_resolver)
+    app.state.feature_flag_service = FeatureFlagService(
+        feature_flag_repo, feature_flag_cache
+    )
+
+    app.state.public_preview_service = PublicPreviewService(
+        public_link_resolver,
+        app.state.entitlement_service,
+        app.state.feature_flag_service,
+    )
     app.state.url_expand_service = UrlExpandService(
         blocked_url_repo,
         MetaFetchCache(redis_client, prefix="url_expand"),
@@ -808,7 +829,8 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
     app.state.public_stats_service = PublicStatsService(
         public_link_resolver,
         app.state.stats_service,
-        max_date_range_days=settings.max_date_range_days,
+        app.state.entitlement_service,
+        app.state.feature_flag_service,
     )
     # Report intake shares the resolver (existence checks answer from the
     # same generation the redirect serves) and the ops notifier + captcha
@@ -832,7 +854,6 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
     )
     app.state.api_key_service = ApiKeyService(
         api_key_repo,
-        max_active_keys=settings.max_active_api_keys,
     )
     app.state.page_layout_service = PageLayoutService(page_layout_repo)
     token_factory = TokenFactory(
@@ -939,10 +960,6 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
         app.state.click_sink = inline_sink
 
     app.state.app_grant_repo = app_grant_repo
-
-    app.state.feature_flag_service = FeatureFlagService(
-        feature_flag_repo, feature_flag_cache
-    )
 
     # Whenever clicks are tracked inline, link.clicked webhooks must fan
     # out at emit time — the worker's stream group only sees clicks that

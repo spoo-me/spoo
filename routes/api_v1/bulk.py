@@ -31,9 +31,11 @@ from dependencies import (
     BulkUrlSvc,
     CurrentUser,
     CustomDomainSvc,
+    Entitled,
     Settings,
     require_scopes,
 )
+from errors import LimitReachedError
 from middleware.openapi import ERROR_RESPONSES
 from middleware.rate_limiter import Limits, limiter
 from schemas.dto.requests.bulk import (
@@ -44,8 +46,15 @@ from schemas.dto.requests.bulk import (
     BulkUpdateStatusRequest,
 )
 from schemas.dto.responses.bulk import BulkUrlOperationResponse
+from services.entitlements import Resolved
 
 router = APIRouter(tags=["Link Management"])
+
+
+def _check_batch_size(ids: list[str], entitlements: Resolved) -> None:
+    cap = entitlements.limit("bulk_batch_max")
+    if len(ids) > cap and not entitlements.is_unlimited("bulk_batch_max"):
+        raise LimitReachedError("bulk_batch_max", max_=cap, current=len(ids))
 
 
 @router.post(
@@ -58,6 +67,7 @@ router = APIRouter(tags=["Link Management"])
 async def bulk_delete_urls_v1(
     request: Request,
     body: BulkDeleteUrlsRequest,
+    entitlements: Entitled,
     bulk_service: BulkUrlSvc,
     user: CurrentUser = Depends(require_scopes(URL_MANAGEMENT_SCOPES)),  # noqa: B008
 ) -> BulkUrlOperationResponse:
@@ -80,6 +90,7 @@ async def bulk_delete_urls_v1(
 
     **Rate Limits**: 30/min, 100/day — counted per request, not per id.
     """
+    _check_batch_size(body.ids, entitlements)
     return await bulk_service.bulk_delete(body.object_ids(), user.user_id)
 
 
@@ -93,6 +104,7 @@ async def bulk_delete_urls_v1(
 async def bulk_update_url_status_v1(
     request: Request,
     body: BulkUpdateStatusRequest,
+    entitlements: Entitled,
     bulk_service: BulkUrlSvc,
     user: CurrentUser = Depends(require_scopes(URL_MANAGEMENT_SCOPES)),  # noqa: B008
 ) -> BulkUrlOperationResponse:
@@ -109,6 +121,7 @@ async def bulk_update_url_status_v1(
 
     **Rate Limits**: 60/min, 200/day — counted per request, not per id.
     """
+    _check_batch_size(body.ids, entitlements)
     return await bulk_service.bulk_set_status(
         body.object_ids(), body.status, user.user_id
     )
@@ -124,6 +137,7 @@ async def bulk_update_url_status_v1(
 async def bulk_update_url_expiry_v1(
     request: Request,
     body: BulkUpdateExpiryRequest,
+    entitlements: Entitled,
     bulk_service: BulkUrlSvc,
     user: CurrentUser = Depends(require_scopes(URL_MANAGEMENT_SCOPES)),  # noqa: B008
 ) -> BulkUrlOperationResponse:
@@ -141,6 +155,7 @@ async def bulk_update_url_expiry_v1(
 
     **Rate Limits**: 60/min, 200/day — counted per request, not per id.
     """
+    _check_batch_size(body.ids, entitlements)
     return await bulk_service.bulk_set_expiry(
         body.object_ids(), body.expire_after, user.user_id
     )
@@ -156,6 +171,7 @@ async def bulk_update_url_expiry_v1(
 async def bulk_move_url_domain_v1(
     request: Request,
     body: BulkMoveDomainRequest,
+    entitlements: Entitled,
     bulk_service: BulkUrlSvc,
     custom_domain_service: CustomDomainSvc,
     settings: Settings,
@@ -185,6 +201,7 @@ async def bulk_move_url_domain_v1(
 
     **Rate Limits**: 60/min, 200/day — counted per request, not per id.
     """
+    _check_batch_size(body.ids, entitlements)
     if body.domain and body.domain != settings.system_default_domain:
         await custom_domain_service.assert_owned_and_active(user, body.domain)
     return await bulk_service.bulk_move_domain(
@@ -202,6 +219,7 @@ async def bulk_move_url_domain_v1(
 async def bulk_tag_urls_v1(
     request: Request,
     body: BulkTagUrlsRequest,
+    entitlements: Entitled,
     bulk_service: BulkUrlSvc,
     user: CurrentUser = Depends(require_scopes(URL_MANAGEMENT_SCOPES)),  # noqa: B008
 ) -> BulkUrlOperationResponse:
@@ -222,6 +240,7 @@ async def bulk_tag_urls_v1(
 
     **Rate Limits**: 60/min, 200/day — counted per request, not per id.
     """
+    _check_batch_size(body.ids, entitlements)
     return await bulk_service.bulk_tag(
         body.object_ids(), body.add_ids(), body.remove_ids(), user.user_id
     )

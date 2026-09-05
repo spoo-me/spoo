@@ -97,6 +97,7 @@ class TestDateHandling:
                 timezone="UTC",
             ),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         assert "time_range" in result
         assert result["time_range"]["start_date"] is not None
@@ -114,20 +115,25 @@ class TestDateHandling:
                     end_date=NOW_ISO,
                 ),
                 owner_id=OWNER_ID,
+                window_days=90,
             )
 
     @pytest.mark.asyncio
-    async def test_date_range_exceeding_90_days_raises(self):
+    async def test_date_range_past_the_window_is_clamped_not_rejected(self):
         svc, _, _ = make_service()
 
-        with pytest.raises(ValidationError, match="date range cannot exceed 90 days"):
-            await svc.query(
-                query=_q(
-                    start_date=(NOW - timedelta(days=95)).isoformat(),
-                    end_date=NOW_ISO,
-                ),
-                owner_id=OWNER_ID,
-            )
+        result = await svc.query(
+            query=_q(
+                start_date=(NOW - timedelta(days=95)).isoformat(),
+                end_date=NOW_ISO,
+            ),
+            owner_id=OWNER_ID,
+            window_days=90,
+        )
+        time_range = result["time_range"]
+        assert time_range["clamped"] is True
+        assert time_range["window_days"] == 90
+        assert time_range["end_date"] - time_range["start_date"] == timedelta(days=90)
 
 
 # ── Tests: authentication ─────────────────────────────────────────────────────
@@ -140,14 +146,14 @@ class TestAuthValidation:
         svc, _, _ = make_service()
 
         with pytest.raises(AuthenticationError):
-            await svc.query(query=_q(), owner_id=None)
+            await svc.query(query=_q(), owner_id=None, window_days=90)
 
     @pytest.mark.asyncio
     async def test_authenticated_succeeds(self):
         svc, click_repo, _ = make_service()
         click_repo.aggregate.return_value = facet_response()
 
-        result = await svc.query(query=_q(), owner_id=OWNER_ID)
+        result = await svc.query(query=_q(), owner_id=OWNER_ID, window_days=90)
         assert result["scope"] == "all"
 
 
@@ -164,6 +170,7 @@ class TestAggregationPipeline:
         await svc.query(
             query=_q(group_by="time,browser"),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         click_repo.aggregate.assert_awaited_once()
 
@@ -175,6 +182,7 @@ class TestAggregationPipeline:
         await svc.query(
             query=_q(),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         pipeline = click_repo.aggregate.call_args[0][0]
         assert pipeline[0].get("$match") is not None
@@ -187,6 +195,7 @@ class TestAggregationPipeline:
         await svc.query(
             query=_q(group_by="browser,country"),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         pipeline = click_repo.aggregate.call_args[0][0]
         assert pipeline[1].get("$facet") is not None
@@ -199,6 +208,7 @@ class TestAggregationPipeline:
         await svc.query(
             query=_q(group_by="browser,os"),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         facet = click_repo.aggregate.call_args[0][0][1]["$facet"]
         assert "_summary" in facet
@@ -215,6 +225,7 @@ class TestAggregationPipeline:
         await svc.query(
             query=_q(),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         match = click_repo.aggregate.call_args[0][0][0]["$match"]
         assert match["meta.owner_id"] == ObjectId(OWNER_ID)
@@ -230,6 +241,7 @@ class TestAggregationPipeline:
         await svc.query(
             query=_q(short_code="mycode"),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         match = click_repo.aggregate.call_args[0][0][0]["$match"]
         assert match["meta.owner_id"] == ObjectId(OWNER_ID)
@@ -248,6 +260,7 @@ class TestResponseStructure:
         result = await svc.query(
             query=_q(),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         for key in (
             "scope",
@@ -268,7 +281,7 @@ class TestResponseStructure:
         svc, click_repo, _ = make_service()
         click_repo.aggregate.return_value = facet_response()
 
-        result = await svc.query(query=_q(), owner_id=OWNER_ID)
+        result = await svc.query(query=_q(), owner_id=OWNER_ID, window_days=90)
         assert result["scope"] == "all"
         assert "short_code" not in result
 
@@ -280,6 +293,7 @@ class TestResponseStructure:
         result = await svc.query(
             query=_q(),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         assert result["summary"]["total_clicks"] == 50
         assert result["summary"]["unique_clicks"] == 20
@@ -292,6 +306,7 @@ class TestResponseStructure:
         result = await svc.query(
             query=_q(),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         cm = result.get("computed_metrics", {})
         assert cm["unique_click_rate"] == 40.0
@@ -306,6 +321,7 @@ class TestResponseStructure:
         result = await svc.query(
             query=_q(group_by="browser"),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         assert result["metrics"]["clicks_by_browser"] == []
         assert result["summary"]["avg_redirection_time"] is None
@@ -315,7 +331,7 @@ class TestResponseStructure:
         svc, click_repo, _ = make_service()
         click_repo.aggregate.return_value = facet_response(avg_redirect=120.456)
 
-        result = await svc.query(query=_q(), owner_id=OWNER_ID)
+        result = await svc.query(query=_q(), owner_id=OWNER_ID, window_days=90)
         assert result["summary"]["avg_redirection_time"] == 120.46
 
     @pytest.mark.asyncio
@@ -324,7 +340,7 @@ class TestResponseStructure:
         svc, click_repo, _ = make_service()
         click_repo.aggregate.return_value = [{"_summary": [], "time": []}]
 
-        result = await svc.query(query=_q(), owner_id=OWNER_ID)
+        result = await svc.query(query=_q(), owner_id=OWNER_ID, window_days=90)
         assert result["summary"]["total_clicks"] == 0
         assert result["summary"]["avg_redirection_time"] is None
 
@@ -334,7 +350,7 @@ class TestResponseStructure:
         svc, click_repo, _ = make_service()
         click_repo.aggregate.return_value = facet_response(total=3, avg_redirect=None)
 
-        result = await svc.query(query=_q(), owner_id=OWNER_ID)
+        result = await svc.query(query=_q(), owner_id=OWNER_ID, window_days=90)
         assert result["summary"]["total_clicks"] == 3
         assert result["summary"]["avg_redirection_time"] is None
 
@@ -351,6 +367,7 @@ class TestTimezone:
         result = await svc.query(
             query=_q(timezone_="Not/ATimezone"),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         assert result["timezone"] == "UTC"
 
@@ -363,6 +380,7 @@ class TestTimezone:
         result = await svc.query(
             query=_q(timezone_="Asia/Calcutta"),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         assert result["timezone"] == "Asia/Kolkata"
 
@@ -554,7 +572,7 @@ class TestClaimedLinksArm:
         click_repo.aggregate.return_value = facet_response()
         url_repo.list_claimed_ids.return_value = []
 
-        await svc.query(query=_q(), owner_id=OWNER_ID)
+        await svc.query(query=_q(), owner_id=OWNER_ID, window_days=90)
 
         match = click_repo.aggregate.call_args[0][0][0]["$match"]
         assert match["meta.owner_id"] == ObjectId(OWNER_ID)
@@ -569,7 +587,7 @@ class TestClaimedLinksArm:
         claimed = [ObjectId("f" * 24)]
         url_repo.list_claimed_ids.return_value = claimed
 
-        await svc.query(query=_q(), owner_id=OWNER_ID)
+        await svc.query(query=_q(), owner_id=OWNER_ID, window_days=90)
 
         url_repo.list_claimed_ids.assert_awaited_once_with(ObjectId(OWNER_ID))
         match = click_repo.aggregate.call_args[0][0][0]["$match"]
@@ -638,6 +656,7 @@ class TestUrlIdFilter:
         await svc.query(
             query=_q(url_id=oid),
             owner_id=OWNER_ID,
+            window_days=90,
         )
         match = click_repo.aggregate.call_args[0][0][0]["$match"]
         assert match["meta.url_id"] == {"$in": [ObjectId(oid)]}
@@ -692,7 +711,7 @@ class TestQueryLink:
         click_repo.aggregate.return_value = facet_response()
         url = make_url_doc()
 
-        await svc.query_link(_lq(), url)
+        await svc.query_link(_lq(), url, window_days=90)
 
         match = click_repo.aggregate.call_args[0][0][0]["$match"]
         assert match["meta.url_id"] == url.id
@@ -707,7 +726,7 @@ class TestQueryLink:
         click_repo.aggregate.return_value = facet_response()
         url = make_url_doc(alias="promo")
 
-        result = await svc.query_link(_lq(), url)
+        result = await svc.query_link(_lq(), url, window_days=90)
 
         assert result["url_id"] == str(url.id)
         assert result["alias"] == "promo"
@@ -719,7 +738,9 @@ class TestQueryLink:
         svc, click_repo, _ = make_service()
         click_repo.aggregate.return_value = facet_response()
 
-        await svc.query_link(_lq(utm_source="(none)", browser="Chrome"), make_url_doc())
+        await svc.query_link(
+            _lq(utm_source="(none)", browser="Chrome"), make_url_doc(), window_days=90
+        )
 
         match = click_repo.aggregate.call_args[0][0][0]["$match"]
         assert match["browser"] == {"$in": ["Chrome"]}
@@ -734,7 +755,7 @@ class TestQueryLink:
         svc, click_repo, _ = make_service()
         click_repo.aggregate.return_value = facet_response()
 
-        await svc.query_link(_lq(group_by="variant"), make_url_doc())
+        await svc.query_link(_lq(group_by="variant"), make_url_doc(), window_days=90)
 
         facet = click_repo.aggregate.call_args[0][0][1]["$facet"]
         group = next(s["$group"] for s in facet["variant"] if "$group" in s)
@@ -745,76 +766,64 @@ class TestQueryLink:
         svc, click_repo, _ = make_service()
         click_repo.aggregate.return_value = facet_response()
 
-        await svc.query_link(_lq(group_by="time,utm_source"), make_url_doc())
+        await svc.query_link(
+            _lq(group_by="time,utm_source"), make_url_doc(), window_days=90
+        )
 
         facet = click_repo.aggregate.call_args[0][0][1]["$facet"]
         assert "utm_source" in facet
 
     @pytest.mark.asyncio
-    async def test_window_validation_shared_with_account_query(self):
+    async def test_window_clamp_shared_with_account_query(self):
         svc, _, _ = make_service()
 
-        with pytest.raises(ValidationError, match="date range cannot exceed 90 days"):
-            await svc.query_link(
-                _lq(start_date=(NOW - timedelta(days=95)).isoformat()),
-                make_url_doc(),
-            )
+        result = await svc.query_link(
+            _lq(start_date=(NOW - timedelta(days=95)).isoformat()),
+            make_url_doc(),
+            window_days=90,
+        )
+        assert result["time_range"]["clamped"] is True
 
 
-# ── Window parity with the public stats service ──────────────────────────────
+# ── Window clamp ─────────────────────────────────────────────────────────────
 
 
-class TestResolveWindowParity:
-    """StatsService._resolve_window and PublicStatsService._resolve_window are
-    two implementations of one contract ("the three must not drift") — run
-    both over the same inputs and pin equal answers."""
-
-    @staticmethod
-    def _both():
-        from services.public_stats_service import PublicStatsService
-
+class TestResolveWindow:
+    def test_range_inside_window_is_untouched(self):
         stats, _, _ = make_service()
-        public = PublicStatsService(resolver=AsyncMock(), stats_service=stats)
-        return stats, public
+        start, end, clamped = stats.resolve_window(
+            "2025-01-01T00:00:00Z", "2025-02-01T00:00:00Z", 90
+        )
+        assert (start, end) == (
+            datetime(2025, 1, 1, tzinfo=timezone.utc),
+            datetime(2025, 2, 1, tzinfo=timezone.utc),
+        )
+        assert clamped is False
 
-    @pytest.mark.parametrize(
-        ("start_raw", "end_raw"),
-        [
-            # fully explicit — byte-equal output required
-            ("2025-01-01T00:00:00Z", "2025-02-01T00:00:00Z"),
-            # end-only: start defaults to end - 7d, still deterministic
-            (None, "2025-02-01T00:00:00Z"),
-        ],
-        ids=["explicit", "end-only"],
-    )
-    def test_deterministic_windows_equal(self, start_raw, end_raw):
-        stats, public = self._both()
-        s1 = stats._resolve_window(start_raw, end_raw)
-        s2 = public._resolve_window(start_raw, end_raw, "UTC")[:2]
-        assert s1 == s2
+    def test_range_past_window_is_clamped_to_end_minus_window(self):
+        stats, _, _ = make_service()
+        start, end, clamped = stats.resolve_window(
+            "2024-01-01T00:00:00Z", "2025-01-01T00:00:00Z", 90
+        )
+        assert end == datetime(2025, 1, 1, tzinfo=timezone.utc)
+        assert start == end - timedelta(days=90)
+        assert clamped is True
 
-    @pytest.mark.parametrize(
-        ("start_raw", "end_raw"),
-        [
-            (None, None),  # both default: end=now, start=now-7d
-            # end defaults to now — start must be genuinely recent (module NOW
-            # is a frozen constant) or the 90-day cap fires first.
-            (
-                (datetime.now(timezone.utc) - timedelta(days=3)).isoformat(),
-                None,
-            ),
-            ("2999-01-01T00:00:00Z", "2999-01-02T00:00:00Z"),  # future-capped
-        ],
-        ids=["both-default", "start-only", "future-capped"],
-    )
-    def test_now_dependent_windows_agree(self, start_raw, end_raw):
-        # Each implementation samples now() itself; equality holds up to that
-        # sampling skew, so pin the pair to within a second of each other.
-        stats, public = self._both()
-        s1 = stats._resolve_window(start_raw, end_raw)
-        s2 = public._resolve_window(start_raw, end_raw, "UTC")[:2]
-        for a, b in zip(s1, s2, strict=True):
-            assert abs(a - b) < timedelta(seconds=1)
+    def test_pro_window_keeps_a_year(self):
+        stats, _, _ = make_service()
+        start, _, clamped = stats.resolve_window(
+            "2024-01-01T00:00:00Z", "2025-01-01T00:00:00Z", 730
+        )
+        assert start == datetime(2024, 1, 1, tzinfo=timezone.utc)
+        assert clamped is False
+
+    def test_unlimited_window_never_clamps(self):
+        stats, _, _ = make_service()
+        start, _, clamped = stats.resolve_window(
+            "2000-01-01T00:00:00Z", "2025-01-01T00:00:00Z", -1
+        )
+        assert start == datetime(2000, 1, 1, tzinfo=timezone.utc)
+        assert clamped is False
 
     @pytest.mark.parametrize(
         ("start_raw", "end_raw", "match"),
@@ -822,13 +831,22 @@ class TestResolveWindowParity:
             ("not-a-date", None, "invalid start_date"),
             (None, "not-a-date", "invalid end_date"),
             ("2025-02-01T00:00:00Z", "2025-01-01T00:00:00Z", "before end_date"),
-            ("2024-01-01T00:00:00Z", "2025-01-01T00:00:00Z", "90 days"),
         ],
-        ids=["bad-start", "bad-end", "inverted", "too-wide"],
+        ids=["bad-start", "bad-end", "inverted"],
     )
-    def test_rejections_agree(self, start_raw, end_raw, match):
-        stats, public = self._both()
+    def test_rejections(self, start_raw, end_raw, match):
+        stats, _, _ = make_service()
         with pytest.raises(ValidationError, match=match):
-            stats._resolve_window(start_raw, end_raw)
-        with pytest.raises(ValidationError, match=match):
-            public._resolve_window(start_raw, end_raw, "UTC")
+            stats.resolve_window(start_raw, end_raw, 90)
+
+    def test_public_stats_reuses_the_same_window(self):
+        from services.public_stats_service import PublicStatsService
+
+        stats, _, _ = make_service()
+        public = PublicStatsService(AsyncMock(), stats, AsyncMock(), AsyncMock())
+        s1 = stats.resolve_window("2024-01-01T00:00:00Z", "2025-01-01T00:00:00Z", 90)
+        start, end, tz, clamped = public._resolve_window(
+            "2024-01-01T00:00:00Z", "2025-01-01T00:00:00Z", "UTC", 90
+        )
+        assert (start, end, clamped) == s1
+        assert tz == "UTC"

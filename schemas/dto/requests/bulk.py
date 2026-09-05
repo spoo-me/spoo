@@ -26,11 +26,9 @@ from shared.tags import TAGS_MAX_PER_LINK
 from shared.url_utils import normalise_fqdn
 from shared.validators import normalise_object_ids
 
-# Server cap per request. The frontend chunks larger selections and
-# merges the per-chunk reports. Bounded by report ergonomics and the
-# per-day item math in middleware/rate_limiter.py, not by execution
-# cost (the set-based pipeline is ~4 calls regardless of batch size).
-BULK_MAX_IDS = 100
+# Envelope cap = the pro plan's bulk_batch_max; the route enforces the
+# caller's plan cap and the frontend chunks larger selections.
+BULK_MAX_IDS = 1000
 
 _OBJECT_ID_RE = re.compile(r"^[0-9a-f]{24}$")
 
