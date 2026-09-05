@@ -74,7 +74,6 @@ class ProfilePictureService:
             "email": user_doc.email,
             "email_verified": user_doc.email_verified,
             "user_name": user_doc.user_name,
-            "plan": user_doc.plan,
             "password_set": user_doc.password_set,
             "auth_providers": [
                 {

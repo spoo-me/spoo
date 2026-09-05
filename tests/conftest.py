@@ -29,6 +29,8 @@ if not os.environ.get("JWT_SECRET"):
 from config import AppSettings
 from middleware.error_handler import register_error_handlers
 from middleware.rate_limiter import limiter
+from services.entitlements import for_plan
+from services.features.catalog import Plan
 
 _STATIC_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static"
@@ -99,6 +101,12 @@ def build_test_app(
         app.state.app_grant_repo = AsyncMock()
         app.state.custom_domain_service = AsyncMock()
         app.state.feature_flag_service = AsyncMock()
+        app.state.entitlement_service = AsyncMock()
+        app.state.entitlement_service.resolve_for = AsyncMock(
+            return_value=for_plan(Plan.FREE)
+        )
+        app.state.entitlement_service.usage_for = AsyncMock(return_value={})
+        app.state.entitlement_service.plan_hint_for = AsyncMock(return_value="free")
         app.state.tenant_resolver = AsyncMock()
         # A REAL permissive L0 gate (no providers): valid URLs pass,
         # invalid/self-links reject — matches the pre-gate route behavior.

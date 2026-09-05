@@ -210,7 +210,7 @@ class DeviceAuthService:
             app_id=app_id,
             scopes=scopes,
         )
-        access_token, refresh_token = self._tokens.issue_tokens(
+        access_token, refresh_token = await self._tokens.issue_tokens(
             user, "ext", app_id=app_id, scopes=scopes
         )
         return AuthResult(
@@ -264,7 +264,7 @@ class DeviceAuthService:
             app_id=app_id,
             scopes=scopes,
         )
-        access_token, refresh_token = self._tokens.issue_tokens(
+        access_token, refresh_token = await self._tokens.issue_tokens(
             user, amr, app_id=app_id, scopes=scopes
         )
         return AuthResult(

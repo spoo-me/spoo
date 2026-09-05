@@ -97,7 +97,7 @@ class EmailVerificationService:
         user_data["email_verified"] = True
         updated_user = UserDoc.model_validate(user_data)
 
-        access_token, refresh_token = self._tokens.issue_tokens(updated_user, amr)
+        access_token, refresh_token = await self._tokens.issue_tokens(updated_user, amr)
 
         # Send welcome email — best-effort, do not fail verification on error
         try:

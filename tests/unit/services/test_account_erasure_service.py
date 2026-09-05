@@ -102,6 +102,14 @@ class Stubs:
 
         self.feature_flag_repo = MagicMock()
         self.feature_flag_repo.pull_allowlisted = self._tracked("feature_flags_pull", 1)
+        self.subscription_repo = MagicMock()
+        self.subscription_repo.delete_by_user = self._tracked("subscriptions", 1)
+        self.override_repo = MagicMock()
+        self.override_repo.delete_by_user = self._tracked("entitlement_overrides", 2)
+        self.entitlement_event_repo = MagicMock()
+        self.entitlement_event_repo.delete_by_user = self._tracked(
+            "entitlement_events", 3
+        )
 
         prefix = owner_key_prefix(UID, SECRET)
         self.r2_storage = MagicMock()
@@ -163,6 +171,9 @@ def _service(
         report_repo=stubs.report_repo,
         report_submission_repo=stubs.report_submission_repo,
         feature_flag_repo=stubs.feature_flag_repo,
+        subscription_repo=stubs.subscription_repo,
+        override_repo=stubs.override_repo,
+        entitlement_event_repo=stubs.entitlement_event_repo,
         r2_storage=stubs.r2_storage if r2 is ... else r2,
         posthog=stubs.posthog if posthog is ... else posthog,
         mailer=stubs.mailer if mailer is ... else mailer,
@@ -190,6 +201,9 @@ EXPECTED_COUNTS = {
     "report_submissions": 1,
     "reports_pulled": 2,
     "feature_flags_pulled": 1,
+    "subscriptions": 1,
+    "entitlement_overrides": 2,
+    "entitlement_events": 3,
     "r2_objects": 2,
 }
 
@@ -234,6 +248,9 @@ async def test_erase_follows_cascade_order_user_doc_last():
         "report_submissions",
         "reports_pull",
         "feature_flags_pull",
+        "subscriptions",
+        "entitlement_overrides",
+        "entitlement_events",
         "posthog",
         "users.delete_hard",
         "mailer",

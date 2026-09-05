@@ -35,12 +35,19 @@ if TYPE_CHECKING:
     from repositories.api_key_repository import ApiKeyRepository
     from repositories.app_grant_repository import AppGrantRepository
     from repositories.click_repository import ClickRepository
+    from repositories.entitlement_event_repository import (
+        EntitlementEventRepository,
+    )
+    from repositories.entitlement_override_repository import (
+        EntitlementOverrideRepository,
+    )
     from repositories.feature_flag_repository import FeatureFlagRepository
     from repositories.page_layout_repository import PageLayoutRepository
     from repositories.report_repository import (
         ReportRepository,
         ReportSubmissionRepository,
     )
+    from repositories.subscription_repository import SubscriptionRepository
     from repositories.token_repository import TokenRepository
     from repositories.user_repository import UserRepository
     from repositories.webhook_delivery_repository import WebhookDeliveryRepository
@@ -130,6 +137,9 @@ class AccountErasureService:
         report_repo: ReportRepository,
         report_submission_repo: ReportSubmissionRepository,
         feature_flag_repo: FeatureFlagRepository,
+        subscription_repo: SubscriptionRepository,
+        override_repo: EntitlementOverrideRepository,
+        entitlement_event_repo: EntitlementEventRepository,
         r2_storage: R2StorageClient | None = None,
         posthog: PostHogEraser | None = None,
         mailer: ErasureMailer | None = None,
@@ -153,6 +163,9 @@ class AccountErasureService:
         self._report_repo = report_repo
         self._report_submission_repo = report_submission_repo
         self._feature_flag_repo = feature_flag_repo
+        self._subscription_repo = subscription_repo
+        self._override_repo = override_repo
+        self._entitlement_event_repo = entitlement_event_repo
         # None ⇒ no R2 on this deployment; the sweep step counts 0.
         self._r2_storage = r2_storage
         self._posthog = posthog or NoopPostHogEraser()
@@ -249,6 +262,13 @@ class AccountErasureService:
         counts["feature_flags_pulled"] = await self._feature_flag_repo.pull_allowlisted(
             user_id, email
         )
+        counts["subscriptions"] = await self._subscription_repo.delete_by_user(user_id)
+        counts["entitlement_overrides"] = await self._override_repo.delete_by_user(
+            user_id
+        )
+        counts[
+            "entitlement_events"
+        ] = await self._entitlement_event_repo.delete_by_user(user_id)
         counts["r2_objects"] = await self._sweep_r2(r2_prefixes)
         # External systems, then the doc itself — LAST among deletes.
         await self._erase_posthog(user_id)
