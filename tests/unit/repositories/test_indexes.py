@@ -63,6 +63,7 @@ class TestEnsureIndexes:
             "subscriptions": subscriptions_col,
             "entitlement_overrides": overrides_col,
             "entitlement_events": ent_events_col,
+            "billing_events": AsyncMock(),
         }[name]
 
         # create_collection raises CollectionInvalid when collection already exists

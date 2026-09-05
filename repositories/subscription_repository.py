@@ -145,6 +145,22 @@ class SubscriptionRepository(BaseRepository[SubscriptionDoc]):
         await self._cache.invalidate(user_id)
         return after
 
+    async def find_by_provider_subscription(
+        self, subscription_id: str
+    ) -> SubscriptionDoc | None:
+        return await self._find_one({"provider_ids.subscription_id": subscription_id})
+
+    async def find_cancel_pending(self) -> list[SubscriptionDoc]:
+        return await self._find_many({"provider_ids.cancel_pending": {"$ne": None}})
+
+    async def clear_cancel_pending(self, user_id: ObjectId) -> bool:
+        return await self._update(
+            {"user_id": user_id}, {"$unset": {"provider_ids.cancel_pending": ""}}
+        )
+
+    async def count_founding(self) -> int:
+        return await self._count({"founding": True})
+
     async def delete_by_user(self, user_id: ObjectId) -> int:
         deleted = await self._delete_many({"user_id": user_id})
         if deleted:

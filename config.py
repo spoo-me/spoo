@@ -10,6 +10,7 @@ FLASK_SECRET_KEY is also accepted as an alias for backward compatibility
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from functools import cached_property
 from typing import Literal
 from urllib.parse import urlparse
@@ -681,10 +682,50 @@ class BillingSettings(BaseSettings):
     founding_monthly_usd: int = Field(default=9, ge=0)
     founding_year_usd: int = Field(default=90, ge=0)
     founding_seats: int = Field(default=100, ge=0)
+    founding_window_days: int = Field(default=90, ge=0)
+    # The founding window opens when checkout opens; unset means closed.
+    founding_opened_at: datetime | None = None
+
+    paddle_env: Literal["sandbox", "production"] = "sandbox"
+    paddle_api_key: str = ""
+    paddle_webhook_secret: str = ""
+    paddle_price_pro_monthly: str = ""
+    paddle_price_pro_year: str = ""
+    paddle_discount_founding_first_monthly: str = ""
+    paddle_discount_founding_first_year: str = ""
+    paddle_discount_founding_renew_monthly: str = ""
+    paddle_discount_founding_renew_year: str = ""
 
     @property
     def selfhost(self) -> bool:
         return self.provider == "none"
+
+    @property
+    def founding_until(self) -> datetime | None:
+        if self.founding_opened_at is None:
+            return None
+        return self.founding_opened_at + timedelta(days=self.founding_window_days)
+
+    @model_validator(mode="after")
+    def _paddle_needs_its_keys(self) -> BillingSettings:
+        if self.provider != "paddle":
+            return self
+        missing = [
+            name
+            for name in (
+                "paddle_api_key",
+                "paddle_webhook_secret",
+                "paddle_price_pro_monthly",
+                "paddle_price_pro_year",
+            )
+            if not getattr(self, name)
+        ]
+        if missing:
+            raise ValueError(
+                "BILLING_PROVIDER=paddle needs "
+                + ", ".join(f"BILLING_{m.upper()}" for m in missing)
+            )
+        return self
 
 
 class AppSettings(BaseSettings):
@@ -954,6 +995,14 @@ class AppSettings(BaseSettings):
                 "BILLING_PROVIDER must be set explicitly in production: "
                 "none for self-host, paddle for the cloud"
             )
+
+        # Sandbox checkouts take Paddle's test card; the webhook would grant real Pro.
+        if (
+            self.env == "production"
+            and self.billing.provider == "paddle"
+            and self.billing.paddle_env != "production"
+        ):
+            raise ValueError("BILLING_PADDLE_ENV must be production in production")
 
         return self
 

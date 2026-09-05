@@ -11,6 +11,14 @@ from services.features.catalog import Plan, bool_features, int_features, plan_de
 
 from .conftest import _build_test_app
 
+_PADDLE = {
+    "BILLING_PROVIDER": "paddle",
+    "BILLING_PADDLE_API_KEY": "pdl_sdbx_test",
+    "BILLING_PADDLE_WEBHOOK_SECRET": "secret",
+    "BILLING_PADDLE_PRICE_PRO_MONTHLY": "pri_m",
+    "BILLING_PADDLE_PRICE_PRO_YEAR": "pri_y",
+}
+
 
 def test_public_and_shaped_from_the_catalog():
     with TestClient(_build_test_app({})) as client:
@@ -34,7 +42,7 @@ def test_prices_come_from_config():
     with patch.dict(
         os.environ,
         {
-            "BILLING_PROVIDER": "paddle",
+            **_PADDLE,
             "BILLING_PRO_MONTHLY_USD": "20",
             "BILLING_PRO_YEAR_USD": "200",
             "BILLING_FOUNDING_MONTHLY_USD": "11",
@@ -52,7 +60,7 @@ def test_prices_come_from_config():
 
 
 def test_default_prices_are_the_locked_ones():
-    with patch.dict(os.environ, {"BILLING_PROVIDER": "paddle"}):
+    with patch.dict(os.environ, _PADDLE):
         app = _build_test_app({})
     with TestClient(app) as client:
         body = client.get("/api/v1/plans").json()

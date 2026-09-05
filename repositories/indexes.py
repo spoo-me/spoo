@@ -199,6 +199,10 @@ async def ensure_indexes(
     await overrides_col.create_index([("expires_at", 1)], sparse=True)
     ent_events_col = db["entitlement_events"]
     await ent_events_col.create_index([("user_id", 1), ("at", -1)])
+    # The dedupe: a webhook delivery is handled once because this insert
+    # either lands or raises DuplicateKeyError.
+    billing_events_col = db["billing_events"]
+    await billing_events_col.create_index([("event_id", 1)], unique=True)
 
     # ── reports ────────────────────────────────────────────────────────
     # One doc per reported (domain, code) — domain is null for the system

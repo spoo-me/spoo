@@ -8754,6 +8754,190 @@
         }
       }
     },
+    "/api/v1/billing/checkout": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Start Checkout",
+        "description": "Create a checkout for the Pro plan and return where to send the browser.\n\nThe server decides founding-cohort eligibility and attaches the discount;\nno code is ever shown to the user. `return` is the dashboard path to land\non once the payment is confirmed.\n\n**Authentication**: Required (interactive session, verified email).",
+        "operationId": "createCheckout",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request \u2014 invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 insufficient permissions or scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict \u2014 resource already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/portal": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Open Billing Portal",
+        "description": "Return an authenticated link to the billing portal (invoices, payment\nmethod, cancellation).\n\n**Authentication**: Required (interactive session).",
+        "operationId": "createPortalSession",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request \u2014 invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 insufficient permissions or scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict \u2014 resource already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/public/preview/{short_code}": {
       "get": {
         "tags": [
@@ -11044,6 +11228,59 @@
           "https"
         ],
         "title": "ChainHop"
+      },
+      "CheckoutRequest": {
+        "properties": {
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "monthly",
+              "year"
+            ],
+            "title": "Cadence",
+            "description": "monthly is a recurring subscription; year is a one-time prepaid purchase"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From",
+            "description": "Catalog key of the feature that sent the user here"
+          },
+          "return": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Return",
+            "description": "Dashboard path to land on after payment",
+            "default": "/dashboard"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cadence"
+        ],
+        "title": "CheckoutRequest"
+      },
+      "CheckoutResponse": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Where to send the browser to pay"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "CheckoutResponse"
       },
       "ClaimItemRequest": {
         "properties": {
@@ -13738,6 +13975,20 @@
         ],
         "title": "PlansResponse",
         "description": "Public projection of the feature catalog plus display prices."
+      },
+      "PortalResponse": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Authenticated customer portal link"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "PortalResponse"
       },
       "PreviewDestination": {
         "properties": {

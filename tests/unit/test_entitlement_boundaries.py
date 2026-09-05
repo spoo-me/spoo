@@ -26,7 +26,9 @@ ALLOWED = {
     "services/account_erasure_service.py",
     "services/feature_flag_service.py",
 }
-ALLOWED_PREFIXES = ("services/entitlements/", "repositories/")
+# Billing writes subscriptions through the entitlement service and reads the
+# provider ids off them; it never gates on them.
+ALLOWED_PREFIXES = ("services/entitlements/", "services/billing/", "repositories/")
 
 
 def _python_files():
