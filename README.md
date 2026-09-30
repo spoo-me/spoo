@@ -1,223 +1,216 @@
-<image src="https://spoo.me/static/images/banner-rounded.png">
-
-<h3 align="center">spoo.me</h3>
-<p align="center">Shorten Your Url not Your Possibilities 🚀</p>
-
 <p align="center">
-    <a href="#-features"><kbd>🔥 Features</kbd></a>
-    <a href="#-endpoints"><kbd>📌 Endpoints</kbd></a>
-    <a href="https://spoo.me/api" target="_blank"><kbd>🛠️ API Docs</kbd></a>
-    <a href="#-getting-started"><kbd>🚀 Getting Started</kbd></a>
-    <a href="#-contributing"><kbd>🤝 Contributing</kbd></a>
+  <a href="https://spoo.me">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://spoo.me/brand/logo-text-dark.png">
+      <img src="https://spoo.me/brand/logo-text-light.png" alt="spoo.me" width="280">
+    </picture>
+  </a>
 </p>
 
 <p align="center">
-<a href="https://status.spoo.me"><img src="https://uptime.betterstack.com/status-badges/v1/monitor/qlmf.svg"></a>
-<img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fspoo.me%2Fmetric&query=%24.total-shortlinks&label=Links%20Shortened&color=6a5cf4&cacheSeconds=60" alt="Total URLs Shortened">
-<img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fspoo.me%2Fmetric&query=%24.total-clicks&label=Clicks%20Redirected&color=6a5cf4&cacheSeconds=60" alt="Total Clicks Redirected">
-<a href="https://spoo.me/discord"><img src="https://img.shields.io/discord/1192388005206433892?logo=discord" alt="Discord"></a>
-<a href="https://twitter.com/spoo_me"><img src="https://img.shields.io/twitter/follow/spoo_me?logo=x&label=%40spoo_me&color=0bf" alt="X (formerly Twitter) Follow"></a>
-<a href="https://codecov.io/gh/spoo-me/spoo"><img src="https://codecov.io/gh/spoo-me/spoo/graph/badge.svg?token=4ZHHWVVCLH" alt="codecov"></a>
+  Open-source link management. Short links, click analytics, and an API.
 </p>
 
-# ⚡ Introduction
+<p align="center">
+  <a href="https://spoo.me"><kbd>🌐 Website</kbd></a>
+  <a href="https://spoo.me/docs/introduction"><kbd>📖 Docs</kbd></a>
+  <a href="https://spoo.me/docs/self-hosting/introduction"><kbd>🏠 Self-hosting</kbd></a>
+  <a href="https://github.com/spoo-me/frontend"><kbd>🖥️ Frontend</kbd></a>
+  <a href="https://spoo.me/discord"><kbd>💬 Discord</kbd></a>
+</p>
 
-**spoo.me** is a free, open-source service for shortening URLs. It offers comprehensive URL statistics, a free API, and extensive customization options. You can create and manage your URLs, generate API keys, create custom `slugs`, add `password protection`, and manage `link lifespans`.
+<p align="center">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fspoo.me%2Fmetric&query=%24.total-shortlinks&label=links%20shortened&color=363a4f&cacheSeconds=3600" alt="Links shortened">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fspoo.me%2Fmetric&query=%24.total-clicks&label=clicks%20redirected&color=363a4f&cacheSeconds=3600" alt="Clicks redirected">
+  <a href="https://status.spoo.me"><img src="https://uptime.betterstack.com/status-badges/v1/monitor/qlmf.svg" alt="Uptime"></a>
+  <a href="https://spoo.me/discord"><img src="https://img.shields.io/discord/1192388005206433892?logo=discord" alt="Discord"></a>
+  <a href="https://twitter.com/spoo_me"><img src="https://img.shields.io/twitter/follow/spoo_me?logo=x&label=%40spoo_me&color=0bf" alt="X (formerly Twitter) Follow"></a>
+  <a href="https://codecov.io/gh/spoo-me/spoo"><img src="https://codecov.io/gh/spoo-me/spoo/graph/badge.svg?token=4ZHHWVVCLH" alt="Coverage"></a>
+</p>
 
-# 🔥 Features
+<p align="center">
+  <a href="https://spoo.me"><img src="https://spoo.me/og/home.jpg" alt="The spoo.me analytics dashboard" width="100%"></a>
+</p>
 
-- `Custom Slugs` - Create custom slugs for your URLs 🎯
-- `Emoji Slugs` - Use emojis as slugs for your URLs 😃
-- `Password Protection` - Protect your URLs with a password 🔒
-- `Link Max Clicks` - Set a maximum number of clicks for your URLs 📈
-- `URL Statistics` - View detailed statistics for your URLs with advanced analytics 📊
-- `BOT Tracking` - Track bot clicks on your URLs 🤖
-- `API` - A free and open-sourced API for URL shortening and statistics 🛠️
-- `Export Click Data` - Export click data as a CSV, JSON, XLSX, or XML file 📤
-- `Dashboard` - Manage all your URLs and view analytics in one place 📱
-- `API Keys` - Generate API keys for programmatic access with rate limiting 🔑
-- `Open Source` - spoo.me is open-sourced and free to use 📖
-- `Absolutely Free` - No hidden costs, no premium plans, no limitations 💸
-- `No Registration Required` - Create short URLs without an account 📝
-- `Self Hosting` - You can host spoo.me on your own server 🏠
+## ⚡ About
 
-# 📌 Endpoints
+spoo.me has shortened over 10 million links and redirected over 150 million clicks. This repository is the backend that serves them: the redirect path, the analytics pipeline, the public API, accounts and auth, and the abuse and safety systems that keep a public shortener usable.
 
-The basic structure for accessing a shortened URL is: `https://spoo.me/<short_code>`
+The backend is FastAPI on MongoDB and Redis, with a Cloudflare Worker in front for the busiest links. The web app lives in [spoo-me/frontend](https://github.com/spoo-me/frontend). Everything here can be self-hosted, and every external service it talks to is optional.
 
-**Example** - **<https://spoo.me/ga>**
+## 🔥 What it does
 
-## 🔐 Accessing Password-Protected URLs
+### 🔗 Links
 
-For password-protected URLs, **use the same basic structure**. This redirects to a **password entry page**.
+- Custom aliases, including emoji aliases (`spoo.me/🚀🔥`)
+- Password protection, click limits, and expiry dates
+- Bot blocking per link
+- Tags for organising links
+- Bulk create, update, and delete
+- Claim links: shorten without an account, then attach the links to one later
 
-**Example** - **<https://spoo.me/exa>** <br/>
-**Password** - <kbd>Example@12</kbd>
+### 📊 Analytics
 
-> [!TIP]
-> Bypass the password entry page by appending the password to the URL parameters - `https://spoo.me/<short_code>?password=<password>`
+- Clicks and unique clicks over time, in any timezone
+- Breakdowns by country, city, browser, OS, device, referrer, and UTM tags
+- Any dimensions combined in one query (`group_by=time,country,browser`) with filters on each
+- Bot traffic detected and counted separately from human traffic
+- Public stats pages at `spoo.me/stats/<alias>`, or private stats per link
+- Exports as CSV, XLSX, JSON, or XML
 
-## 📈 Checking URL Statistics
+### ⌨️ Developer platform
 
-To view the statistics for a URL, use the following structure: `https://spoo.me/stats/<short_code>`
+- A versioned REST API at `/api/v1` with a published [OpenAPI spec](openapi.json)
+- API keys with scopes and per-key rate limits
+- OAuth 2.0 device flow with PKCE, so CLIs, bots, and apps can sign users in
+- Official SDKs in five languages, [listed below](#-ecosystem)
 
-**Example** - **<https://spoo.me/stats/ga>**
+## 🏗️ Architecture
 
-> [!NOTE]
-> You won't be able to view statistics for a password-protected page unless you provide its password.
+<p align="center">
+  <a href=".github/assets/architecture.svg"><img src=".github/assets/architecture.svg" alt="spoo.me architecture: edge worker, Caddy, FastAPI redirect and API paths, click workers, webhook worker, MongoDB" width="100%"></a>
+  <br><sub>Click the diagram to open it full size.</sub>
+</p>
 
-# 📊 Analytics Dashboard
+- **Redirects.** The app resolves an alias through a two-tier cache before it touches MongoDB. Links that cross a click threshold get promoted to Workers KV, and the Worker serves them from the Cloudflare edge without reaching the origin.
+- **Clicks.** A redirect writes a click event to a Redis stream and returns. A separate worker consumes the stream to record stats, promote hot links, and run safety analysis, so a slow database never slows a redirect.
+- **Degrades instead of failing.** If the queue Redis is down, clicks are recorded inline. If the cache Redis is down, reads go to MongoDB. Without Cloudflare credentials the origin serves everything. A self-hosted instance needs MongoDB and Redis and nothing else.
+- **Layered code.** Requests go `routes` to `services` to `repositories` to MongoDB, with dependencies wired in one place (`dependencies/wiring.py`).
 
-Get deep insights into your shortened URLs with our comprehensive analytics platform:
+## 🧩 Ecosystem
 
-- `Geographic Intelligence` - Interactive world map showing click distribution by country and city 🌍
-- `Device Analytics` - Detailed breakdowns of devices, browsers, operating systems, and screen sizes 📱
-- `Traffic Patterns` - Time-series charts showing clicks over time with granular date ranges ⏱️
-- `Referrer Tracking` - Understand where your traffic comes from with full referrer analysis 🔗
-- `Bot Detection` - Separate human traffic from bot clicks for accurate metrics 🤖
-- `N-Dimensional Filtering` - Apply multi-layer filters across **browsers**, **platforms**, **referrers**, **short URLs**, and more for granular analysis 🔍
-- `Custom Time Ranges` - Filter analytics by specific date ranges, from hours to months, for precise temporal insights 📅
-- `Export Capabilities` - Download your data in CSV, JSON, XLSX, or XML formats 📤
+Everything below is built on the public API. The web app is [spoo-me/frontend](https://github.com/spoo-me/frontend), and the docs source is [spoo-me/docs](https://github.com/spoo-me/docs).
 
-Access statistics for any public URL at `https://spoo.me/stats/<short_code>` or manage all your links through the dashboard.
+### 📦 SDKs
 
-# 🛠️ API Docs
+<table>
+  <tr>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-ts"><img src="https://spoo.me/og/apps/sdk-typescript.jpg" alt="TypeScript"></a><br>TypeScript</td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-py"><img src="https://spoo.me/og/apps/sdk-python.jpg" alt="Python"></a><br>Python</td>
+  </tr>
+  <tr>
+    <td width='50%' align='center'><code>npm install spoo.me</code></td>
+    <td width='50%' align='center'><code>pip install spoo</code></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-go"><img src="https://spoo.me/og/apps/sdk-go.jpg" alt="Go"></a><br>Go</td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-rust"><img src="https://spoo.me/og/apps/sdk-rust.jpg" alt="Rust"></a><br>Rust</td>
+  </tr>
+  <tr>
+    <td width='50%' align='center'><code>go get github.com/spoo-me/spoo-go</code></td>
+    <td width='50%' align='center'><code>cargo add spoo-me</code></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-kotlin"><img src="https://spoo.me/og/apps/sdk-kotlin.jpg" alt="Kotlin"></a><br>Kotlin</td>
+    <td width="50%"></td>
+  </tr>
+  <tr>
+    <td width='50%' align='center'><code>me.spoo:spoo</code></td>
+    <td width="50%"></td>
+  </tr>
+</table>
 
-Spoo.me offers a free, open-source API for URL shortening and statistics. Check it out below:
+### 📱 Client apps
 
-|[spoo.me API](https://spoo.me/api)|
-|---|
+<table>
+  <tr>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-cli"><img src="https://spoo.me/og/apps/spoo-cli.jpg" alt="CLI"></a><br>CLI</td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-android"><img src="https://spoo.me/og/apps/android.jpg" alt="Android"></a><br>Android</td>
+  </tr>
+  <tr>
+    <td width='50%' align='center'><code>brew install spoo-me/tap/spoo</code></td>
+    <td width='50%' align='center'><a href="https://github.com/spoo-me/spoo-android/releases/latest">GitHub releases</a></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-raycast"><img src="https://spoo.me/og/apps/spoo-raycast.jpg" alt="Raycast"></a><br>Raycast</td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-bot"><img src="https://spoo.me/og/apps/spoo-discord.jpg" alt="Discord bot"></a><br>Discord bot</td>
+  </tr>
+  <tr>
+    <td width='50%' align='center'><a href="https://github.com/spoo-me/spoo-raycast">From source</a></td>
+    <td width='50%' align='center'><a href="https://github.com/spoo-me/spoo-bot">From source</a></td>
+  </tr>
+</table>
 
-# 🚀 Getting Started
+## 🛡️ Safety
 
-To self-host spoo.me on your server, follow the this **detailed** guide:
+A public shortener attracts phishing. spoo.me checks a destination more than once over a link's life, and each check can hand off to a deeper one.
 
-|[Self-Hosting Guide 🏠](https://spoo.me/docs/self-hosting)|
-|---|
+### ⏱️ When a link gets checked
 
-<details>
+| Moment | What happens |
+|---|---|
+| Created or edited | Every create and every destination edit passes the gate before it is saved. Changing a link's destination later is a common bait-and-switch, so an edit always qualifies for the deep check. |
+| Created in a burst | Counters on link creation flag a destination domain that suddenly gets a lot of new links. |
+| Goes viral | A link that crosses the click threshold is screened at that moment if nobody has judged its destination yet. This catches campaigns seeded quietly and spread after every creation check has passed. |
+| Hidden behind a wrapper | Links through share wrappers like `t.co` and `lnkd.in` are followed hop by hop, and the page they land on is what gets judged. |
+| Reported | The public report form feeds the same pipeline, with its own daily budget for deep checks. |
+| After the fact | When a threat feed lists a new domain, existing links to it are found through an index and blocked in the same sync. Every hour, a sweep screens each destination host created in the last 48 hours that has no verdict yet. |
 
-<summary>Expand this for a Quick Start</summary>
+### 🔍 How deep each check goes
 
-## Method 1 - Docker (Recommended)
+1. **Gate.** Runs on every create and edit against blocklists, threat feeds, and destinations already judged harmful.
+2. **Screening.** Runs in the background and adds Google Web Risk. Anything it can't judge goes to a person, never straight to "safe".
+3. **Investigation.** Renders the page in an isolated browser, follows every redirect, and checks the domain's records before deciding how far a block should reach.
 
-### 📋 Prerequisites
+### 🚫 What a block does
 
-- [Docker](https://docs.docker.com/get-docker/) 🐳
+- A block can cover a whole host, one path, or single links, so a phishing page on `sites.google.com` doesn't take down the platform.
+- Blocked links return `451` from the next click, at the origin and the edge, and new links to the same destination are refused.
+- A person's call always overrides an automated one, and every block can be reversed.
 
-### 📂 Clone the repository (Docker Method)
+## 🌍 Using the hosted service
+
+Every short link works the same way.
+
+| URL | What you get |
+|---|---|
+| `spoo.me/<alias>` | Redirects to the destination. [spoo.me/ga](https://spoo.me/ga) |
+| `spoo.me/<alias>+` | Shows where the link goes without following it. [spoo.me/ga+](https://spoo.me/ga+) |
+| `spoo.me/stats/<alias>` | Public stats for the link. [spoo.me/stats/ga](https://spoo.me/stats/ga) |
+
+Password-protected links open a password page. Pass `?password=<password>` to skip it.
+
+To shorten from code, see the [API reference](https://spoo.me/docs/introduction) or pick an SDK above.
+
+## 🏠 Self-hosting
+
+The full guide, including every environment variable, is at [spoo.me/docs/self-hosting](https://spoo.me/docs/self-hosting/introduction). The short version, with Docker:
 
 ```bash
 git clone https://github.com/spoo-me/spoo.git
+cd spoo
+cp .env.example .env    # set SECRET_KEY and the JWT_* values
+docker compose up -d
 ```
 
-### Rename .env.example to .env
+That starts MongoDB, Redis, and the app on `http://localhost:8000`. OAuth providers, email, Sentry, hCaptcha, and Cloudflare are all optional and switch off cleanly when their variables are empty.
+
+To run without Docker, you need Python 3.10+, [uv](https://docs.astral.sh/uv/), and a MongoDB and Redis you can reach:
 
 ```bash
-mv .env.example .env
-```
-
-### ➕ Adding environment variables to .env file
-
-```bash
-MONGODB_URI=<your_MONGODB_URI>
-REDIS_URI=<your_REDIS_URI>
-
-# OAuth Configuration (Optional - for social login features)
-GOOGLE_CLIENT_ID=<your_google_client_id>
-GOOGLE_CLIENT_SECRET=<your_google_client_secret>
-
-# JWT Secret Keys (Required for authentication)
-JWT_ISSUER=
-JWT_AUDIENCE=
-ACCESS_TOKEN_TTL_SECONDS=3600
-REFRESH_TOKEN_TTL_SECONDS=2592000
-COOKIE_SECURE="false"    # false: for local dev, true: for production
-JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n.....\n-----END PRIVATE KEY-----"
-JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n.....\n-----END PUBLIC KEY-----"
-JWT_SECRET=""
-```
-
-> [!NOTE]
->
-> - The above is a minimal set of environment variables required to run spoo.me using Docker. Please refer to our official [self-hosting guide](https://spoo.me/docs/self-hosting) for a complete list of environment variables and their descriptions.
-> - OAuth credentials are optional. Users can still register with email/password if OAuth is not configured.
-> - JWT secret keys should be long, random strings. You can generate them using `openssl rand -hex 32`.
-> - With this method, you can either use a cloud service like [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) to store the data remotely or you can use a local MongoDB instance.
-> - If you want to use a local MongoDB instance, your MongoDB URI would be `mongodb://localhost:27017/`.
-
-### 🚀 Starting the server
-
-```bash
-docker-compose up -d
-```
-
-## Method 2 - Manual
-
-### 📋 Prerequisites
-
-- [MongoDB](https://www.mongodb.com/try/download/community) 🌿
-  - MongoDB is only required if you want to store the **data locally**. You can also use a cloud service like [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) to store the data remotely.
-- [Python](https://www.python.org/downloads/) 🐍
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) 🛠️
-
-### 📂 Clone the repository
-
-```bash
-git clone https://github.com/spoo-me/spoo.git
-```
-
-### Installing `uv` for tooling
-
-```bash
-pip install uv
-```
-
-### 📦 Install dependencies & setting virtual env
-
-```bash
-uv venv
 uv sync
-```
-
-### Rename `.env.example` to `.env`
-
-```bash
-mv .env.example .env
-```
-
-### ➕ Adding environment variables to .env file
-
-Same as in the Docker method above.
-
-> [!NOTE]
->
-> - OAuth credentials are optional. Users can still register with email/password if OAuth is not configured.
-> - JWT secret keys should be long, random strings. You can generate them using `openssl rand -hex 32`.
-> - If you installed MongoDB locally, your MongoDB URI would be `mongodb://localhost:27017/` or if you are using MongoDB Atlas, you can find your MongoDB URI in the **Connect** tab of your cluster.
-
-### 🚀 Starting the server
-
-```bash
 uv run main.py
 ```
 
-### 🌐 Access the server
+## 🛠️ Development
 
-Open your browser and go to `http://localhost:8000` to access the **spoo.me** URL shortener.
+```bash
+make dev             # run the app with reload
+make test            # full test suite with coverage
+make test-unit       # unit tests only
+make lint            # ruff check
+make format-check    # ruff format --check
+make docker-up       # full stack: MongoDB, Redis, app
+make openapi         # regenerate openapi.json after changing routes or schemas
+```
 
-</details>
+Both `make lint` and `make format-check` must pass before a pull request can merge.
 
-# 🤝 Contributing
+## 🤝 Contributing
 
-**Contributions are always welcome!** 🎉 Here's how you can contribute:
+Bug reports and pull requests are welcome. Read the [contributing guide](.github/CONTRIBUTING.md) first, and [open an issue](https://github.com/spoo-me/spoo/issues/new) before starting on anything large.
 
-- Bugs are logged using the github issue system. To report a bug, simply [open a new issue](https://github.com/spoo-me/spoo/issues/new).
-- Follow the [contribution guidelines](.github/CONTRIBUTING.md) to get started.
-- Make a [pull request](https://github.com/spoo-me/spoo/pull) for any feature or bug fix.
-
-> [!IMPORTANT]
-> For any type of support or queries, feel free to reach out to us at <kbd>[✉️ support@spoo.me](mailto:support@spoo.me)</kbd>
+To report a security issue, follow [SECURITY.md](.github/SECURITY.md) instead of opening a public issue. For anything else, email [support@spoo.me](mailto:support@spoo.me) or ask on [Discord](https://spoo.me/discord).
 
 ---
 
