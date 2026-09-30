@@ -91,11 +91,17 @@ class FeedDomainProvider:
     feed layer is additive signal, never a gate on its own health."""
 
     def __init__(
-        self, repo: FeedDomainRepository, *, feed: str, reason_label: str
+        self,
+        repo: FeedDomainRepository,
+        *,
+        feed: str,
+        reason_label: str,
+        exempt_feed: str | None = None,
     ) -> None:
         self._repo = repo
         self._feed = feed
         self._label = reason_label
+        self._exempt_feed = exempt_feed
         self.name = f"feed_{feed}"
 
     async def analyze(
@@ -112,6 +118,10 @@ class FeedDomainProvider:
                 registrable_domain
                 and registrable_domain != host
                 and await self._repo.contains(self._feed, registrable_domain)
+                and not (
+                    self._exempt_feed
+                    and await self._repo.contains(self._exempt_feed, host)
+                )
             ):
                 return ProviderVerdict(
                     tier=VerdictTier.TOXIC,

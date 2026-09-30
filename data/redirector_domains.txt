@@ -8,3 +8,6 @@ l.facebook.com
 lm.facebook.com
 l.instagram.com
 t.umblr.com
+maps.app.goo.gl
+photos.app.goo.gl
+search.app.goo.gl

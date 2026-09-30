@@ -204,3 +204,110 @@ class TestRedirectProbe:
 
         policy = UrlPolicyService([], blocked_self_domains=["spoo.me"])
         await policy.record_create("https://t.co/AbCdEf")
+
+
+class _SeededFeedRepo:
+    """The shipped seed files as the feed store, keyed like the real repo."""
+
+    def __init__(self, extra: dict[str, set[str]] | None = None):
+        from services.safety.feeds import (
+            REDIRECTOR_FEED,
+            SHORTENER_FEED,
+            load_redirector_seed,
+            load_shortener_seed,
+        )
+
+        self.feeds = {
+            SHORTENER_FEED: set(load_shortener_seed()),
+            REDIRECTOR_FEED: set(load_redirector_seed()),
+        }
+        for feed, domains in (extra or {}).items():
+            self.feeds.setdefault(feed, set()).update(domains)
+
+    async def contains(self, feed: str, domain: str) -> bool:
+        return domain in self.feeds.get(feed, set())
+
+
+class TestShortenerGateOnShippedSeeds:
+    """The registry-built gate against the real seed data, with the
+    shortener switch on as production would run it."""
+
+    @staticmethod
+    def _gate(repo) -> UrlPolicyService:
+        from config import SafetySettings
+        from services.safety.feeds import build_feed_providers
+
+        gate, _, messages = build_feed_providers(
+            SafetySettings(shorteners_enabled=True), repo
+        )
+        return UrlPolicyService(
+            gate, blocked_self_domains=["spoo.me"], public_messages=messages
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://bit.ly/abc",
+            "https://www.bit.ly/abc",
+            "https://goo.gl/xyz",
+            "https://ouo.io/xDdQg5U",
+            "https://link-to.net/442599/1.2/dynamic/?r=x",
+            "https://grabb.site/AJFEDGC",
+            "https://videyyhubx.s.gy/Clicknow",
+        ],
+    )
+    async def test_listed_shorteners_are_refused_with_the_published_message(self, url):
+        rejection = await self._gate(_SeededFeedRepo()).check(url)
+        assert rejection is not None
+        assert rejection.code == "feed_shorteners"
+        assert rejection.public_message == (
+            "Links to other URL shorteners are not allowed"
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://maps.app.goo.gl/AbCdEf123",
+            "https://photos.app.goo.gl/AbCdEf123",
+            "https://search.app.goo.gl/AbCdEf123",
+            "https://t.co/AbCdEf",
+            "https://lnkd.in/AbCdEf",
+            "https://example.com/x",
+        ],
+    )
+    async def test_platform_share_links_are_not_refused(self, url):
+        assert await self._gate(_SeededFeedRepo()).check(url) is None
+
+    @pytest.mark.asyncio
+    async def test_a_redirector_entry_for_the_shortener_itself_exempts_nothing(self):
+        from services.safety.feeds import REDIRECTOR_FEED
+
+        repo = _SeededFeedRepo({REDIRECTOR_FEED: {"goo.gl"}})
+        rejection = await self._gate(repo).check("https://goo.gl/xyz")
+        assert rejection is not None
+        assert rejection.code == "feed_shorteners"
+
+    @pytest.mark.asyncio
+    async def test_the_exemption_is_shortener_only(self):
+        from services.safety.feeds import MANUAL_FEED
+
+        repo = _SeededFeedRepo({MANUAL_FEED: {"goo.gl"}})
+        rejection = await self._gate(repo).check("https://maps.app.goo.gl/AbCdEf")
+        assert rejection is not None
+        assert rejection.code == "feed_manual"
+
+    @pytest.mark.asyncio
+    async def test_share_links_still_get_the_redirect_probe(self):
+        sink = AsyncMock()
+        policy = UrlPolicyService(
+            [],
+            blocked_self_domains=["spoo.me"],
+            redirect_feed_repo=_SeededFeedRepo(),
+            redirect_sink=sink,
+        )
+        await policy.record_create("https://maps.app.goo.gl/AbCdEf123")
+        event = sink.emit.await_args.args[0]
+        assert event.trigger == "redirect"
+        assert event.host == "maps.app.goo.gl"
