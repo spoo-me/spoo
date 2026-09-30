@@ -48,6 +48,12 @@ The backend is FastAPI on MongoDB and Redis, with a Cloudflare Worker in front f
 - Tags for organising links
 - Bulk create, update, and delete
 - Claim links: shorten without an account, then attach the links to one later
+- Custom domains, with your own root redirect, 404 page, and robots.txt [![self-host][self-host]](#-self-hosting)
+- Geo targeting: a different destination for each visitor country [![self-host][self-host]](#-self-hosting)
+- A/B splits across several destinations, with stats per variant [![self-host][self-host]](#-self-hosting)
+- Scheduled links that go live at a set time, with an optional page before launch [![self-host][self-host]](#-self-hosting)
+- A fallback destination for when a link expires or hits its click limit [![self-host][self-host]](#-self-hosting)
+- Custom link previews: the title, description, and image social apps show [![self-host][self-host]](#-self-hosting)
 
 ### 📊 Analytics
 
@@ -63,6 +69,7 @@ The backend is FastAPI on MongoDB and Redis, with a Cloudflare Worker in front f
 - A versioned REST API at `/api/v1` with a published [OpenAPI spec](openapi.json)
 - API keys with scopes and per-key rate limits
 - OAuth 2.0 device flow with PKCE, so CLIs, bots, and apps can sign users in
+- Signed webhooks for clicks and link changes, with retries [![self-host][self-host]](#-self-hosting)
 - Official SDKs in five languages, [listed below](#-ecosystem)
 
 ## 🏗️ Architecture
@@ -185,6 +192,14 @@ docker compose up -d
 
 That starts MongoDB, Redis, and the app on `http://localhost:8000`. OAuth providers, email, Sentry, hCaptcha, and Cloudflare are all optional and switch off cleanly when their variables are empty.
 
+Features marked ![self-host][self-host] are built and tested but switched off by default. Turn one on for everyone with a document in the `feature_flags` collection:
+
+```js
+db.feature_flags.insertOne({ name: "geo_targeting", enabled: true, rollout_type: "everyone" })
+```
+
+The flag names are `custom_domains`, `geo_targeting`, `ab_testing`, `link_scheduling`, `expired_fallback`, `custom_meta_tags`, and `webhooks`. Webhooks also need `WEBHOOKS_ENABLED=true`, and custom domains need `CUSTOM_DOMAINS_ENABLED=true` plus a Cloudflare for SaaS zone (`CUSTOM_DOMAINS_CF_*`).
+
 To run without Docker, you need Python 3.10+, [uv](https://docs.astral.sh/uv/), and a MongoDB and Redis you can reach:
 
 ```bash
@@ -224,3 +239,5 @@ All Rights Reserved</h6>
 <p align="center">
  <a href="https://github.com/spoo-me/spoo/blob/main/LICENSE"><img src="https://img.shields.io/static/v1.svg?style=for-the-badge&label=License&message=AGPL-3.0&logoColor=d9e0ee&colorA=363a4f&colorB=b7bdf8"/></a>
 </p>
+
+[self-host]: https://img.shields.io/badge/self--host-30363d?style=flat-square
