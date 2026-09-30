@@ -134,9 +134,9 @@ This adds a `Signed-off-by` line to the commit message.
 
 ## License
 
-This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the AGPL-3.0 License - see the [LICENSE](../LICENSE) file for details.
 Versions released before the switch remain available under Apache 2.0.
 
-The spoo.me name and logo are not covered by the code license - see [TRADEMARK.md](../TRADEMARK.md).
+The spoo.me name and logo are not covered by the code license - see [TRADEMARK.md](TRADEMARK.md).
 
 ![Contribution Charts](https://repobeats.axiom.co/api/embed/48a40934896cbcaff2812e80478ebb701ee49dd4.svg)

@@ -15,7 +15,7 @@ downloads/
 eggs/
 .eggs/
 lib/
-!k6/lib/
+!tests/k6/lib/
 lib64/
 parts/
 sdist/
@@ -183,7 +183,6 @@ cython_debug/
 .hintrc
 
 # Custom
-misc/*.py
 todo.md
 
 # Local API Testings

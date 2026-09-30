@@ -21,9 +21,7 @@ htmlcov/
 
 # Dev/test files
 tests/
-k6-tests/
 local_test_db/
-misc/*.py
 thoughts/
 
 # Editor/OS

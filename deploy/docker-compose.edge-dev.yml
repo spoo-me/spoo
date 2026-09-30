@@ -7,7 +7,7 @@
 #   1. echo "127.0.0.1 spoo.local" | sudo tee -a /etc/hosts   # once
 #   2. npx wrangler dev            # in edge/spoo-edge-cache
 #   3. docker compose --profile click-events \
-#        -f docker-compose.yml -f docker-compose.edge-dev.yml up -d click-worker
+#        -f docker-compose.yml -f deploy/docker-compose.edge-dev.yml up -d click-worker
 services:
   click-worker:
     environment:

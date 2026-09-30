@@ -21,13 +21,13 @@ Performance test suite for spoo.me URL shortener using [k6](https://k6.io/).
 
 ```bash
 # Smoke test (quick sanity check)
-k6 run k6-tests/scenarios/redirect-smoke.js
+k6 run tests/k6/scenarios/redirect-smoke.js
 
 # Load test
-k6 run k6-tests/scenarios/redirect-load.js
+k6 run tests/k6/scenarios/redirect-load.js
 
 # Against a remote server
-K6_BASE_URL=https://staging.spoo.me k6 run k6-tests/scenarios/redirect-smoke.js
+K6_BASE_URL=https://staging.spoo.me k6 run tests/k6/scenarios/redirect-smoke.js
 ```
 
 ## Scenarios
@@ -85,7 +85,7 @@ All tests include pass/fail thresholds:
 ## Architecture
 
 ```
-k6-tests/
+tests/k6/
 ├── lib/
 │   ├── config.js    # BASE_URL, thresholds
 │   ├── data.js      # User agents, IPs, referrers (SharedArray)
