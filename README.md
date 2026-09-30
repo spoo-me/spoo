@@ -42,35 +42,35 @@ The backend is FastAPI on MongoDB and Redis, with a Cloudflare Worker in front f
 
 ### 🔗 Links
 
-- Custom aliases, including emoji aliases (`spoo.me/🚀🔥`)
-- Password protection, click limits, and expiry dates
-- Bot blocking per link
-- Tags for organising links
-- Bulk create, update, and delete
-- Claim links: shorten without an account, then attach the links to one later
-- Custom domains, with your own root redirect, 404 page, and robots.txt [![self-host][self-host]](#-self-hosting)
-- Geo targeting: a different destination for each visitor country [![self-host][self-host]](#-self-hosting)
-- A/B splits across several destinations, with stats per variant [![self-host][self-host]](#-self-hosting)
-- Scheduled links that go live at a set time, with an optional page before launch [![self-host][self-host]](#-self-hosting)
-- A fallback destination for when a link expires or hits its click limit [![self-host][self-host]](#-self-hosting)
-- Custom link previews: the title, description, and image social apps show [![self-host][self-host]](#-self-hosting)
+- **Custom aliases**, including emoji aliases (`spoo.me/🚀🔥`)
+- **Password protection, click limits, and expiry dates** on any link
+- **Bot blocking** per link
+- **Tags** for organising links
+- **Bulk actions** to create, update, and delete many links at once
+- **Claim links**: shorten without an account, then attach the links to one later
+- **Custom domains**, with your own root redirect, 404 page, and robots.txt [![self-host][self-host]](#-self-hosting)
+- **Geo targeting**: a different destination for each visitor country [![self-host][self-host]](#-self-hosting)
+- **A/B splits** across several destinations, with stats per variant [![self-host][self-host]](#-self-hosting)
+- **Scheduled links** that go live at a set time, with an optional page before launch [![self-host][self-host]](#-self-hosting)
+- **Expired-link fallback**: a destination for when a link expires or hits its click limit [![self-host][self-host]](#-self-hosting)
+- **Custom link previews**: the title, description, and image social apps show [![self-host][self-host]](#-self-hosting)
 
 ### 📊 Analytics
 
-- Clicks and unique clicks over time, in any timezone
-- Breakdowns by country, city, browser, OS, device, referrer, and UTM tags
-- Any dimensions combined in one query (`group_by=time,country,browser`) with filters on each
-- Bot traffic detected and counted separately from human traffic
-- Public stats pages at `spoo.me/stats/<alias>`, or private stats per link
-- Exports as CSV, XLSX, JSON, or XML
+- **Clicks and unique clicks** over time, in any timezone
+- **Breakdowns** by country, city, browser, OS, device, referrer, and UTM tags
+- **Combined dimensions** in one query (`group_by=time,country,browser`), with filters on each
+- **Bot traffic** detected and counted separately from human traffic
+- **Public stats pages** at `spoo.me/stats/<alias>`, or private stats per link
+- **Exports** as CSV, XLSX, JSON, or XML
 
 ### ⌨️ Developer platform
 
-- A versioned REST API at `/api/v1` with a published [OpenAPI spec](openapi.json)
-- API keys with scopes and per-key rate limits
-- OAuth 2.0 device flow with PKCE, so CLIs, bots, and apps can sign users in
-- Signed webhooks for clicks and link changes, with retries [![self-host][self-host]](#-self-hosting)
-- Official SDKs in five languages, [listed below](#-ecosystem)
+- **REST API** at `/api/v1`, versioned, with a published [OpenAPI spec](openapi.json)
+- **API keys** with scopes and per-key rate limits
+- **OAuth 2.0 device flow** with PKCE, so CLIs, bots, and apps can sign users in
+- **Signed webhooks** for clicks and link changes, with retries [![self-host][self-host]](#-self-hosting)
+- **Official SDKs** in five languages, [listed below](#-ecosystem)
 
 ## 🏗️ Architecture
 
