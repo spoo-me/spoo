@@ -7,12 +7,11 @@ on:
     paths-ignore:
       - '**/*.md'
       - '**/*.rst'
+  # No paths filter on PRs: check_formatting is required by branch
+  # protection, and a workflow that never reports leaves docs PRs stuck.
   pull_request:
     branches:
       - '**'
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.rst'
   workflow_dispatch:
 
 jobs:
