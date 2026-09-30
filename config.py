@@ -714,8 +714,8 @@ class AppSettings(BaseSettings):
     max_content_length: int = 1_048_576
 
     # GeoIP database paths (configurable for self-hosters)
-    geoip_country_db: str = "misc/GeoLite2-Country.mmdb"
-    geoip_city_db: str = "misc/GeoLite2-City.mmdb"
+    geoip_country_db: str = "data/geoip/GeoLite2-Country.mmdb"
+    geoip_city_db: str = "data/geoip/GeoLite2-City.mmdb"
 
     # GitHub repository (owner/repo) — used for star count + outbound links
     github_repo: str = "spoo-me/spoo"

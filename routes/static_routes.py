@@ -25,7 +25,6 @@ log = get_logger(__name__)
 router = APIRouter(include_in_schema=False)
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
-_MISC_DIR = os.path.join(_PROJECT_ROOT, "misc")
 _STATIC_DIR = os.path.join(_PROJECT_ROOT, "static")
 
 
@@ -35,28 +34,32 @@ _STATIC_DIR = os.path.join(_PROJECT_ROOT, "static")
 @router.get("/robots.txt")
 @limiter.exempt
 async def robots(request: Request) -> Response:
-    return FileResponse(os.path.join(_MISC_DIR, "robots.txt"), media_type="text/plain")
+    return FileResponse(
+        os.path.join(_STATIC_DIR, "robots.txt"), media_type="text/plain"
+    )
 
 
 @router.get("/sitemap.xml")
 @limiter.exempt
 async def sitemap(request: Request) -> Response:
     return FileResponse(
-        os.path.join(_MISC_DIR, "sitemap.xml"), media_type="application/xml"
+        os.path.join(_STATIC_DIR, "sitemap.xml"), media_type="application/xml"
     )
 
 
 @router.get("/humans.txt")
 @limiter.exempt
 async def humans(request: Request) -> Response:
-    return FileResponse(os.path.join(_MISC_DIR, "humans.txt"), media_type="text/plain")
+    return FileResponse(
+        os.path.join(_STATIC_DIR, "humans.txt"), media_type="text/plain"
+    )
 
 
 @router.get("/security.txt")
 @limiter.exempt
 async def security(request: Request) -> Response:
     return FileResponse(
-        os.path.join(_MISC_DIR, "security.txt"), media_type="text/plain"
+        os.path.join(_STATIC_DIR, "security.txt"), media_type="text/plain"
     )
 
 
