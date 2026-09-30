@@ -121,6 +121,8 @@ class FeedSpec:
     ) = None
     # First-boot seed loader; fires only when the feed is empty.
     seed: Callable[[], tuple[str, ...]] | None = None
+    # A subdomain host listed here escapes a match on its registrable domain.
+    exempt_feed: str | None = None
 
 
 def _fishfish_task(
@@ -156,6 +158,8 @@ FEED_REGISTRY: tuple[FeedSpec, ...] = (
         enabled=lambda s: s.shorteners_enabled,
         public_message="Links to other URL shorteners are not allowed",
         seed=load_shortener_seed,
+        # goo.gl is refused but maps.app.goo.gl is a share link Google generates.
+        exempt_feed=REDIRECTOR_FEED,
     ),
     FeedSpec(
         name=REDIRECTOR_FEED,
@@ -191,7 +195,10 @@ def build_feed_providers(
         if not spec.enabled(settings):
             continue
         provider = FeedDomainProvider(
-            repo, feed=spec.name, reason_label=spec.reason_label
+            repo,
+            feed=spec.name,
+            reason_label=spec.reason_label,
+            exempt_feed=spec.exempt_feed,
         )
         if spec.gate:
             gate.append(provider)

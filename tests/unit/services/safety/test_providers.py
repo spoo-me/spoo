@@ -74,6 +74,44 @@ class TestFeedDomainProvider:
         assert verdict.reason == "domain evil.com is listed by fishfish.gg"
 
     @pytest.mark.asyncio
+    async def test_exempt_subdomain_host_abstains_on_a_registrable_hit(self):
+        from services.safety.providers import FeedDomainProvider
+
+        feeds = {"shorteners": {"goo.gl"}, "redirectors": {"maps.app.goo.gl"}}
+        repo = AsyncMock()
+        repo.contains = AsyncMock(side_effect=lambda feed, d: d in feeds[feed])
+        provider = FeedDomainProvider(
+            repo, feed="shorteners", reason_label="x", exempt_feed="redirectors"
+        )
+        assert (
+            await provider.analyze(
+                "https://maps.app.goo.gl/a", "maps.app.goo.gl", "goo.gl"
+            )
+            is None
+        )
+        assert (
+            await provider.analyze("https://x.goo.gl/a", "x.goo.gl", "goo.gl")
+            is not None
+        )
+
+    @pytest.mark.asyncio
+    async def test_exempt_feed_is_not_read_on_a_miss(self):
+        from services.safety.providers import FeedDomainProvider
+
+        repo = AsyncMock()
+        repo.contains = AsyncMock(return_value=False)
+        provider = FeedDomainProvider(
+            repo, feed="shorteners", reason_label="x", exempt_feed="redirectors"
+        )
+        assert (
+            await provider.analyze("https://a.ok.com/x", "a.ok.com", "ok.com") is None
+        )
+        assert [c.args[0] for c in repo.contains.await_args_list] == [
+            "shorteners",
+            "shorteners",
+        ]
+
+    @pytest.mark.asyncio
     async def test_miss_and_error_abstain(self):
         from services.safety.providers import FeedDomainProvider
 

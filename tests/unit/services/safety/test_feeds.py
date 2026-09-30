@@ -141,6 +141,18 @@ class TestFeedSeeds:
         assert "bitly.com" not in seed
         assert not any(d.startswith("#") or " " in d for d in seed)
 
+    def test_seeds_never_overlap_and_file_hosts_stay_off(self):
+        from services.safety.feeds import load_redirector_seed, load_shortener_seed
+
+        shorteners = set(load_shortener_seed())
+        redirectors = set(load_redirector_seed())
+        assert not shorteners & redirectors
+        assert {"maps.app.goo.gl", "photos.app.goo.gl"} <= redirectors
+        # Both Linkvertise serving domains, or neither.
+        assert {"link-to.net", "link-center.net"} <= shorteners
+        # File and paste hosts are not shorteners.
+        assert not {"videy.co", "privatebin.net", "sourceb.in", "send.now"} & shorteners
+
 
 class TestFeedRegistry:
     """The registry drives composition — these pins are what makes 'add a
@@ -175,6 +187,13 @@ class TestFeedRegistry:
         gate, analyzer, _ = build_feed_providers(self._settings(enabled=True), repo)
         assert "feed_fishfish" in [p.name for p in gate]
         assert "feed_fishfish" in [p.name for p in analyzer]
+
+    def test_only_the_shortener_gate_defers_to_redirectors(self):
+        from services.safety.feeds import FEED_REGISTRY, REDIRECTOR_FEED
+
+        exempt = {spec.name: spec.exempt_feed for spec in FEED_REGISTRY}
+        assert exempt.pop("shorteners") == REDIRECTOR_FEED
+        assert set(exempt.values()) == {None}
 
     def test_shorteners_never_join_the_analyzer(self):
         from services.safety.feeds import build_feed_providers
