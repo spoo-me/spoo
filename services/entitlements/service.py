@@ -24,6 +24,7 @@ from repositories.entitlement_override_repository import (
 )
 from repositories.subscription_repository import SubscriptionRepository
 from schemas.models.subscription import SubscriptionDoc, SubscriptionStatus
+from services.entitlements.over_limit import OverLimitService
 from services.entitlements.resolver import ANONYMOUS, Resolved, for_plan, resolve
 from services.entitlements.state_machine import SubscriptionEvent, next_status
 from services.features.catalog import Plan
@@ -43,6 +44,7 @@ class EntitlementService:
         *,
         selfhost: bool,
         usage: dict[str, UsageCounter] | None = None,
+        over_limit: OverLimitService | None = None,
     ) -> None:
         self._subs = subscriptions
         self._overrides = overrides
@@ -50,6 +52,7 @@ class EntitlementService:
         self._cache = cache
         self._selfhost = selfhost
         self._usage = usage or {}
+        self._over_limit = over_limit
 
     @property
     def selfhost(self) -> bool:
@@ -128,6 +131,17 @@ class EntitlementService:
             out[key] = await counter(user_id)
         return out
 
+    async def over_limit_for(self, user_id: ObjectId) -> dict[str, list[str]]:
+        if self._over_limit is None:
+            return {}
+        return await self._over_limit.paused(user_id)
+
+    async def reconcile_over_limit(self, user_id: ObjectId) -> dict[str, list[str]]:
+        """Pause or unpause the owner's items to fit what they hold now."""
+        if self._over_limit is None:
+            return {}
+        return await self._over_limit.apply(user_id, await self.resolve_for(user_id))
+
     # ── Write ────────────────────────────────────────────────────────────
 
     async def transition(
@@ -150,7 +164,7 @@ class EntitlementService:
         after_status = next_status(before.status if before else None, event)
         if after_status is SubscriptionStatus.GRACE and "grace_until" not in fields:
             raise ValueError("a transition to grace needs grace_until")
-        return await self._subs.write_transition(
+        after = await self._subs.write_transition(
             user_id,
             before=before,
             after_status=after_status,
@@ -159,3 +173,14 @@ class EntitlementService:
             reason=reason,
             now=now,
         )
+        before_plan = before.effective_plan if before else Plan.FREE
+        if after.effective_plan != before_plan:
+            # The transition is already durable; a failed pause is retried by
+            # the lifecycle tick, not by failing the caller.
+            try:
+                await self.reconcile_over_limit(user_id)
+            except Exception as e:
+                log.error(
+                    "over_limit_reconcile_failed", user_id=str(user_id), error=str(e)
+                )
+        return after

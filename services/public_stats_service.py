@@ -31,7 +31,7 @@ this service never writes.
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from bson import ObjectId
@@ -40,16 +40,18 @@ from errors import (
     InvalidPasswordError,
     NotFoundError,
     PasswordRequiredError,
-    ValidationError,
 )
 from infrastructure.crypto import verify_password
 from infrastructure.logging import get_logger
 from schemas.enums.stats import StatsScope
+from schemas.models.base import ANONYMOUS_OWNER_ID
 from schemas.models.url import LegacyUrlDoc, UrlV2Doc
+from services.entitlements import EntitlementService
+from services.feature_flag_service import DOMAIN_POLISH_FLAG, FeatureFlagService
+from services.features.catalog import Plan, plan_defaults
 from services.public_link_resolver import PublicLinkResolver, ResolvedPublicLink
 from services.stats_service import StatsService
 from shared.aggregation_strategies import convert_country_name
-from shared.datetime_utils import parse_datetime
 
 log = get_logger(__name__)
 
@@ -74,19 +76,21 @@ class PublicStatsService:
         resolver:            The shared public-link resolver (resolution,
                              raw v1 reads, derived status, created_at).
         stats_service:       The shared StatsService (v2 aggregation reuse).
-        max_date_range_days: Maximum allowed date range in days.
+        entitlements:        Resolves the owner's plan: the analytics window
+                             the page may show and whether it is whitelabel.
     """
 
     def __init__(
         self,
         resolver: PublicLinkResolver,
         stats_service: StatsService,
-        *,
-        max_date_range_days: int = 90,
+        entitlements: EntitlementService,
+        flags: FeatureFlagService,
     ) -> None:
         self._resolver = resolver
         self._stats = stats_service
-        self._max_date_range_days = max_date_range_days
+        self._entitlements = entitlements
+        self._flags = flags
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -168,15 +172,33 @@ class PublicStatsService:
                 )
                 raise InvalidPasswordError("incorrect password")
 
-        window_start, window_end, tz_name = self._resolve_window(
-            start_date, end_date, tz_name
+        owner = doc.owner_id if is_v2 else None
+        if not owner or owner == ANONYMOUS_OWNER_ID:
+            owner = None
+        plan = await self._entitlements.resolve_for(owner)
+        whitelabel = bool(owner) and plan.has("domain_polish")
+        if whitelabel:
+            whitelabel = await self._flags.is_enabled_for_owner(
+                DOMAIN_POLISH_FLAG, owner
+            )
+        # Only the owner gets the plan's window; a public visitor's facet
+        # stays sized for the anonymous rate budget.
+        window_days = (
+            plan.limit("analytics_window_days")
+            if is_owner
+            else plan_defaults(Plan.FREE)["analytics_window_days"]
+        )
+        window_start, window_end, tz_name, clamped = self._resolve_window(
+            start_date, end_date, tz_name, window_days
         )
 
         status = link.effective_status()
         facts = self._link_facts(link, doc, status, is_owner=is_owner)
 
         if is_v2:
-            stats = await self._query_v2_stats(doc, window_start, window_end, tz_name)
+            stats = await self._query_v2_stats(
+                doc, window_start, window_end, tz_name, clamped=clamped
+            )
         else:
             stats = self._synthesize_v1_stats(
                 doc, link.alias, window_start, window_end, tz_name
@@ -195,7 +217,12 @@ class PublicStatsService:
             duration_ms=duration_ms,
         )
 
-        return {"generation": link.generation, "link": facts, "stats": stats}
+        return {
+            "generation": link.generation,
+            "link": facts,
+            "stats": stats,
+            "whitelabel": whitelabel,
+        }
 
     # ── Private: gates and derived facts ──────────────────────────────────────
 
@@ -242,37 +269,13 @@ class PublicStatsService:
         start_raw: str | None,
         end_raw: str | None,
         tz_name: str,
-    ) -> tuple[datetime, datetime, str]:
-        """Defaults and validation mirroring StatsService.query."""
-        start = parse_datetime(start_raw) if start_raw else None
-        if start_raw and start is None:
-            raise ValidationError("invalid start_date format")
-        end = parse_datetime(end_raw) if end_raw else None
-        if end_raw and end is None:
-            raise ValidationError("invalid end_date format")
-
-        now = datetime.now(timezone.utc)
-        if start is None and end is None:
-            end = now
-            start = now - timedelta(days=7)
-        elif start is None:
-            start = end - timedelta(days=7)
-        elif end is None:
-            end = now
-
-        if start > now:
-            start = now
-        if end > now:
-            end = now
-
-        if start > end:
-            raise ValidationError("start_date must be before end_date")
-        if (end - start).days > self._max_date_range_days:
-            raise ValidationError(
-                f"date range cannot exceed {self._max_date_range_days} days"
-            )
-
-        return start, end, self._stats.normalize_timezone(tz_name)
+        window_days: int,
+    ) -> tuple[datetime, datetime, str, bool]:
+        """The dashboard's window rules, then the normalized timezone."""
+        start, end, clamped = self._stats.resolve_window(
+            start_raw, end_raw, window_days
+        )
+        return start, end, self._stats.normalize_timezone(tz_name), clamped
 
     # ── Private: v2 stats (StatsService reuse, scoped by url_id) ─────────────
 
@@ -282,6 +285,8 @@ class PublicStatsService:
         start_date: datetime,
         end_date: datetime,
         tz_name: str,
+        *,
+        clamped: bool = False,
     ) -> dict[str, Any]:
         """Run the standard $facet aggregation scoped by ``meta.url_id``.
 
@@ -301,6 +306,7 @@ class PublicStatsService:
             group_by=_V2_GROUP_BY,
             metrics=_METRICS,
             tz_name=tz_name,
+            clamped=clamped,
         )
 
     # ── Private: v1/emoji stats (synthesized from the embedded doc) ──────────

@@ -94,6 +94,7 @@ def _int(
 
 _ENTRIES: tuple[Feature, ...] = (
     _bool("geo_targeting", rollout="geo_targeting", free=False, lapse=Lapse.DISABLE),
+    # Edge KV keeps an already-written card for up to its TTL after a lapse.
     _bool(
         "custom_meta_tags", rollout="custom_meta_tags", free=False, lapse=Lapse.DISABLE
     ),

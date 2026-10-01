@@ -247,3 +247,35 @@ class TestUsage:
         )
         assert await svc.usage_for(UID) == {"custom_domains_max": 2}
         counter.assert_awaited_once_with(UID)
+
+
+class TestOverLimitHook:
+    @pytest.mark.asyncio
+    async def test_plan_change_reconciles_over_limit(self):
+        svc, _, _, _, cache = _service(sub=_sub(SubscriptionStatus.ACTIVE))
+        over_limit = AsyncMock()
+        over_limit.apply = AsyncMock(return_value={"custom_domains_max": ["x"]})
+        svc._over_limit = over_limit
+        cache.get = AsyncMock(return_value=None)
+
+        await svc.transition(UID, SubscriptionEvent.ENDED, actor="ops", reason="refund")
+
+        over_limit.apply.assert_awaited_once()
+        assert over_limit.apply.await_args.args[0] == UID
+
+    @pytest.mark.asyncio
+    async def test_same_plan_transition_does_not_reconcile(self):
+        svc, *_ = _service(sub=_sub(SubscriptionStatus.ACTIVE))
+        over_limit = AsyncMock()
+        svc._over_limit = over_limit
+
+        await svc.transition(
+            UID, SubscriptionEvent.PAYMENT_FAILED, actor="paddle", reason="declined"
+        )
+
+        over_limit.apply.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_over_limit_for_is_empty_without_the_service(self):
+        svc, *_ = _service()
+        assert await svc.over_limit_for(UID) == {}

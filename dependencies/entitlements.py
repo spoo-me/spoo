@@ -29,6 +29,7 @@ async def get_entitlements(
         user.user_id if user else None,
         plan_hint=user.plan_claim if user else None,
     )
+    request.state.entitlements = resolved
     if user is not None and not resolved.degraded:
         request.state.entitlements_version = resolved.version
     return resolved

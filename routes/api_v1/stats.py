@@ -21,12 +21,13 @@ from fastapi import APIRouter, Depends, Path, Query, Request
 from dependencies import (
     STATS_SCOPES,
     CurrentUser,
+    Entitled,
     StatsSvc,
     UrlSvc,
     require_scopes,
 )
 from middleware.openapi import ERROR_RESPONSES
-from middleware.rate_limiter import Limits, limiter
+from middleware.rate_limiter import Limits, limiter, plan_scaled
 from routes.api_v1._helpers import parse_url_id
 from schemas.dto.requests.stats import LinkStatsQuery, StatsQuery
 from schemas.dto.responses.stats import LinkStatsResponse, StatsResponse
@@ -40,9 +41,10 @@ router = APIRouter(tags=["Statistics"])
     operation_id="getStats",
     summary="URL Statistics",
 )
-@limiter.limit(Limits.API_AUTHED)
+@limiter.limit(plan_scaled(Limits.API_AUTHED))
 async def stats_v1(
     request: Request,
+    entitlements: Entitled,
     query: Annotated[StatsQuery, Query()],
     stats_service: StatsSvc,
     user: CurrentUser = Depends(require_scopes(STATS_SCOPES)),  # noqa: B008
@@ -70,7 +72,11 @@ async def stats_v1(
     `url_id` values you do not own simply match nothing. For statistics on
     a single link, prefer `GET /stats/links/{url_id}`.
     """
-    result = await stats_service.query(query, str(user.user_id))
+    result = await stats_service.query(
+        query,
+        str(user.user_id),
+        window_days=entitlements.limit("analytics_window_days"),
+    )
     return StatsResponse.model_validate(result)
 
 
@@ -80,9 +86,10 @@ async def stats_v1(
     operation_id="getLinkStats",
     summary="Link Statistics",
 )
-@limiter.limit(Limits.API_AUTHED)
+@limiter.limit(plan_scaled(Limits.API_AUTHED))
 async def link_stats_v1(
     request: Request,
+    entitlements: Entitled,
     url_id: Annotated[
         str,
         Path(description="Unique identifier of the URL (MongoDB ObjectId)."),
@@ -123,5 +130,7 @@ async def link_stats_v1(
     """
     oid = parse_url_id(url_id)
     url = await url_service.get_owned(oid, user.user_id)
-    result = await stats_service.query_link(query, url)
+    result = await stats_service.query_link(
+        query, url, window_days=entitlements.limit("analytics_window_days")
+    )
     return LinkStatsResponse.model_validate(result)

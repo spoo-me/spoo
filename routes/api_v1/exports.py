@@ -16,12 +16,13 @@ from fastapi.responses import Response
 from dependencies import (
     STATS_SCOPES,
     CurrentUser,
+    Entitled,
     ExportSvc,
     UrlSvc,
     require_scopes,
 )
 from middleware.openapi import EXPORT_RESPONSES
-from middleware.rate_limiter import Limits, limiter
+from middleware.rate_limiter import Limits, limiter, plan_scaled
 from routes.api_v1._helpers import parse_url_id
 from schemas.dto.requests.stats import ExportQuery, LinkExportQuery
 
@@ -59,11 +60,12 @@ _EXPORT_200_RESPONSES = {
     operation_id="exportStats",
     summary="Export Statistics",
 )
-@limiter.limit(Limits.API_EXPORT_AUTHED)
+@limiter.limit(plan_scaled(Limits.API_EXPORT_AUTHED))
 async def export_v1(
     request: Request,
     query: Annotated[ExportQuery, Query()],
     export_service: ExportSvc,
+    entitlements: Entitled,
     user: CurrentUser = Depends(require_scopes(STATS_SCOPES)),  # noqa: B008
 ) -> Response:
     """Export click statistics across all URLs you own as a downloadable file.
@@ -105,7 +107,7 @@ async def export_v1(
     operation_id="exportLinkStats",
     summary="Export Link Statistics",
 )
-@limiter.limit(Limits.API_EXPORT_AUTHED)
+@limiter.limit(plan_scaled(Limits.API_EXPORT_AUTHED))
 async def export_link_v1(
     request: Request,
     url_id: Annotated[
@@ -115,6 +117,7 @@ async def export_link_v1(
     query: Annotated[LinkExportQuery, Query()],
     export_service: ExportSvc,
     url_service: UrlSvc,
+    entitlements: Entitled,
     user: CurrentUser = Depends(require_scopes(STATS_SCOPES)),  # noqa: B008
 ) -> Response:
     """Export click statistics for a single URL you own.

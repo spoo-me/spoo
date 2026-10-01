@@ -25,6 +25,8 @@ class CustomDomainDoc(MongoBaseModel):
     # actually consumes it.
     verification_token: str | None = None
     is_system_default: bool = False
+    # Newest domains beyond the plan's limit stop serving until it grows.
+    paused_by_limit: bool = False
 
     created_at: datetime
     updated_at: datetime | None = None

@@ -158,6 +158,22 @@ class WebhookEndpointRepository(BaseRepository[WebhookEndpointDoc]):
     async def increment_dropped(self, endpoint_id: ObjectId) -> None:
         await self._update({"_id": endpoint_id}, {"$inc": {"dropped_count": 1}})
 
+    async def reactivate_over_limit(self, endpoint_id: ObjectId) -> bool:
+        """Lift an over-limit pause; any other disabled reason stays."""
+        return await self._update(
+            {
+                "_id": endpoint_id,
+                "disabled_reason": EndpointDisabledReason.OVER_LIMIT.value,
+            },
+            {
+                "$set": {
+                    "status": WebhookStatus.ACTIVE.value,
+                    "disabled_reason": None,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
+        )
+
     async def disable(
         self, endpoint_id: ObjectId, reason: EndpointDisabledReason
     ) -> bool:

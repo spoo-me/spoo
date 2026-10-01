@@ -10,12 +10,16 @@ from __future__ import annotations
 import hashlib
 import math
 import os
+import re
+from collections.abc import Callable
 
 from fastapi import Request
 from slowapi import Limiter
 from starlette.datastructures import MutableHeaders
 
 from infrastructure.logging import get_logger
+from services.entitlements.resolver import Resolved
+from services.features.catalog import UNLIMITED
 from shared.ip_utils import get_client_ip
 
 log = get_logger(__name__)
@@ -91,8 +95,8 @@ class Limits:
     # so the request budget must never make bulk scarcer than looping the
     # per-item routes — that would push clients back to the fan-out these
     # endpoints exist to kill. Per-minute is kept high for bursts (a mass
-    # takedown chunks at 100 ids/request); the daily cap is a lid, not a
-    # ration. Blast radius per request is bounded by the 100-id cap and
+    # takedown chunks at the plan's bulk_batch_max); the daily cap is a lid, not a
+    # ration. Blast radius per request is bounded by that batch cap and
     # ownership scoping, and each batch is ~4 local calls plus at most
     # one CF call, so these are cheap requests. Delete stays the tighter
     # pair because it is irreversible.
@@ -190,12 +194,26 @@ class Limits:
 # ── Key resolution ───────────────────────────────────────────────────────────
 
 
+# Plan multiplier suffix on the key, so slowapi counts each tier in its own
+# bucket and the limit function can scale the string it applies.
+_MULTIPLIER_SEP = "|x"
+# What "unlimited" means for a rate: still bounded, just far above any client.
+_UNLIMITED_MULTIPLIER = 1000
+
+
 def rate_limit_key(request: Request) -> str:
-    """Three-tier rate limit key: API key hash → JWT hash → client IP.
+    """Three-tier rate limit key: API key hash → JWT hash → client IP, plus
+    the caller's plan rate multiplier when the route resolved entitlements.
 
     Lightweight header inspection only — no DB queries, no JWT verification.
     Provides consistent per-session bucketing for rate limiting purposes.
     """
+    key = _identity_key(request)
+    multiplier = plan_multiplier(request)
+    return f"{key}{_MULTIPLIER_SEP}{multiplier}" if multiplier > 1 else key
+
+
+def _identity_key(request: Request) -> str:
     auth_header = request.headers.get("Authorization", "")
 
     if auth_header.lower().startswith("bearer "):
@@ -212,6 +230,49 @@ def rate_limit_key(request: Request) -> str:
         return f"jwt:{token_hash}"
 
     return get_client_ip(request)
+
+
+def plan_multiplier(request: Request) -> int:
+    """The ``api_rate_multiplier`` of the entitlements the ``Entitled``
+    dependency stored on this request; 1 when the route did not resolve them."""
+    resolved = getattr(request.state, "entitlements", None)
+    if not isinstance(resolved, Resolved):
+        return 1
+    value = resolved.limit("api_rate_multiplier")
+    if value == UNLIMITED:
+        return _UNLIMITED_MULTIPLIER
+    return value if value > 1 else 1
+
+
+def multiplier_of(key: str) -> int:
+    _, sep, suffix = key.rpartition(_MULTIPLIER_SEP)
+    return int(suffix) if sep and suffix.isdigit() else 1
+
+
+def scale_limit(limit: str, factor: int) -> str:
+    """``"60 per minute; 5000 per day"`` times ``factor`` on every count."""
+    if factor <= 1:
+        return limit
+    return "; ".join(
+        re.sub(r"^\d+", lambda m: str(int(m.group(0)) * factor), part.strip())
+        for part in limit.split(";")
+    )
+
+
+def plan_scaled(limit: str) -> Callable[[str], str]:
+    """Limit callable for ``@limiter.limit``: the base string scaled by the
+    plan multiplier carried on the key. The route must declare ``Entitled``
+    so the multiplier is known before the limiter runs.
+
+    Scaled: the per-request API budgets an integration spends on links,
+    stats and exports. Flat: auth, keys, domains, webhooks and bulk, which
+    are admin actions (bulk already scales through ``bulk_batch_max``).
+    """
+
+    def _limit(key: str) -> str:
+        return scale_limit(limit, multiplier_of(key))
+
+    return _limit
 
 
 # ── Limiter singleton ────────────────────────────────────────────────────────
@@ -306,7 +367,7 @@ def dynamic_limit(authenticated: str, anonymous: str) -> tuple:
 
     def _limit(key: str) -> str:
         if key.startswith("apikey:") or key.startswith("jwt:"):
-            return authenticated
+            return scale_limit(authenticated, multiplier_of(key))
         return anonymous
 
     return _limit, rate_limit_key

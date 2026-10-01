@@ -74,6 +74,12 @@ class ApiKeyRepository(BaseRepository[ApiKeyDoc]):
         """
         return await self._delete_many({"user_id": user_id})
 
+    async def set_paused_by_limit(self, ids: list[ObjectId], paused: bool) -> int:
+        result = await self._col.update_many(
+            {"_id": {"$in": ids}}, {"$set": {"paused_by_limit": paused}}
+        )
+        return result.modified_count
+
     async def count_by_user(self, user_id: ObjectId) -> int:
         """Count active (non-revoked) API keys for a user."""
         return await self._count({"user_id": user_id, "revoked": {"$ne": True}})

@@ -65,10 +65,25 @@ class TestBulkDeleteRoute:
         assert resp.status_code == 422
         mock_svc.bulk_delete.assert_not_awaited()
 
-    def test_over_cap_is_422(self):
+    def test_over_plan_batch_is_403_limit_reached(self):
+        # The free plan's bulk_batch_max is 100; the DTO cap is the pro max.
         user = _make_user()
         mock_svc = AsyncMock()
         ids = [f"{i:024x}" for i in range(101)]
+        with _client(mock_svc, user) as client:
+            resp = client.post("/api/v1/urls/bulk/delete", json={"ids": ids})
+        assert resp.status_code == 403
+        body = resp.json()
+        assert body["code"] == "limit_reached"
+        assert body["limit"] == "bulk_batch_max"
+        assert body["max"] == 100
+        assert body["current"] == 101
+        mock_svc.bulk_delete.assert_not_awaited()
+
+    def test_over_dto_cap_is_422(self):
+        user = _make_user()
+        mock_svc = AsyncMock()
+        ids = [f"{i:024x}" for i in range(1001)]
         with _client(mock_svc, user) as client:
             resp = client.post("/api/v1/urls/bulk/delete", json={"ids": ids})
         assert resp.status_code == 422

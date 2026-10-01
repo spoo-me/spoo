@@ -26,11 +26,12 @@ from dependencies import (
     DOMAIN_READ_SCOPES,
     CurrentUser,
     CustomDomainSvc,
+    Entitled,
     FeatureFlagSvc,
     require_scopes,
     require_scopes_verified,
 )
-from errors import NotFoundError
+from errors import NotFoundError, PlanRequiredError
 from middleware.openapi import AUTH_RESPONSES, ERROR_RESPONSES
 from middleware.rate_limiter import Limits, limiter
 from schemas.dto.requests.custom_domain import (
@@ -43,6 +44,7 @@ from schemas.dto.responses.custom_domain import (
     CustomDomainListResponse,
     CustomDomainResponse,
 )
+from services.entitlements import Resolved
 from services.feature_flag_service import CUSTOM_DOMAINS_FLAG
 
 router = APIRouter(tags=["Custom Domains"])
@@ -61,10 +63,12 @@ def _parse_domain_id(domain_id: str) -> ObjectId:
         raise NotFoundError("domain not found") from None
 
 
-async def _require_create_enabled(flag_svc: FeatureFlagSvc, user: CurrentUser) -> None:
-    """Flag gate for CREATE. 404 (not 403) — don't leak feature existence."""
-    if not await flag_svc.is_enabled(_FEATURE_FLAG, user):
-        raise NotFoundError("not found")
+async def _require_create_enabled(
+    flag_svc: FeatureFlagSvc, user: CurrentUser, entitlements: Resolved
+) -> None:
+    """Flag off: 404, so the feature's existence never leaks. Flag on but
+    not in the plan: 403 ``plan_required``, the client already sees LOCKED."""
+    await flag_svc.require(_FEATURE_FLAG, user, entitlements=entitlements, hide=True)
 
 
 @router.post(
@@ -80,6 +84,7 @@ async def create_custom_domain(
     body: CreateCustomDomainRequest,
     service: CustomDomainSvc,
     flag_svc: FeatureFlagSvc,
+    entitlements: Entitled,
     user: CurrentUser = Depends(require_scopes_verified(DOMAIN_MANAGE_SCOPES)),  # noqa: B008
 ) -> CustomDomainResponse:
     """Register a new custom domain for branded short links.
@@ -95,11 +100,14 @@ async def create_custom_domain(
 
     **Feature gate**: Must be enabled for the calling user.
 
-    **Rate Limits**: 10/hour (route, failed attempts count) + `max_per_user`
-    owned domains (service quota, any status).
+    **Rate Limits**: 10/hour (route, failed attempts count). Owned domains
+    (any status) count against the plan's `custom_domains_max`; a full
+    limit answers 403 `limit_reached`.
     """
-    await _require_create_enabled(flag_svc, user)
-    doc = await service.create(body, user)
+    await _require_create_enabled(flag_svc, user, entitlements)
+    doc = await service.create(
+        body, user, max_domains=entitlements.limit("custom_domains_max")
+    )
     return CustomDomainResponse.from_doc(doc)
 
 
@@ -205,6 +213,7 @@ async def update_custom_domain(
     domain_id: Annotated[str, Path(description="MongoDB ObjectId of the domain.")],
     body: UpdateCustomDomainRequest,
     service: CustomDomainSvc,
+    entitlements: Entitled,
     user: CurrentUser = Depends(require_scopes(DOMAIN_MANAGE_SCOPES)),  # noqa: B008
 ) -> CustomDomainResponse:
     """Update the per-domain routing config.
@@ -225,11 +234,18 @@ async def update_custom_domain(
 
     **Responses**:
     - 200 — updated; full domain response returned
-    - 403 — caller does not own this domain
+    - 403 — caller does not own this domain, or the plan lacks domain polish
     - 404 — domain not found (or invalid id)
     - 422 — domain isn't ACTIVE, or body fails validation
     """
     oid = _parse_domain_id(domain_id)
+    # Setting any routing value needs the entitlement (the endpoint itself is
+    # already behind custom_domains); clearing (null) never does.
+    if not entitlements.has("domain_polish") and any(
+        getattr(body, f) is not None
+        for f in ("root_redirect", "not_found_redirect", "custom_robots_txt")
+    ):
+        raise PlanRequiredError("domain_polish")
     doc = await service.update_routing(oid, user, body)
     return CustomDomainResponse.from_doc(doc)
 

@@ -56,6 +56,8 @@ from schemas.dto.requests.url import (
 )
 from services.edge_cache.contract import cache_key
 from services.edge_cache.og_writethrough import OgEdgeWritethrough
+from services.entitlements.lapse import apply_lapse_policies
+from services.entitlements.service import EntitlementService
 from services.events.contract import DomainEvent
 from services.events.protocol import DomainEventSink
 from services.events.sinks import NullDomainEventSink
@@ -111,6 +113,8 @@ from shared.validators import (
     validate_alias,
     validate_blocked_url,
 )
+
+_ANONYMOUS_OWNER = str(ANONYMOUS_OWNER_ID)
 
 log = get_logger(__name__)
 
@@ -579,7 +583,9 @@ class UrlService:
         events: DomainEventSink | None = None,
         user_repo: UserRepository | None = None,
         tag_service: TagService | None = None,
+        entitlements: EntitlementService | None = None,
     ) -> None:
+        self._entitlements = entitlements
         self._url_repo = url_repo
         self._legacy_repo = legacy_repo
         self._emoji_repo = emoji_repo
@@ -662,6 +668,9 @@ class UrlService:
         # 1. Cache hit
         cached = await self._url_cache.get(short_code, scope)
         if cached is not None:
+            cached = await self._with_owner_policies(
+                cached, short_code, scope, from_cache=True
+            )
             schema = cached.schema_version
             # BLOCKED raises on every schema (v1/emoji carry the safety
             # flag); EXPIRED/INACTIVE only exist on v2.
@@ -700,6 +709,9 @@ class UrlService:
         if url_cache_data is None:
             log.info("url_resolve_not_found", short_code=short_code, domain=scope)
             raise NotFoundError("URL not found")
+        url_cache_data = await self._with_owner_policies(
+            url_cache_data, short_code, scope, from_cache=False
+        )
 
         # 3. Populate cache according to caching rules
         await self._populate_cache(short_code, url_cache_data, schema)
@@ -740,6 +752,45 @@ class UrlService:
         _raise_if_not_yet_live(url_cache_data, short_code, "db")
 
         return url_cache_data, schema
+
+    async def _with_owner_policies(
+        self,
+        data: UrlCacheData,
+        short_code: str,
+        scope: str,
+        *,
+        from_cache: bool,
+    ) -> UrlCacheData:
+        """Shape an owned v2 link by its owner's current entitlements.
+
+        A cache entry carries the owner version it was shaped under; on a
+        match it is served as-is (one Redis GET for the owner map). On a
+        mismatch the document is re-read, the lapse policies applied, and
+        the entry rewritten. When the resolver is degraded the entry is
+        served as-is: the last known behaviour beats a guess.
+        """
+        if (
+            self._entitlements is None
+            or data.schema_version != SchemaVersion.V2
+            or not data.owner_id
+            or data.owner_id == _ANONYMOUS_OWNER
+        ):
+            return data
+        resolved = await self._entitlements.resolve_for(ObjectId(data.owner_id))
+        if resolved.degraded:
+            log.warning("entitlements_degraded", path="redirect", short_code=short_code)
+            return data
+        if from_cache:
+            if data.owner_ent_version == resolved.version:
+                return data
+            doc = await self._url_repo.find_by_alias(short_code, scope)
+            if doc is None:
+                return data
+            data = UrlCacheData.from_v2_doc(doc)
+        shaped = apply_lapse_policies(data, resolved)
+        if from_cache:
+            await self._url_cache.set(short_code, shaped)
+        return shaped
 
     async def _raise_if_time_expired(
         self, data: UrlCacheData, schema: SchemaVersion, short_code: str, source: str

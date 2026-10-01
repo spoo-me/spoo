@@ -29,6 +29,9 @@ from schemas.dto.responses.public_preview import (
     PreviewVariantDestination,
     PublicPreviewResponse,
 )
+from schemas.models.base import ANONYMOUS_OWNER_ID
+from services.entitlements import EntitlementService
+from services.feature_flag_service import DOMAIN_POLISH_FLAG, FeatureFlagService
 from services.public_link_resolver import PublicLinkResolver, ResolvedPublicLink
 from shared.datetime_utils import to_unix_timestamp
 from shared.url_utils import split_destination
@@ -39,8 +42,15 @@ log = get_logger(__name__)
 class PublicPreviewService:
     """Derivation of the public link preview wire over the shared resolver."""
 
-    def __init__(self, resolver: PublicLinkResolver) -> None:
+    def __init__(
+        self,
+        resolver: PublicLinkResolver,
+        entitlements: EntitlementService,
+        flags: FeatureFlagService,
+    ) -> None:
         self._resolver = resolver
+        self._entitlements = entitlements
+        self._flags = flags
 
     # ── Public API ────────────────────────────────────────────────────────
 
@@ -54,9 +64,15 @@ class PublicPreviewService:
         if link is None:
             log.info("public_preview_not_found", short_code=short_code)
             raise NotFoundError("short_code not found")
-        if link.is_v2:
-            return self._v2_preview(link)
-        return self._v1_preview(link)
+        preview = self._v2_preview(link) if link.is_v2 else self._v1_preview(link)
+        owner = link.v2_doc.owner_id if link.is_v2 else None
+        if not owner or owner == ANONYMOUS_OWNER_ID:
+            return preview
+        plan = await self._entitlements.resolve_for(owner)
+        whitelabel = plan.has(
+            "domain_polish"
+        ) and await self._flags.is_enabled_for_owner(DOMAIN_POLISH_FLAG, owner)
+        return preview.model_copy(update={"whitelabel": whitelabel})
 
     # ── v2 derivation ─────────────────────────────────────────────────────
 

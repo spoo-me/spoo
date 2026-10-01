@@ -47,6 +47,8 @@ class PublicStatsResponse(ResponseBase):
     # "v1" — they carry v1-shaped (lifetime-dimension) analytics.
     generation: Literal["v1", "v2"]
     link: PublicLinkFacts
+    # The owner's plan strips the spoo.me chrome from the public page.
+    whitelabel: bool = False
     stats: dict[str, Any] = Field(
         description=(
             "The modern stats wire shape (same as GET /api/v1/stats): "

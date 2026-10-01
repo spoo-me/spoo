@@ -11,11 +11,12 @@ from datetime import datetime, timezone
 
 from bson import ObjectId
 
-from errors import EmailNotVerifiedError, ValidationError
+from errors import EmailNotVerifiedError, LimitReachedError
 from infrastructure.crypto import hash_token
 from infrastructure.logging import get_logger
 from repositories.api_key_repository import ApiKeyRepository
 from schemas.models.api_key import ApiKeyDoc
+from services.features.catalog import UNLIMITED
 from shared.generators import generate_secure_token
 
 log = get_logger(__name__)
@@ -25,10 +26,8 @@ class ApiKeyService:
     def __init__(
         self,
         api_key_repo: ApiKeyRepository,
-        max_active_keys: int = 20,
     ) -> None:
         self._repo = api_key_repo
-        self._max_active_keys = max_active_keys
 
     async def create(
         self,
@@ -38,6 +37,8 @@ class ApiKeyService:
         email_verified: bool,
         description: str | None = None,
         expires_at: datetime | None = None,
+        *,
+        max_keys: int,
     ) -> tuple[ApiKeyDoc, str]:
         """Create a new API key.
 
@@ -57,17 +58,18 @@ class ApiKeyService:
             )
             raise EmailNotVerifiedError("Email verification required")
 
-        active_count = await self._repo.count_by_user(user_id)
-        if active_count >= self._max_active_keys:
-            log.info(
-                "api_key_create_rejected",
-                reason="max_limit_reached",
-                user_id=str(user_id),
-                count=active_count,
-            )
-            raise ValidationError(
-                f"maximum {self._max_active_keys} active keys allowed"
-            )
+        if max_keys != UNLIMITED:
+            active_count = await self._repo.count_by_user(user_id)
+            if active_count >= max_keys:
+                log.info(
+                    "api_key_create_rejected",
+                    reason="max_limit_reached",
+                    user_id=str(user_id),
+                    count=active_count,
+                )
+                raise LimitReachedError(
+                    "api_keys_max", max_=max_keys, current=active_count
+                )
 
         raw = generate_secure_token()
         token_prefix = raw[:8]

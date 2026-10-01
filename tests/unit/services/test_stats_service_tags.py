@@ -47,7 +47,7 @@ class TestTagScope:
         svc, click_repo, url_repo, _ = _svc()
         url_repo.list_ids_by_owner_and_tag_ids.return_value = [A, B]
 
-        await svc.query(query=_q(tag_id=str(T1)), owner_id=OWNER_ID)
+        await svc.query(query=_q(tag_id=str(T1)), owner_id=OWNER_ID, window_days=90)
 
         url_repo.list_ids_by_owner_and_tag_ids.assert_awaited_once_with(
             ObjectId(OWNER_ID), [T1]
@@ -62,7 +62,9 @@ class TestTagScope:
         svc, _, url_repo, tag_service = _svc([_tag(T2, "launch")])
         url_repo.list_ids_by_owner_and_tag_ids.return_value = [A]
 
-        await svc.query(query=_q(tag="Launch", tag_id=str(T1)), owner_id=OWNER_ID)
+        await svc.query(
+            query=_q(tag="Launch", tag_id=str(T1)), owner_id=OWNER_ID, window_days=90
+        )
 
         tag_service.ids_for_names.assert_awaited_once_with(
             ObjectId(OWNER_ID), ["launch"]
@@ -75,7 +77,7 @@ class TestTagScope:
     async def test_unknown_name_matches_nothing(self):
         svc, click_repo, url_repo, _ = _svc([])
 
-        await svc.query(query=_q(tag="ghost"), owner_id=OWNER_ID)
+        await svc.query(query=_q(tag="ghost"), owner_id=OWNER_ID, window_days=90)
 
         url_repo.list_ids_by_owner_and_tag_ids.assert_not_called()
         assert _match(click_repo)["meta.url_id"] == {"$in": [NOTHING]}
@@ -85,7 +87,7 @@ class TestTagScope:
         svc, click_repo, url_repo, _ = _svc()
         url_repo.list_ids_by_owner_and_tag_ids.return_value = []
 
-        await svc.query(query=_q(tag_id=str(T1)), owner_id=OWNER_ID)
+        await svc.query(query=_q(tag_id=str(T1)), owner_id=OWNER_ID, window_days=90)
 
         assert _match(click_repo)["meta.url_id"] == {"$in": [NOTHING]}
 
@@ -94,7 +96,9 @@ class TestTagScope:
         svc, click_repo, url_repo, _ = _svc()
         url_repo.list_ids_by_owner_and_tag_ids.return_value = [A, B]
 
-        await svc.query(query=_q(tag_id=str(T1), url_id=str(B)), owner_id=OWNER_ID)
+        await svc.query(
+            query=_q(tag_id=str(T1), url_id=str(B)), owner_id=OWNER_ID, window_days=90
+        )
 
         assert _match(click_repo)["meta.url_id"] == {"$in": [B]}
 
@@ -103,7 +107,9 @@ class TestTagScope:
         svc, _, url_repo, _ = _svc()
         url_repo.list_ids_by_owner_and_tag_ids.return_value = [A]
 
-        resp = await svc.query(query=_q(tag_id=str(T1)), owner_id=OWNER_ID)
+        resp = await svc.query(
+            query=_q(tag_id=str(T1)), owner_id=OWNER_ID, window_days=90
+        )
 
         assert resp["filters"] == {"tag_id": [str(T1)]}
 
@@ -111,7 +117,7 @@ class TestTagScope:
     async def test_no_tag_filter_skips_resolution(self):
         svc, _, url_repo, tag_service = _svc()
 
-        await svc.query(query=_q(), owner_id=OWNER_ID)
+        await svc.query(query=_q(), owner_id=OWNER_ID, window_days=90)
 
         url_repo.list_ids_by_owner_and_tag_ids.assert_not_called()
         tag_service.ids_for_names.assert_not_called()

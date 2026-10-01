@@ -20,7 +20,12 @@ import pytest
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import get_current_user, get_feature_flag_service, get_webhook_service
+from dependencies import (
+    get_current_user,
+    get_entitlements,
+    get_feature_flag_service,
+    get_webhook_service,
+)
 from errors import ForbiddenError
 from infrastructure.safe_fetch import PostResult
 from middleware.rate_limiter import limiter
@@ -31,6 +36,8 @@ from schemas.models.webhook import (
     WebhookEndpointDoc,
     WebhookEventDoc,
 )
+from services.entitlements import for_plan
+from services.features.catalog import Plan, plan_defaults
 from services.webhooks import DeliveryExecutor, OwnerSubscriptionCache, WebhookService
 from services.webhooks.renderers import default_renderers
 from services.webhooks.signing import verify
@@ -271,12 +278,12 @@ class _FakeEventRepo:
 
 
 class _AllowFlags:
-    async def require(self, name, user):
+    async def require(self, name, user, **kwargs):
         return None
 
 
 class _DenyFlags:
-    async def require(self, name, user):
+    async def require(self, name, user, **kwargs):
         raise ForbiddenError("This feature is not available on your account")
 
 
@@ -284,6 +291,14 @@ class _DenyFlags:
 
 
 def _build(max_endpoints: int = 5, flags: Any | None = None):
+    entitlements = for_plan(Plan.PRO).model_copy(
+        update={
+            "values": {
+                **plan_defaults(Plan.PRO),
+                "webhook_endpoints_max": max_endpoints,
+            }
+        }
+    )
     endpoint_repo = _FakeEndpointRepo()
     delivery_repo = _FakeDeliveryRepo()
     event_repo = _FakeEventRepo()
@@ -301,7 +316,6 @@ def _build(max_endpoints: int = 5, flags: Any | None = None):
         executor,
         OwnerSubscriptionCache(None, ttl_seconds=60),
         master_secret=_MASTER,
-        max_endpoints=max_endpoints,
     )
     user = _make_user()
     app = build_test_app(
@@ -310,6 +324,7 @@ def _build(max_endpoints: int = 5, flags: Any | None = None):
             get_webhook_service: lambda: service,
             get_current_user: lambda: user,
             get_feature_flag_service: lambda: flags or _AllowFlags(),
+            get_entitlements: lambda: entitlements,
         },
     )
     return app, user, endpoint_repo, delivery_repo
@@ -371,8 +386,12 @@ def test_create_over_quota_rejected():
     with _NO_SSRF, TestClient(app) as c:
         assert c.post(_URL, json=_create_body()).status_code == 201
         resp = c.post(_URL, json=_create_body())
-    assert resp.status_code == 400
-    assert "limit" in resp.json()["error"].lower()
+    assert resp.status_code == 403
+    body = resp.json()
+    assert body["code"] == "limit_reached"
+    assert body["limit"] == "webhook_endpoints_max"
+    assert body["max"] == 1
+    assert body["current"] == 1
 
 
 def test_create_rejects_non_https_url():

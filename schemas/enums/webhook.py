@@ -33,3 +33,5 @@ class EndpointDisabledReason(str, Enum):
     # delivery would fail identically, so the endpoint is disabled loudly.
     SECRET_UNREADABLE = "secret_unreadable"
     ADMIN = "admin"
+    # Newest endpoints beyond the plan's limit; lifted when the limit grows.
+    OVER_LIMIT = "over_limit"

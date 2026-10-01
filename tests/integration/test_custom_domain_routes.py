@@ -22,6 +22,7 @@ from dependencies import (
     CurrentUser,
     get_current_user,
     get_custom_domain_service,
+    get_entitlements,
     get_feature_flag_service,
 )
 from errors import (
@@ -33,6 +34,9 @@ from errors import (
 from routes.api_v1 import router as api_v1_router
 from schemas.enums.domain_status import DomainStatus, VerificationMethod
 from schemas.models.custom_domain import CustomDomainDoc
+from services.entitlements import for_plan
+from services.feature_flag_service import FeatureFlagService
+from services.features.catalog import Plan
 from tests.conftest import build_test_app
 
 _USER_ID = ObjectId()
@@ -62,12 +66,18 @@ def _doc(**overrides) -> CustomDomainDoc:
 
 
 def _flag_svc(enabled: bool = True):
-    svc = AsyncMock()
-    svc.is_enabled = AsyncMock(return_value=enabled)
+    """Real service with only the flag lookup faked, so ``require`` keeps
+    its real semantics: flag off hides the endpoint with a 404."""
+    svc = FeatureFlagService.__new__(FeatureFlagService)
+
+    async def _is_enabled(name, user):
+        return enabled
+
+    svc.is_enabled = _is_enabled  # type: ignore[method-assign]
     return svc
 
 
-def _make_app(svc_mock, flag_enabled=True, current_user=None):
+def _make_app(svc_mock, flag_enabled=True, current_user=None, plan=Plan.PRO):
     """Wire test app, overriding get_current_user so the real auth dependency
     chain (require_auth → require_scopes → require_scopes_verified) executes
     against the stub user. Lets us exercise the scope and email-verified
@@ -79,11 +89,31 @@ def _make_app(svc_mock, flag_enabled=True, current_user=None):
             get_current_user: lambda: user,
             get_custom_domain_service: lambda: svc_mock,
             get_feature_flag_service: lambda: _flag_svc(flag_enabled),
+            get_entitlements: lambda: for_plan(plan),
         },
     )
 
 
 class TestCreateCustomDomain:
+    def test_free_plan_gets_403_plan_required_not_404(self):
+        svc = AsyncMock()
+        client = TestClient(
+            _make_app(svc, plan=Plan.FREE), raise_server_exceptions=False
+        )
+        resp = client.post("/api/v1/custom-domains", json={"fqdn": "links.acme.com"})
+        assert resp.status_code == 403
+        assert resp.json()["code"] == "plan_required"
+        assert resp.json()["feature"] == "custom_domains"
+        svc.create.assert_not_awaited()
+
+    def test_limit_is_passed_from_the_plan(self):
+        svc = AsyncMock()
+        svc.create = AsyncMock(return_value=_doc())
+        client = TestClient(_make_app(svc), raise_server_exceptions=False)
+        resp = client.post("/api/v1/custom-domains", json={"fqdn": "links.acme.com"})
+        assert resp.status_code == 201
+        assert svc.create.await_args.kwargs["max_domains"] == 5
+
     def test_happy_path(self):
         svc = AsyncMock()
         svc.create = AsyncMock(return_value=_doc())
@@ -259,6 +289,44 @@ class TestListCustomDomains:
             _make_app(svc, flag_enabled=False), raise_server_exceptions=False
         )
         resp = client.get("/api/v1/custom-domains")
+        assert resp.status_code == 200
+
+
+class TestUpdateCustomDomain:
+    def test_free_plan_gets_403_plan_required(self):
+        svc = AsyncMock()
+        client = TestClient(
+            _make_app(svc, plan=Plan.FREE), raise_server_exceptions=False
+        )
+        resp = client.patch(
+            f"/api/v1/custom-domains/{_DOMAIN_ID}",
+            json={"root_redirect": "https://acme.com/"},
+        )
+        assert resp.status_code == 403
+        assert resp.json()["code"] == "plan_required"
+        assert resp.json()["feature"] == "domain_polish"
+        svc.update_routing.assert_not_awaited()
+
+    def test_clearing_is_never_gated(self):
+        svc = AsyncMock()
+        svc.update_routing = AsyncMock(return_value=_doc())
+        client = TestClient(
+            _make_app(svc, plan=Plan.FREE), raise_server_exceptions=False
+        )
+        resp = client.patch(
+            f"/api/v1/custom-domains/{_DOMAIN_ID}", json={"root_redirect": None}
+        )
+        assert resp.status_code == 200
+        svc.update_routing.assert_awaited_once()
+
+    def test_pro_plan_sets_routing(self):
+        svc = AsyncMock()
+        svc.update_routing = AsyncMock(return_value=_doc())
+        client = TestClient(_make_app(svc), raise_server_exceptions=False)
+        resp = client.patch(
+            f"/api/v1/custom-domains/{_DOMAIN_ID}",
+            json={"root_redirect": "https://acme.com/"},
+        )
         assert resp.status_code == 200
 
 

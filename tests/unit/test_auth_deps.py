@@ -789,3 +789,17 @@ class TestApiKeyHygiene:
             key_id=str(KEY_OID),
             user_id=str(USER_OID),
         )
+
+
+class TestPausedApiKey:
+    @pytest.mark.asyncio
+    async def test_paused_key_is_denied(self):
+        key = make_key_doc().model_copy(update={"paused_by_limit": True})
+        req = make_request(auth_header="Bearer spoo_rawtoken")
+        db = MagicMock()
+        with (
+            patch("dependencies.auth.get_settings", return_value=make_settings()),
+            patch("dependencies.auth.ApiKeyRepository") as repo_cls,
+        ):
+            repo_cls.return_value.find_by_hash = AsyncMock(return_value=key)
+            assert await get_current_user(req, db=db) is None

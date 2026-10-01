@@ -277,10 +277,6 @@ class TestCustomDomainSettings:
         monkeypatch.setenv("CUSTOM_DOMAINS_ENABLED", "true")
         assert CustomDomainSettings().enabled is True
 
-    def test_prefixed_max_per_user_overrides_default(self, monkeypatch):
-        monkeypatch.setenv("CUSTOM_DOMAINS_MAX_PER_USER", "10")
-        assert CustomDomainSettings().max_per_user == 10
-
 
 class TestWebhookSettingsGuard:
     def test_enabled_webhooks_require_secret_key(self, monkeypatch):

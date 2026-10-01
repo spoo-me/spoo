@@ -186,6 +186,17 @@ class TestRolloutAllowlist:
         assert await service.is_enabled("test_flag", _user(USER_B)) is False
 
     @pytest.mark.asyncio
+    async def test_owner_by_id_matches_the_id_allowlist_only(self):
+        flag = _flag(
+            rollout_type=RolloutType.ALLOWLIST,
+            allowlist_user_ids=[USER_A],
+            allowlist_emails=["bob@example.com"],
+        )
+        service, _, _ = make_service(flag=flag)
+        assert await service.is_enabled_for_owner("test_flag", USER_A) is True
+        assert await service.is_enabled_for_owner("test_flag", USER_B) is False
+
+    @pytest.mark.asyncio
     async def test_email_match_case_insensitive(self):
         flag = _flag(
             rollout_type=RolloutType.ALLOWLIST,

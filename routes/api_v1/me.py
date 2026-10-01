@@ -43,6 +43,7 @@ from schemas.dto.responses.account import AccountDeletionResponse
 from schemas.dto.responses.entitlements import (
     EntitlementsResponse,
     LimitBlock,
+    OverLimitBlock,
     PlanBlock,
 )
 from schemas.dto.responses.features import FeaturesResponse
@@ -152,6 +153,7 @@ async def get_my_entitlements(
     """
     features = await flag_service.states_for(user, entitlements)
     used = await entitlement_service.usage_for(user.user_id)
+    paused = await entitlement_service.over_limit_for(user.user_id)
     return EntitlementsResponse(
         version=entitlements.version,
         plan=PlanBlock(
@@ -165,6 +167,7 @@ async def get_my_entitlements(
             f.key: LimitBlock(max=entitlements.limit(f.key), used=used.get(f.key))
             for f in int_features()
         },
+        over_limit={k: OverLimitBlock(paused=v) for k, v in paused.items()},
     )
 
 
