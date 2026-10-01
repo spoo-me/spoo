@@ -30,20 +30,20 @@ from slowapi.errors import RateLimitExceeded
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import AppSettings
-from dependencies import get_db, get_redis, get_settings, get_url_service
-from errors import NotFoundError
-from infrastructure.cache.url_cache import UrlCacheData
-from middleware.error_handler import register_error_handlers
-from middleware.rate_limiter import limiter
-from routes.legacy.stats import router as legacy_stats_router
-from routes.legacy.url_shortener import router as legacy_url_router
+from app.config import AppSettings
+from app.dependencies import get_db, get_redis, get_settings, get_url_service
+from app.errors import NotFoundError
+from app.infrastructure.cache.url_cache import UrlCacheData
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.rate_limiter import limiter
+from app.routes.legacy.stats import router as legacy_stats_router
+from app.routes.legacy.url_shortener import router as legacy_url_router
 from tests.conftest import build_test_app
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 _STATIC_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static"
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "app", "static"
 )
 
 _SETTINGS = AppSettings()
@@ -51,8 +51,8 @@ _SETTINGS = AppSettings()
 
 def _build_legacy_test_app(overrides: dict) -> FastAPI:
     """Build a test app with legacy routers, injecting get_settings override."""
-    from dependencies import get_url_policy
-    from services.safety.policy import UrlPolicyService
+    from app.dependencies import get_url_policy
+    from app.services.safety.policy import UrlPolicyService
 
     # Always provide settings + a permissive L0 gate — several tests here
     # never enter the lifespan, so app.state is not populated.
@@ -152,7 +152,9 @@ def test_legacy_shorten_json_response():
     client = TestClient(app, raise_server_exceptions=False)
 
     with (
-        patch("routes.legacy.url_shortener.generate_short_code", return_value="gen123"),
+        patch(
+            "app.routes.legacy.url_shortener.generate_short_code", return_value="gen123"
+        ),
     ):
         resp = client.post(
             "/",
@@ -182,7 +184,9 @@ def test_legacy_shorten_html_redirect():
     client = TestClient(app, raise_server_exceptions=False)
 
     with (
-        patch("routes.legacy.url_shortener.generate_short_code", return_value="gen456"),
+        patch(
+            "app.routes.legacy.url_shortener.generate_short_code", return_value="gen456"
+        ),
     ):
         resp = client.post(
             "/",
@@ -230,8 +234,8 @@ def test_legacy_shorten_blocked_url():
             get_url_service: lambda: mock_url_svc,
         }
     )
-    from dependencies import get_url_policy
-    from services.safety.policy import PolicyRejection, UrlPolicyService
+    from app.dependencies import get_url_policy
+    from app.services.safety.policy import PolicyRejection, UrlPolicyService
 
     class _BlockingGate(UrlPolicyService):
         async def check(self, url):
@@ -269,7 +273,7 @@ def test_legacy_shorten_invalid_alias():
     client = TestClient(app, raise_server_exceptions=False)
 
     with (
-        patch("routes.legacy.url_shortener.validate_alias", return_value=False),
+        patch("app.routes.legacy.url_shortener.validate_alias", return_value=False),
     ):
         resp = client.post(
             "/",
@@ -297,7 +301,7 @@ def test_legacy_shorten_alias_exists():
     client = TestClient(app, raise_server_exceptions=False)
 
     with (
-        patch("routes.legacy.url_shortener.validate_alias", return_value=True),
+        patch("app.routes.legacy.url_shortener.validate_alias", return_value=True),
     ):
         resp = client.post(
             "/",
@@ -330,7 +334,7 @@ def test_legacy_emoji_shorten_success():
 
     with (
         patch(
-            "routes.legacy.url_shortener.generate_emoji_alias",
+            "app.routes.legacy.url_shortener.generate_emoji_alias",
             return_value="\U0001f600\U0001f680\U0001f389",
         ),
     ):
@@ -560,7 +564,7 @@ def test_legacy_stats_post_not_found():
     )
     client = TestClient(app, raise_server_exceptions=False)
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         mock_repo_instance = AsyncMock()
         mock_repo_instance.find_by_id = AsyncMock(return_value=None)
         MockLegacyRepo.return_value = mock_repo_instance
@@ -587,7 +591,7 @@ def test_legacy_stats_password_protected_redirect():
     )
     client = TestClient(app, raise_server_exceptions=False)
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         mock_repo_instance = AsyncMock()
         mock_repo_instance.find_by_id = AsyncMock(return_value=fake_doc)
         MockLegacyRepo.return_value = mock_repo_instance
@@ -639,12 +643,12 @@ def test_legacy_export_json():
     )
     client = TestClient(app, raise_server_exceptions=False)
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         mock_repo_instance = AsyncMock()
         mock_repo_instance.aggregate = AsyncMock(return_value=stats_data)
         MockLegacyRepo.return_value = mock_repo_instance
 
-        with patch("routes.legacy.stats.is_emoji_alias", return_value=False):
+        with patch("app.routes.legacy.stats.is_emoji_alias", return_value=False):
             resp = client.post("/export/abc123/json")
 
     assert resp.status_code == 200

@@ -9,8 +9,8 @@ import pytest
 from bson import ObjectId
 from pymongo.errors import DuplicateKeyError
 
-from config import CustomDomainSettings
-from errors import (
+from app.config import CustomDomainSettings
+from app.errors import (
     AppError,
     DomainAlreadyRegisteredError,
     DomainBlocklistedError,
@@ -21,16 +21,16 @@ from errors import (
     InvalidDomainTransitionError,
     NotFoundError,
 )
-from schemas.dto.requests.custom_domain import (
+from app.schemas.dto.requests.custom_domain import (
     CreateCustomDomainRequest,
     ListCustomDomainsQuery,
     UpdateCustomDomainRequest,
 )
-from schemas.enums.domain_status import DomainStatus, VerificationMethod
-from schemas.models.custom_domain import CustomDomainDoc
-from services.custom_domain_service import CustomDomainService
-from services.registrar.protocol import RegistrationResult
-from services.verifiers.protocol import VerificationResult
+from app.schemas.enums.domain_status import DomainStatus, VerificationMethod
+from app.schemas.models.custom_domain import CustomDomainDoc
+from app.services.custom_domain_service import CustomDomainService
+from app.services.registrar.protocol import RegistrationResult
+from app.services.verifiers.protocol import VerificationResult
 
 USER_OID = ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")
 DOMAIN_OID = ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")
@@ -366,7 +366,7 @@ class TestVerify:
         # When preflight fails, CF/verifier MUST NOT be invoked — otherwise CF
         # enters its 15-min backoff for unpropagated domains. The reason is
         # surfaced as last_verification_error on the doc; status unchanged.
-        from services import dns_preflight as preflight_module
+        from app.services import dns_preflight as preflight_module
 
         svc, repo, verifiers, _, _ = _build_service(
             preflight_cname_target="customers.spoo.me"
@@ -381,7 +381,7 @@ class TestVerify:
             )
 
         with patch(
-            "services.custom_domain_service.check_cname",
+            "app.services.custom_domain_service.check_cname",
             side_effect=_bad_preflight,
         ):
             await svc.verify(DOMAIN_OID, _user())
@@ -393,7 +393,7 @@ class TestVerify:
 
     @pytest.mark.asyncio
     async def test_preflight_success_lets_verifier_run(self):
-        from services import dns_preflight as preflight_module
+        from app.services import dns_preflight as preflight_module
 
         svc, repo, verifiers, _, _ = _build_service(
             preflight_cname_target="customers.spoo.me"
@@ -407,7 +407,7 @@ class TestVerify:
         async def _ok(fqdn, target):
             return preflight_module.PreflightResult(ok=True)
 
-        with patch("services.custom_domain_service.check_cname", side_effect=_ok):
+        with patch("app.services.custom_domain_service.check_cname", side_effect=_ok):
             await svc.verify(DOMAIN_OID, _user())
 
         verifier.verify.assert_awaited_once()
@@ -1127,7 +1127,7 @@ class TestUpdateRouting:
         repo.update_routing = AsyncMock(return_value=True)
 
         with patch(
-            "services.custom_domain_service.log",
+            "app.services.custom_domain_service.log",
             new=MagicMock(),
         ) as mock_log:
             await svc.update_routing(
@@ -1205,7 +1205,7 @@ class TestDeleteAllForOwner:
     async def test_noop_delete_raises_instead_of_spinning(self):
         """A delete that removes nothing would re-list the same page forever
         (page zero is re-read each pass) — it must raise, not loop."""
-        from errors import AppError
+        from app.errors import AppError
 
         svc, repo, _, _, _ = _build_service()
         repo.count_by_owner = AsyncMock(return_value=1)
@@ -1220,7 +1220,7 @@ class TestDeleteAllForOwner:
     async def test_pass_cap_raises_when_pages_never_drain(self):
         """Deletes report success but the listing never shrinks (replica
         lag, repo drift): the absolute pass cap turns it into a failure."""
-        from errors import AppError
+        from app.errors import AppError
 
         svc, repo, _, _, _ = _build_service()
         repo.count_by_owner = AsyncMock(return_value=1)

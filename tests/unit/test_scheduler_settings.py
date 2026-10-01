@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from config import AppSettings, SchedulerSettings
+from app.config import AppSettings, SchedulerSettings
 
 
 class TestSchedulerSettings:

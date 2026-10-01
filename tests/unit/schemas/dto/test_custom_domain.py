@@ -8,15 +8,15 @@ import pytest
 from bson import ObjectId
 from pydantic import ValidationError
 
-from schemas.dto.requests.custom_domain import UpdateCustomDomainRequest
-from schemas.dto.responses.custom_domain import (
+from app.schemas.dto.requests.custom_domain import UpdateCustomDomainRequest
+from app.schemas.dto.responses.custom_domain import (
     CustomDomainDeleteResponse,
     CustomDomainListResponse,
     CustomDomainResponse,
     DnsRecord,
 )
-from schemas.enums.domain_status import DomainStatus, VerificationMethod
-from schemas.models.custom_domain import CustomDomainDoc
+from app.schemas.enums.domain_status import DomainStatus, VerificationMethod
+from app.schemas.models.custom_domain import CustomDomainDoc
 
 
 def _doc(**overrides) -> CustomDomainDoc:

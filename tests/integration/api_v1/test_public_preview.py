@@ -14,10 +14,10 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
 
-from dependencies.services import get_public_preview_service
-from schemas.models.url import UrlV2Doc
-from services.public_link_resolver import PublicLinkResolver
-from services.public_preview_service import PublicPreviewService
+from app.dependencies.services import get_public_preview_service
+from app.schemas.models.url import UrlV2Doc
+from app.services.public_link_resolver import PublicLinkResolver
+from app.services.public_preview_service import PublicPreviewService
 
 from .conftest import _build_test_app, _make_url_doc
 

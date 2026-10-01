@@ -17,7 +17,7 @@ from .conftest import USER_OID, make_collection
 
 class TestUserRepository:
     def _repo(self, col=None):
-        from repositories.user_repository import UserRepository
+        from app.repositories.user_repository import UserRepository
 
         return UserRepository(col or make_collection())
 

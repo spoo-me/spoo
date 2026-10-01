@@ -5,7 +5,7 @@ from __future__ import annotations
 import struct
 import zlib
 
-from shared.image_sniff import EXT, MIME, sniff_image
+from app.shared.image_sniff import EXT, MIME, sniff_image
 
 # ── Real minimal fixtures ─────────────────────────────────────────────────────
 

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from services.scheduler.registry import (
+from app.services.scheduler.registry import (
     ScheduledTask,
     TaskRegistry,
     compute_next_run,

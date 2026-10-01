@@ -11,7 +11,7 @@ from pymongo.errors import CollectionInvalid, OperationFailure
 class TestEnsureIndexes:
     @pytest.mark.asyncio
     async def test_ensure_indexes_calls_create_index(self):
-        from repositories.indexes import ensure_indexes
+        from app.repositories.indexes import ensure_indexes
 
         # Build a mock db with mock collections
         db = MagicMock()
@@ -181,7 +181,7 @@ class TestEnsureIndexes:
 
     @pytest.mark.asyncio
     async def test_ensure_indexes_creates_timeseries_collection(self):
-        from repositories.indexes import ensure_indexes
+        from app.repositories.indexes import ensure_indexes
 
         db = MagicMock()
         for_col = AsyncMock()
@@ -204,7 +204,7 @@ class TestEnsureIndexes:
         # On boots after the legacy alias_1 has been dropped, drop_index
         # raises OperationFailure code 27. Must be silently swallowed so
         # ensure_indexes stays idempotent.
-        from repositories.indexes import ensure_indexes
+        from app.repositories.indexes import ensure_indexes
 
         db = MagicMock()
         col = AsyncMock()
@@ -221,7 +221,7 @@ class TestEnsureIndexes:
     async def test_sweep_index_recreated_on_options_conflict(self):
         # Deploys carrying the old PENDING_DELETION-only partial filter hit
         # code 85 — the index must be drop-recreated, not left stale.
-        from repositories.indexes import ensure_indexes
+        from app.repositories.indexes import ensure_indexes
 
         db = MagicMock()
         col = AsyncMock()
@@ -257,7 +257,7 @@ class TestEnsureIndexes:
         """Rolling deploy: two instances hit code 85 together; the loser's
         drop_index gets code 27 (IndexNotFound). Recreating is still correct,
         so startup must swallow it (same guard as _ensure_ttl_index)."""
-        from repositories.indexes import ensure_indexes
+        from app.repositories.indexes import ensure_indexes
 
         db = MagicMock()
         col = AsyncMock()
@@ -299,7 +299,7 @@ class TestEnsureIndexes:
     async def test_sweep_index_drop_propagates_non_index_not_found(self):
         # Only IndexNotFound is a benign race — anything else (permissions,
         # connection loss) must fail startup, not be papered over.
-        from repositories.indexes import ensure_indexes
+        from app.repositories.indexes import ensure_indexes
 
         db = MagicMock()
         col = AsyncMock()
@@ -329,7 +329,7 @@ class TestEnsureIndexes:
     async def test_drop_alias_1_propagates_other_errors(self):
         # Any drop_index failure that ISN'T IndexNotFound must propagate —
         # silent swallowing of e.g. permission errors would mask real bugs.
-        from repositories.indexes import ensure_indexes
+        from app.repositories.indexes import ensure_indexes
 
         db = MagicMock()
         col = AsyncMock()

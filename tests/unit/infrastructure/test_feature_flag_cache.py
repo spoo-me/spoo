@@ -8,13 +8,13 @@ specific to this cache.
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
-from infrastructure.cache.feature_flag_cache import (
+from app.infrastructure.cache.feature_flag_cache import (
     NEGATIVE_MISS,
     FeatureFlagCache,
     NegativeMiss,
 )
-from schemas.enums.rollout_type import RolloutType
-from schemas.models.feature_flag import FeatureFlagDoc
+from app.schemas.enums.rollout_type import RolloutType
+from app.schemas.models.feature_flag import FeatureFlagDoc
 
 from .conftest import _fake_redis
 

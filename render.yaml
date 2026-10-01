@@ -5,7 +5,7 @@ services:
     repo: https://github.com/spoo-me/spoo
     plan: free
     buildCommand: pip install uv && uv sync --frozen
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --no-access-log
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --no-access-log
     envVars:
       # ── Runtime mode ────────────────────────────────────────────────────────
       - key: ENV

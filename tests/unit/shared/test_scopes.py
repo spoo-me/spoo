@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from schemas.dto.requests.api_key import ALLOWED_SCOPES, ApiKeyScope
-from shared.scopes import (
+from app.schemas.dto.requests.api_key import ALLOWED_SCOPES, ApiKeyScope
+from app.shared.scopes import (
     LEGACY_FULL_ACCESS_DESCRIPTION,
     SCOPE_DESCRIPTIONS,
     describe_scopes,

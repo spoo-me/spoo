@@ -2,17 +2,17 @@ import string
 from datetime import datetime, timedelta
 from urllib.parse import unquote
 
-from routes.legacy.helpers import (
+from app.routes.legacy.helpers import (
     add_missing_dates,
     calculate_click_averages,
     humanize_number,
     is_positive_integer,
     top_four,
 )
-from shared.aggregation_strategies import convert_country_name
-from shared.emoji_policy import check_emoji_alias
-from shared.generators import generate_short_code
-from shared.validators import validate_alias
+from app.shared.aggregation_strategies import convert_country_name
+from app.shared.emoji_policy import check_emoji_alias
+from app.shared.generators import generate_short_code
+from app.shared.validators import validate_alias
 
 # Test humanize_number
 

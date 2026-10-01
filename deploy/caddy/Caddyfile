@@ -9,7 +9,7 @@
 	# depth so a UFW misconfig can't enable CF-Connecting-IP spoofing.
 	#
 	# CIDR list mirrors https://www.cloudflare.com/ips-v4 and /ips-v6.
-	# infrastructure/ufw-cloudflare.sh refreshes UFW from the same source.
+	# app/infrastructure/ufw-cloudflare.sh refreshes UFW from the same source.
 	# When Cloudflare rotates ranges (rare, ~yearly), update both files.
 	servers {
 		trusted_proxies static \

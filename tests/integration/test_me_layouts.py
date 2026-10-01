@@ -16,9 +16,9 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import CurrentUser, get_page_layout_service, require_jwt
-from errors import AuthenticationError
-from routes.api_v1 import router as api_v1_router
+from app.dependencies import CurrentUser, get_page_layout_service, require_jwt
+from app.errors import AuthenticationError
+from app.routes.api_v1 import router as api_v1_router
 from tests.conftest import build_test_app
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

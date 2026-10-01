@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     get_current_user,
     get_feature_flag_service,
     require_auth,
     require_jwt,
 )
-from services.feature_flag_service import (
+from app.services.feature_flag_service import (
     AB_TESTING_FLAG,
     CUSTOM_DOMAINS_FLAG,
     EXPOSED_FEATURES,

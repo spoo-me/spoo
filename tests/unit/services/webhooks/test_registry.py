@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from errors import ValidationError
-from services.webhooks.registry import (
+from app.errors import ValidationError
+from app.services.webhooks.registry import (
     EVENT_REGISTRY,
     TEST_EVENT_SPEC,
     expand,

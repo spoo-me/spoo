@@ -6,8 +6,8 @@ import pytest
 from bson import ObjectId
 from pydantic import ValidationError as PydanticValidationError
 
-from schemas.models.base import ANONYMOUS_OWNER_ID
-from schemas.models.url import (
+from app.schemas.models.base import ANONYMOUS_OWNER_ID
+from app.schemas.models.url import (
     EmojiUrlDoc,
     LegacyUrlDoc,
     LinkMetaTags,
@@ -398,7 +398,7 @@ class TestUrlV2DocEffectiveStatus:
     def test_wire_casing_pin(self):
         """The public-page contract is frozen lowercase — .value.lower()
         in v2_effective_status is load-bearing over UPPERCASE enum values."""
-        from services.public_link_resolver import v2_effective_status
+        from app.services.public_link_resolver import v2_effective_status
 
         assert v2_effective_status(self._make()) == "active"
         expired = self._make(expire_after=now() - timedelta(hours=1))
@@ -496,7 +496,7 @@ class TestEffectiveStatusScheduled:
         assert doc.effective_status == UrlStatus(status)
 
     def test_public_wire_casing(self):
-        from services.public_link_resolver import v2_effective_status
+        from app.services.public_link_resolver import v2_effective_status
 
         doc = self._make(starts_at=now() + timedelta(hours=1))
         assert v2_effective_status(doc) == "scheduled"

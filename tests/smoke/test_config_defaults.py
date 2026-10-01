@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import (
+from app.config import (
     AppSettings,
     DatabaseSettings,
     EmailSettings,
@@ -113,7 +113,7 @@ def test_is_production_true_for_production() -> None:
 
 def test_docs_disabled_in_fastapi() -> None:
     """Built-in docs_url should be None — Scalar docs are served via a custom /docs route."""
-    from app import create_app
+    from app.factory import create_app
 
     app = create_app()
     assert app.docs_url is None

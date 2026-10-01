@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from services.safety.admission import AdmissionPolicy
-from services.safety.events import SafetyAnalyzeEvent
+from app.services.safety.admission import AdmissionPolicy
+from app.services.safety.events import SafetyAnalyzeEvent
 
 
 def _event(trigger: str) -> SafetyAnalyzeEvent:

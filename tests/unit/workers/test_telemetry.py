@@ -9,8 +9,8 @@ import pytest
 from bson import ObjectId
 from structlog.testing import capture_logs
 
-from schemas.models.webhook import WebhookEndpointDoc
-from workers.telemetry import (
+from app.schemas.models.webhook import WebhookEndpointDoc
+from app.workers.telemetry import (
     StaleConsumerJanitor,
     StreamMetricsReporter,
     WebhookDepthReporter,

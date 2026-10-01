@@ -22,19 +22,19 @@ import pytest
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from config import AppSettings
-from dependencies import get_current_user
-from dependencies.services import get_report_intake_service
-from infrastructure.ops_notify import DiscordOpsNotifier
-from middleware.rate_limiter import limiter
-from repositories.report_repository import (
+from app.config import AppSettings
+from app.dependencies import get_current_user
+from app.dependencies.services import get_report_intake_service
+from app.infrastructure.ops_notify import DiscordOpsNotifier
+from app.middleware.rate_limiter import limiter
+from app.repositories.report_repository import (
     ReportRepository,
     ReportSubmissionRepository,
 )
-from routes.api_v1 import router as api_v1_router
-from schemas.models.url import UrlV2Doc
-from services.public_link_resolver import PublicLinkResolver
-from services.report_intake_service import (
+from app.routes.api_v1 import router as api_v1_router
+from app.schemas.models.url import UrlV2Doc
+from app.services.public_link_resolver import PublicLinkResolver
+from app.services.report_intake_service import (
     ReportIntakeService,
     normalize_report_target,
 )
@@ -721,7 +721,7 @@ def test_safety_sink_absent_means_no_enqueue_and_no_failure():
 
 
 def test_reported_link_enqueues_variant_destinations_too():
-    from schemas.models.url import AbVariant
+    from app.schemas.models.url import AbVariant
 
     doc = _make_v2_doc("var1234")
     doc.long_url = "https://clean.example/"

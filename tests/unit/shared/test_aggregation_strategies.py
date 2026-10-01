@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from shared.aggregation_strategies import (
+from app.shared.aggregation_strategies import (
     AggregationStrategyFactory,
     FieldAggregationStrategy,
     TimeAggregationStrategy,

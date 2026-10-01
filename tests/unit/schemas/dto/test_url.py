@@ -10,18 +10,18 @@ import pytest
 from bson import ObjectId
 from pydantic import ValidationError
 
-from schemas.dto.requests.url import (
+from app.schemas.dto.requests.url import (
     CreateUrlRequest,
     ListUrlsQuery,
     UpdateUrlRequest,
 )
-from schemas.dto.responses.url import (
+from app.schemas.dto.responses.url import (
     UpdateUrlResponse,
     UrlListItem,
     UrlListResponse,
     UrlResponse,
 )
-from schemas.models.url import UrlV2Doc
+from app.schemas.models.url import UrlV2Doc
 
 # ── CreateUrlRequest ───────────────────────────────────────────────────────────
 
@@ -366,7 +366,7 @@ class TestUrlResponseFromDoc:
 
     def test_anonymous_owner_id_returns_none(self):
         """Anonymous URLs (sentinel ObjectId) should return null owner_id."""
-        from schemas.models.base import ANONYMOUS_OWNER_ID
+        from app.schemas.models.base import ANONYMOUS_OWNER_ID
 
         r = UrlResponse.from_doc(
             _make_doc(owner_id=ANONYMOUS_OWNER_ID), "https://spoo.me"
@@ -483,13 +483,13 @@ class TestUrlListItemFromDoc:
 
 class TestUrlListItemDomain:
     def test_domain_propagates(self):
-        from schemas.dto.responses.url import UrlListItem
+        from app.schemas.dto.responses.url import UrlListItem
 
         r = UrlListItem.from_doc(_make_doc(domain="links.acme.com"))
         assert r.domain == "links.acme.com"
 
     def test_domain_default_system(self):
-        from schemas.dto.responses.url import UrlListItem
+        from app.schemas.dto.responses.url import UrlListItem
 
         r = UrlListItem.from_doc(_make_doc())  # domain = spoo.me
         assert r.domain == "spoo.me"
@@ -497,19 +497,19 @@ class TestUrlListItemDomain:
 
 class TestCreateUrlRequestDomainField:
     def test_lowercases_and_strips_dot(self):
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(url="https://example.com", domain="LINKS.ACME.COM.")
         assert req.domain == "links.acme.com"
 
     def test_empty_string_normalised_to_none(self):
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(url="https://example.com", domain="")
         assert req.domain is None
 
     def test_omitted_domain_is_none(self):
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(url="https://example.com")
         assert req.domain is None
@@ -517,13 +517,13 @@ class TestCreateUrlRequestDomainField:
 
 class TestListUrlsQueryDomainFilter:
     def test_domain_filter_normalised(self):
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         q = ListUrlsQuery(domain="Links.Acme.COM")
         assert q.domain == "links.acme.com"
 
     def test_no_domain_filter(self):
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         q = ListUrlsQuery()
         assert q.domain is None
@@ -614,7 +614,7 @@ class TestMetaTagsResponseWarnings:
 
     @staticmethod
     def _meta(width=None, height=None, bytes_=None):
-        from schemas.models.url import LinkMetaTags, MetaImageMeta
+        from app.schemas.models.url import LinkMetaTags, MetaImageMeta
 
         image_meta = None
         if width or height or bytes_:
@@ -630,7 +630,7 @@ class TestMetaTagsResponseWarnings:
 
     @staticmethod
     def _warnings(meta):
-        from schemas.dto.responses.url import MetaTagsResponse
+        from app.schemas.dto.responses.url import MetaTagsResponse
 
         return MetaTagsResponse.from_model(meta).warnings
 

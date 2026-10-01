@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from repositories.blocked_domain_repository import BlockedDomainRepository
+from app.repositories.blocked_domain_repository import BlockedDomainRepository
 
 
 class TestBlockedDomainRepository:

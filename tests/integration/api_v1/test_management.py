@@ -10,13 +10,13 @@ import pytest
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     get_custom_domain_service,
     get_url_service,
     require_auth,
 )
-from errors import ForbiddenError, NotFoundError
-from schemas.models.url import AbVariant
+from app.errors import ForbiddenError, NotFoundError
+from app.schemas.models.url import AbVariant
 
 from .conftest import _build_test_app, _make_api_key_doc, _make_url_doc, _make_user
 
@@ -226,7 +226,7 @@ class TestUpdateUrlWithDomain:
         assert custom_svc.assert_owned_and_active.await_count == 0
 
     def test_update_with_unauthorized_domain_returns_403(self):
-        from errors import ForbiddenError
+        from app.errors import ForbiddenError
 
         user = _make_user()
         url_svc = AsyncMock()
@@ -274,7 +274,7 @@ class TestUpdateUrlAbVariants:
         return svc
 
     def _app(self, user, mock_svc, flag_svc):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         return _build_test_app(
             {
@@ -350,7 +350,7 @@ class TestUpdateUrlGeoRules:
         return svc
 
     def _app(self, user, mock_svc, flag_svc):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         return _build_test_app(
             {
@@ -491,7 +491,7 @@ class TestUpdateUrlScheduling:
         return svc
 
     def _app(self, user, mock_svc, flag_svc):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         return _build_test_app(
             {

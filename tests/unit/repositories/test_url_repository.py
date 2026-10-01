@@ -20,7 +20,7 @@ DOMAIN = "spoo.me"
 
 class TestUrlRepository:
     def _repo(self, col=None):
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         return UrlRepository(col or make_collection())
 
@@ -233,7 +233,7 @@ class TestUrlRepository:
         cursor = col.find.return_value
         cursor.to_list = AsyncMock(return_value=[_url_v2_doc()])
         query = {"owner_id": USER_OID}
-        from schemas.models.url import UrlV2Doc
+        from app.schemas.models.url import UrlV2Doc
 
         docs = await self._repo(col).find_by_owner(query, "created_at", -1, 0, 20)
         col.find.assert_called_once_with(query)
@@ -312,7 +312,7 @@ class TestUrlRepository:
 
 class TestUrlRepositoryBulkDelete:
     def _repo(self, col=None):
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         return UrlRepository(col or make_collection())
 
@@ -374,7 +374,7 @@ class TestUrlRepositoryBulkDelete:
 
 class TestUrlRepositoryBulkByIds:
     def _repo(self, col=None):
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         return UrlRepository(col or make_collection())
 
@@ -449,7 +449,7 @@ class TestUrlRepositoryBulkByIds:
         col = make_collection()
         col.update_many = AsyncMock(side_effect=DuplicateKeyError("dup"))
         with (
-            patch("repositories.url_repository.log") as log_mock,
+            patch("app.repositories.url_repository.log") as log_mock,
             pytest.raises(DuplicateKeyError),
         ):
             await self._repo(col).update_by_ids_and_owner(
@@ -464,7 +464,7 @@ class TestSweepQueries:
 
     @pytest.mark.asyncio
     async def test_list_active_hosts_by_registrable_awaits_aggregate(self):
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         col = AsyncMock()
         col.name = "urlsV2"
@@ -488,7 +488,7 @@ class TestSweepQueries:
     async def test_list_recent_destination_hosts_awaits_aggregate(self):
         from datetime import datetime, timezone
 
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         col = AsyncMock()
         col.name = "urlsV2"
@@ -509,7 +509,7 @@ class TestSweepQueries:
 
 class TestBlockActiveByAliases:
     def _repo(self, col):
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         col.name = "urlsV2"
         return UrlRepository(col)
@@ -543,7 +543,7 @@ class TestBlockActiveByAliases:
 
 class TestDestinationHistory:
     def _repo(self, col):
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         col.name = "urlsV2"
         return UrlRepository(col)
@@ -558,7 +558,7 @@ class TestDestinationHistory:
 
     @pytest.mark.asyncio
     async def test_splits_anon_and_owned_and_counts_owners(self):
-        from schemas.models.base import ANONYMOUS_OWNER_ID
+        from app.schemas.models.base import ANONYMOUS_OWNER_ID
 
         col = make_collection()
         first = ObjectId()
@@ -587,7 +587,7 @@ class TestDestinationHistory:
 
 class TestHostBreadth:
     def _repo(self, col):
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         col.name = "urlsV2"
         return UrlRepository(col)
@@ -624,7 +624,7 @@ class TestUrlRepositoryOwnerErasure:
     """iter_by_owner + delete_by_owner — the account-erasure pair."""
 
     def _repo(self, col=None):
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         return UrlRepository(col or make_collection())
 
@@ -644,7 +644,7 @@ class TestUrlRepositoryOwnerErasure:
 
     @pytest.mark.asyncio
     async def test_delete_by_owner_refuses_anonymous_sentinel(self):
-        from schemas.models.base import ANONYMOUS_OWNER_ID
+        from app.schemas.models.base import ANONYMOUS_OWNER_ID
 
         col = make_collection()
         with pytest.raises(ValueError):
@@ -690,7 +690,7 @@ class TestUrlRepositoryOwnerErasure:
 
     @pytest.mark.asyncio
     async def test_scrub_blocked_pii_refuses_anonymous_sentinel(self):
-        from schemas.models.base import ANONYMOUS_OWNER_ID
+        from app.schemas.models.base import ANONYMOUS_OWNER_ID
 
         col = make_collection()
         with pytest.raises(ValueError):
@@ -718,7 +718,7 @@ class TestUrlRepositoryOwnerErasure:
 
     @pytest.mark.asyncio
     async def test_iter_by_owner_refuses_anonymous_sentinel(self):
-        from schemas.models.base import ANONYMOUS_OWNER_ID
+        from app.schemas.models.base import ANONYMOUS_OWNER_ID
 
         col = make_collection()
         with pytest.raises(ValueError):
@@ -752,7 +752,7 @@ class TestSecondaryHostMatching:
 
     @pytest.mark.asyncio
     async def test_block_matches_main_or_secondary_host(self):
-        from repositories.url_repository import UrlRepository, dest_host_filter
+        from app.repositories.url_repository import UrlRepository, dest_host_filter
 
         col = self._col()
         col.update_many = AsyncMock(return_value=MagicMock(modified_count=1))
@@ -765,7 +765,7 @@ class TestSecondaryHostMatching:
 
     @pytest.mark.asyncio
     async def test_listing_for_eviction_matches_either_field(self):
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         col = self._col()
         cursor = MagicMock()
@@ -780,7 +780,7 @@ class TestSecondaryHostMatching:
     async def test_recent_hosts_sweep_unwinds_secondary_hosts(self):
         from datetime import datetime, timezone
 
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         col = self._col()
         cursor = MagicMock()
@@ -801,7 +801,7 @@ class TestBlockCausesPerHost:
     unblock; blocks stamped before the field are host-of-long_url blocks."""
 
     def _repo(self):
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         col = make_collection()
         col.name = "urlsV2"
@@ -866,7 +866,7 @@ class TestFeedSweepReachesSecondaryDestinations:
 
     @pytest.mark.asyncio
     async def test_pipeline_keeps_only_hosts_under_the_domain(self):
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         col = make_collection()
         col.name = "urlsV2"
@@ -888,7 +888,7 @@ class TestFeedSweepReachesSecondaryDestinations:
 
 class TestSweepSampleUrls:
     def test_secondary_host_samples_its_own_url_not_the_main_one(self):
-        from repositories.url_repository import _host_samples
+        from app.repositories.url_repository import _host_samples
 
         rows = [
             {
@@ -909,7 +909,7 @@ class TestSweepSampleUrls:
     async def test_recent_hosts_projects_every_url_of_the_link(self):
         from datetime import datetime, timezone
 
-        from repositories.url_repository import UrlRepository
+        from app.repositories.url_repository import UrlRepository
 
         col = make_collection()
         col.name = "urlsV2"
@@ -928,7 +928,7 @@ class TestSweepSampleUrls:
         assert urls[2]["$map"]["input"] == {"$ifNull": ["$ab_variants", []]}
         # One arm per single-URL destination field, in the shared list's order:
         # a field missing here is a sweep that samples the wrong URL.
-        from shared.url_utils import SINGLE_DESTINATION_FIELDS
+        from app.shared.url_utils import SINGLE_DESTINATION_FIELDS
 
         arms = [arm["$cond"][1] for arm in urls[3:]]
         assert arms == [[f"${field}"] for field in SINGLE_DESTINATION_FIELDS]

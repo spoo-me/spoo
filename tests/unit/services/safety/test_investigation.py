@@ -8,10 +8,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from infrastructure.llm import LlmTaskFailed
-from schemas.enums.safety import VerdictTier
-from services.safety.events import SafetyAnalyzeEvent
-from services.safety.investigation import (
+from app.infrastructure.llm import LlmTaskFailed
+from app.schemas.enums.safety import VerdictTier
+from app.services.safety.events import SafetyAnalyzeEvent
+from app.services.safety.investigation import (
     AutoBlockPolicy,
     Classification,
     Confidence,
@@ -63,7 +63,7 @@ class TestAuthorityMapper:
     def test_a_proposed_list_add_always_needs_a_human_tap(self):
         # Even fully corroborated and high-confidence: a list add reaches
         # every future link to the service.
-        from services.safety.investigation import ListProposal
+        from app.services.safety.investigation import ListProposal
 
         d = decide_authority(
             _verdict(
@@ -227,7 +227,7 @@ class TestInvestigatorFlow:
     @pytest.mark.asyncio
     async def test_burst_scam_self_corroborated_by_feed_hit_blocks(self):
         """A feed hit feed_lookup actually returned corroborates on its own."""
-        from services.safety import tools as safety_tools
+        from app.services.safety import tools as safety_tools
 
         async def run_and_set_flag(_task, _bundle):
             # Mutate the shared flag from a CHILD task, exactly as the agent
@@ -301,7 +301,7 @@ class TestInvestigatorFlow:
 
     @pytest.mark.asyncio
     async def test_redirector_proposal_goes_to_review(self):
-        from services.safety.investigation import ListProposal
+        from app.services.safety.investigation import ListProposal
 
         inv, _, enforcer, notifier = _investigator(
             _verdict(
@@ -480,7 +480,7 @@ class TestProposalsCarryTheAsk:
         assert decision.tier == VerdictTier.GRAY
 
     def test_redirector_with_a_proposal_still_asks(self):
-        from services.safety.investigation import ListProposal
+        from app.services.safety.investigation import ListProposal
 
         decision = decide_authority(
             _verdict(
@@ -551,7 +551,7 @@ class TestProposalsCloseTheLoop:
 
     @staticmethod
     def _proposal(list_name: str, domain: str):
-        from services.safety.investigation import ListProposal
+        from app.services.safety.investigation import ListProposal
 
         return ListProposal(list=list_name, domain=domain, why="test")
 
@@ -650,7 +650,7 @@ class TestApplyListWithoutAFeedRepo:
     async def test_bails_quietly_when_no_repo_is_wired(self):
         """The inline (worker-less) runtime has no feed repo. A self-applying
         proposal there must not raise, and must not pretend it applied."""
-        from services.safety.investigation import ListProposal
+        from app.services.safety.investigation import ListProposal
 
         inv, verdict_repo, _enforcer, notifier = _investigator(
             _verdict(
@@ -672,7 +672,7 @@ class TestReviewDecisions:
     """The two should-decide threads on the PR, settled."""
 
     def test_off_means_no_autonomous_action_even_for_resolve_only(self):
-        from services.safety.investigation import ListProposal
+        from app.services.safety.investigation import ListProposal
 
         d = decide_authority(
             _verdict(
@@ -690,7 +690,7 @@ class TestReviewDecisions:
     async def test_a_sweep_proposal_still_reaches_the_operator(self):
         """A proposal carries something to approve. Silencing it would make a
         waa.ai-class discovery arriving via sweep invisible forever."""
-        from services.safety.investigation import ListProposal
+        from app.services.safety.investigation import ListProposal
 
         inv, _repo, _enforcer, notifier = _investigator(
             _verdict(
@@ -708,7 +708,7 @@ class TestReviewDecisions:
     def test_a_proposal_for_an_unknown_list_fails_parse(self):
         import pydantic
 
-        from services.safety.investigation import ListProposal
+        from app.services.safety.investigation import ListProposal
 
         with pytest.raises(pydantic.ValidationError):
             ListProposal(list="manual", domain="x.example", why="t")
@@ -721,7 +721,7 @@ class TestPromptCarriesTheClickFixRule:
     hedged. This pins the rule so a prompt edit cannot quietly drop it."""
 
     def test_rule_and_worked_example_are_present(self):
-        from services.safety.investigation import _DEFAULT_PROMPT as p
+        from app.services.safety.investigation import _DEFAULT_PROMPT as p
 
         assert "A fake verification gate is the payload" in p
         assert "ClickFix" in p
@@ -733,7 +733,7 @@ class TestPromptCarriesTheClickFixRule:
     def test_rule_requires_a_rendered_non_provider_gate_plus_two_signals(self):
         """One weak property must never be enough. The first draft used 'or'
         and a dead page went high on hostname shape alone."""
-        from services.safety.investigation import _DEFAULT_PROMPT as p
+        from app.services.safety.investigation import _DEFAULT_PROMPT as p
 
         rule = p[p.index("A fake verification gate is the payload") :]
         rule = rule[: rule.index("\n")]
@@ -746,7 +746,7 @@ class TestPromptCarriesTheClickFixRule:
         assert "Name the signals you counted" in rule
 
     def test_example_10_claims_only_what_its_bundle_observed(self):
-        from services.safety.investigation import _DEFAULT_PROMPT as p
+        from app.services.safety.investigation import _DEFAULT_PROMPT as p
 
         ex = p[p.index("**Example 10") :]
         ex = ex[: ex.index("\n\n") if "\n\n" in ex else None]
@@ -765,7 +765,7 @@ class TestEnactCarriesScopeAndScreenshot:
         embed through the same mutable-holder contextvar as the hard-hit
         flag. Mutating it from a child task here is exactly how the agent
         dispatches tools."""
-        from services.safety import tools as safety_tools
+        from app.services.safety import tools as safety_tools
 
         async def run_and_render(_task, _bundle):
             async def tool_call():
@@ -804,7 +804,7 @@ class TestEnactCarriesScopeAndScreenshot:
 class TestBundleListsEveryDestination:
     @pytest.mark.asyncio
     async def test_other_destinations_of_the_link_are_listed(self):
-        from services.safety.investigation import build_evidence_bundle
+        from app.services.safety.investigation import build_evidence_bundle
 
         url_repo = AsyncMock()
         url_repo.destination_history = AsyncMock(
@@ -840,7 +840,7 @@ class TestBundleListsEveryDestination:
 
     @pytest.mark.asyncio
     async def test_single_destination_link_has_no_section(self):
-        from services.safety.investigation import build_evidence_bundle
+        from app.services.safety.investigation import build_evidence_bundle
 
         url_repo = AsyncMock()
         url_repo.destination_history = AsyncMock(

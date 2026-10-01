@@ -18,4 +18,4 @@ COPY . /app/
 WORKDIR /app
 RUN uv sync --frozen --no-cache
 
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

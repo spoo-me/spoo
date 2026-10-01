@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 
-from errors import CloudflareAPIError
-from infrastructure.cloudflare_client import CFHostnameResult
-from services.cf_saas_backend import CfSaasBackend
+from app.errors import CloudflareAPIError
+from app.infrastructure.cloudflare_client import CFHostnameResult
+from app.services.cf_saas_backend import CfSaasBackend
 
 
 def _backend(
@@ -68,7 +68,7 @@ class TestRegister:
                 ssl_status="initializing",
             )
         )
-        from services.cf_saas_backend import CfSaasBackend
+        from app.services.cf_saas_backend import CfSaasBackend
 
         backend = CfSaasBackend(
             cf_client=cf_client,

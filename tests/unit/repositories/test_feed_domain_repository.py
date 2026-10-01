@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from repositories.feed_domain_repository import FeedDomainRepository
+from app.repositories.feed_domain_repository import FeedDomainRepository
 
 
 def _col() -> AsyncMock:

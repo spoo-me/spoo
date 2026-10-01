@@ -15,8 +15,8 @@ from unittest.mock import AsyncMock, patch
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import get_click_sink, get_url_service
-from errors import (
+from app.dependencies import get_click_sink, get_url_service
+from app.errors import (
     BlockedUrlError,
     ExpiredRedirectError,
     ForbiddenError,
@@ -24,7 +24,7 @@ from errors import (
     NotFoundError,
     ValidationError,
 )
-from routes.redirect_routes import router as redirect_router
+from app.routes.redirect_routes import router as redirect_router
 from tests.conftest import build_test_app
 from tests.factories import make_url_cache
 
@@ -191,7 +191,7 @@ def test_redirect_v2_correct_password_bcrypt():
     client = TestClient(app, raise_server_exceptions=False)
 
     with patch(
-        "infrastructure.cache.url_cache.verify_password_hash", return_value=True
+        "app.infrastructure.cache.url_cache.verify_password_hash", return_value=True
     ):
         resp = client.get("/abc123?password=correct", follow_redirects=False)
 
@@ -237,7 +237,7 @@ def test_redirect_wrong_password():
     client = TestClient(app, raise_server_exceptions=False)
 
     with patch(
-        "infrastructure.cache.url_cache.verify_password_hash", return_value=False
+        "app.infrastructure.cache.url_cache.verify_password_hash", return_value=False
     ):
         resp = client.get("/abc123?password=wrong", follow_redirects=False)
 
@@ -493,7 +493,7 @@ def test_password_form_submit_correct():
     client = TestClient(app, raise_server_exceptions=False)
 
     with patch(
-        "infrastructure.cache.url_cache.verify_password_hash", return_value=True
+        "app.infrastructure.cache.url_cache.verify_password_hash", return_value=True
     ):
         resp = client.post(
             "/abc123/password",
@@ -520,7 +520,7 @@ def test_password_form_submit_wrong():
     client = TestClient(app, raise_server_exceptions=False)
 
     with patch(
-        "infrastructure.cache.url_cache.verify_password_hash", return_value=False
+        "app.infrastructure.cache.url_cache.verify_password_hash", return_value=False
     ):
         resp = client.post(
             "/abc123/password",

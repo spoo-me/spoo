@@ -6,14 +6,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     get_current_user,
     get_profile_picture_service,
     require_auth,
     require_jwt,
 )
-from errors import NotFoundError, ValidationError
-from services.profile_picture_service import ProfilePictureService
+from app.errors import NotFoundError, ValidationError
+from app.services.profile_picture_service import ProfilePictureService
 
 from .conftest import _build_test_app, _make_api_key_doc, _make_user
 

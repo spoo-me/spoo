@@ -6,9 +6,13 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from dependencies import get_current_user
-from infrastructure.cache.meta_fetch_cache import MetaFetchCache
-from infrastructure.safe_fetch import FetchedBody, FetchHardError, FetchTransientError
+from app.dependencies import get_current_user
+from app.infrastructure.cache.meta_fetch_cache import MetaFetchCache
+from app.infrastructure.safe_fetch import (
+    FetchedBody,
+    FetchHardError,
+    FetchTransientError,
+)
 
 from .conftest import _build_test_app, _make_user
 
@@ -28,7 +32,9 @@ def test_metadata_works_anonymously():
     # Auth is optional — the public preview checker calls this logged out.
     body = FetchedBody(HTML, "text/html", "https://dest.example/final")
     with (
-        patch("routes.api_v1.metadata.fetch_public", new=AsyncMock(return_value=body)),
+        patch(
+            "app.routes.api_v1.metadata.fetch_public", new=AsyncMock(return_value=body)
+        ),
         TestClient(_app(user=None), raise_server_exceptions=True) as client,
     ):
         resp = client.get("/api/v1/metadata", params={"url": "https://dest.example/a"})
@@ -39,7 +45,9 @@ def test_metadata_works_anonymously():
 def test_metadata_parses_destination():
     body = FetchedBody(HTML, "text/html", "https://dest.example/final")
     with (
-        patch("routes.api_v1.metadata.fetch_public", new=AsyncMock(return_value=body)),
+        patch(
+            "app.routes.api_v1.metadata.fetch_public", new=AsyncMock(return_value=body)
+        ),
         TestClient(_app(user=_make_user()), raise_server_exceptions=True) as client,
     ):
         resp = client.get("/api/v1/metadata", params={"url": "https://dest.example/a"})
@@ -60,7 +68,9 @@ def test_metadata_carries_audit_fields():
     </head><body></body></html>"""
     body = FetchedBody(page, "text/html", "https://dest.example/final")
     with (
-        patch("routes.api_v1.metadata.fetch_public", new=AsyncMock(return_value=body)),
+        patch(
+            "app.routes.api_v1.metadata.fetch_public", new=AsyncMock(return_value=body)
+        ),
         TestClient(_app(), raise_server_exceptions=True) as client,
     ):
         resp = client.get("/api/v1/metadata", params={"url": "https://dest.example/a"})
@@ -79,7 +89,7 @@ def test_metadata_rejects_http_url():
 def test_metadata_unfetchable_is_422():
     with (
         patch(
-            "routes.api_v1.metadata.fetch_public",
+            "app.routes.api_v1.metadata.fetch_public",
             new=AsyncMock(
                 side_effect=FetchHardError("resolves to a non-public address")
             ),
@@ -96,7 +106,7 @@ def test_metadata_unfetchable_is_422():
 def test_metadata_timeout_is_504():
     with (
         patch(
-            "routes.api_v1.metadata.fetch_public",
+            "app.routes.api_v1.metadata.fetch_public",
             new=AsyncMock(side_effect=FetchTransientError("timeout")),
         ),
         TestClient(_app(), raise_server_exceptions=False) as client,

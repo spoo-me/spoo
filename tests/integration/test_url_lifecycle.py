@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     CurrentUser,
     get_click_service,
     get_current_user,
@@ -22,11 +22,11 @@ from dependencies import (
     get_url_service,
     require_auth,
 )
-from errors import GoneError, NotFoundError
-from infrastructure.cache.url_cache import UrlCacheData
-from routes.api_v1 import router as api_v1_router
-from routes.redirect_routes import router as redirect_router
-from schemas.models.url import UrlV2Doc
+from app.errors import GoneError, NotFoundError
+from app.infrastructure.cache.url_cache import UrlCacheData
+from app.routes.api_v1 import router as api_v1_router
+from app.routes.redirect_routes import router as redirect_router
+from app.schemas.models.url import UrlV2Doc
 from tests.conftest import build_test_app
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -356,7 +356,7 @@ def test_create_password_protected_then_redirect():
 
         # Step 3: GET with correct password redirects
         with patch(
-            "infrastructure.cache.url_cache.verify_password_hash", return_value=True
+            "app.infrastructure.cache.url_cache.verify_password_hash", return_value=True
         ):
             resp = client.get(f"/{_ALIAS}?password=correct", follow_redirects=False)
         assert resp.status_code == 302
@@ -426,7 +426,7 @@ def test_create_url_then_export_stats():
     url_svc = AsyncMock()
     url_svc.create.return_value = (doc, None)
 
-    from schemas.results import ExportResult
+    from app.schemas.results import ExportResult
 
     export_svc = AsyncMock()
     export_svc.export.return_value = ExportResult(

@@ -17,8 +17,8 @@ from fastapi.testclient import TestClient
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import AppSettings
-from routes.auth import router as auth_router
+from app.config import AppSettings
+from app.routes.auth import router as auth_router
 from tests.conftest import build_test_app
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -119,8 +119,8 @@ class TestDeviceConsentCSRF:
 
     def _consent_app(self):
         """Build an app whose JwtUser dependency is satisfied."""
-        from dependencies import require_jwt
-        from dependencies.auth import CurrentUser
+        from app.dependencies import require_jwt
+        from app.dependencies.auth import CurrentUser
 
         fake_user = CurrentUser(user_id=ObjectId(_USER_ID), email_verified=True)
         return build_test_app(

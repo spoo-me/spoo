@@ -10,12 +10,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from schemas.enums.safety import VerdictTier
-from schemas.models.verdict import VerdictDoc
-from services.safety.admission import AdmissionPolicy
-from services.safety.analyzer import SafetyAnalyzer
-from services.safety.events import SafetyAnalyzeEvent
-from services.safety.investigation import (
+from app.schemas.enums.safety import VerdictTier
+from app.schemas.models.verdict import VerdictDoc
+from app.services.safety.admission import AdmissionPolicy
+from app.services.safety.analyzer import SafetyAnalyzer
+from app.services.safety.events import SafetyAnalyzeEvent
+from app.services.safety.investigation import (
     AutoBlockPolicy,
     Classification,
     Confidence,
@@ -23,7 +23,7 @@ from services.safety.investigation import (
     InvestigationVerdict,
     Scope,
 )
-from services.safety.providers import BlockedPatternProvider, ToxicVerdictProvider
+from app.services.safety.providers import BlockedPatternProvider, ToxicVerdictProvider
 
 
 class FakeVerdictRepo:
@@ -272,7 +272,7 @@ class TestScreeningToInvestigationToReenforcement:
     @pytest.mark.asyncio
     async def test_investigation_failure_leaves_the_host_reviewable(self):
         """Deep-tier breakage degrades to uncertain + review, never a silent pass."""
-        from infrastructure.llm import LlmTaskFailed
+        from app.infrastructure.llm import LlmTaskFailed
 
         store = FakeVerdictRepo()
         enforcer = _enforcer()
@@ -301,7 +301,7 @@ class TestRedirectCrossTier:
         )
 
         with patch(
-            "services.safety.resolver.resolve_terminal_url",
+            "app.services.safety.resolver.resolve_terminal_url",
             AsyncMock(return_value="https://landing-scam.example/kit"),
         ):
             await analyzer.analyze(

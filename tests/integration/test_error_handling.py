@@ -21,8 +21,8 @@ from slowapi.errors import RateLimitExceeded
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import AppSettings
-from errors import (
+from app.config import AppSettings
+from app.errors import (
     AuthenticationError,
     BlockedUrlError,
     ConflictError,
@@ -33,11 +33,11 @@ from errors import (
     RateLimitError,
     ValidationError,
 )
-from middleware.error_handler import register_error_handlers
-from middleware.rate_limiter import limiter
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.rate_limiter import limiter
 
 _STATIC_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static"
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "app", "static"
 )
 
 # ── Test routers with controlled error triggers ─────────────────────────────
@@ -477,7 +477,7 @@ def test_http_exception_fallback_slug_in_header():
 def test_redirect_intercept_set_is_subset_of_app_level_set():
     """An origin-empty status the edge doesn't compose is a blank page —
     the hot path may only empty-body what the app-level set covers."""
-    from middleware.error_handler import (
+    from app.middleware.error_handler import (
         EDGE_INTERCEPTED_STATUSES,
         REDIRECT_EDGE_INTERCEPTED_STATUSES,
     )

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from middleware.rate_limiter import limiter
+from app.middleware.rate_limiter import limiter
 
 
 @pytest.fixture(autouse=True)

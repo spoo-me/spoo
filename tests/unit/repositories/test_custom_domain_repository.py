@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from repositories.custom_domain_repository import CustomDomainRepository
-from schemas.enums.domain_status import DomainStatus, VerificationMethod
+from app.repositories.custom_domain_repository import CustomDomainRepository
+from app.schemas.enums.domain_status import DomainStatus, VerificationMethod
 
 
 def _doc_dict(**overrides):

@@ -2,7 +2,7 @@
 
 Pure-reader Cloudflare Worker: serves hot short-URL redirects straight
 from KV at the PoP. Origin decides *what* gets cached (promotion via the
-hotness consumer — `services/edge_cache.py`); this
+hotness consumer — `app/services/edge_cache/`); this
 Worker only reads. Miss, excluded path, unknown entry type, or any
 internal error → passthrough to origin, byte-identical to having no
 Worker at all. Design doc: `thoughts/cf-edge-cache-v2.md` (spoo-latest).

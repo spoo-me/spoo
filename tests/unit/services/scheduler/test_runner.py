@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock
 import pytest
 from pymongo.errors import PyMongoError
 
-from schemas.models.scheduled_task import ScheduledTaskDoc
-from services.scheduler.registry import ScheduledTask, TaskRegistry
-from services.scheduler.runner import TaskScheduler
+from app.schemas.models.scheduled_task import ScheduledTaskDoc
+from app.services.scheduler.registry import ScheduledTask, TaskRegistry
+from app.services.scheduler.runner import TaskScheduler
 
 
 def _repo() -> AsyncMock:

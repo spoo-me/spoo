@@ -8,11 +8,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from schemas.enums.webhook import WebhookFlavor
-from services.webhooks.registry import EVENT_REGISTRY, TEST_EVENT_SPEC
-from services.webhooks.renderers import default_renderers
-from services.webhooks.renderers.discord import DiscordRenderer
-from services.webhooks.renderers.slack import SlackRenderer
+from app.schemas.enums.webhook import WebhookFlavor
+from app.services.webhooks.registry import EVENT_REGISTRY, TEST_EVENT_SPEC
+from app.services.webhooks.renderers import default_renderers
+from app.services.webhooks.renderers.discord import DiscordRenderer
+from app.services.webhooks.renderers.slack import SlackRenderer
 
 _TS = "2026-07-24T14:32:00+00:00"
 

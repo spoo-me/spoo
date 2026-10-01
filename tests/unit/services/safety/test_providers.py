@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from schemas.enums.safety import VerdictTier
-from services.safety.providers import BlockedPatternProvider
+from app.schemas.enums.safety import VerdictTier
+from app.services.safety.providers import BlockedPatternProvider
 
 
 class TestBlockedPatternProvider:
@@ -49,7 +49,7 @@ class TestBlockedPatternProvider:
 class TestFeedDomainProvider:
     @pytest.mark.asyncio
     async def test_host_hit_is_toxic(self):
-        from services.safety.providers import FeedDomainProvider
+        from app.services.safety.providers import FeedDomainProvider
 
         repo = AsyncMock()
         repo.contains = AsyncMock(return_value=True)
@@ -62,7 +62,7 @@ class TestFeedDomainProvider:
 
     @pytest.mark.asyncio
     async def test_registrable_fallback_when_host_clean(self):
-        from services.safety.providers import FeedDomainProvider
+        from app.services.safety.providers import FeedDomainProvider
 
         repo = AsyncMock()
         repo.contains = AsyncMock(side_effect=[False, True])
@@ -75,7 +75,7 @@ class TestFeedDomainProvider:
 
     @pytest.mark.asyncio
     async def test_exempt_subdomain_host_abstains_on_a_registrable_hit(self):
-        from services.safety.providers import FeedDomainProvider
+        from app.services.safety.providers import FeedDomainProvider
 
         feeds = {"shorteners": {"goo.gl"}, "redirectors": {"maps.app.goo.gl"}}
         repo = AsyncMock()
@@ -96,7 +96,7 @@ class TestFeedDomainProvider:
 
     @pytest.mark.asyncio
     async def test_exempt_feed_is_not_read_on_a_miss(self):
-        from services.safety.providers import FeedDomainProvider
+        from app.services.safety.providers import FeedDomainProvider
 
         repo = AsyncMock()
         repo.contains = AsyncMock(return_value=False)
@@ -113,7 +113,7 @@ class TestFeedDomainProvider:
 
     @pytest.mark.asyncio
     async def test_miss_and_error_abstain(self):
-        from services.safety.providers import FeedDomainProvider
+        from app.services.safety.providers import FeedDomainProvider
 
         repo = AsyncMock()
         repo.contains = AsyncMock(return_value=False)
@@ -137,8 +137,8 @@ class TestWebRiskProvider:
 
     @pytest.mark.asyncio
     async def test_threat_match_is_toxic(self):
-        from infrastructure.web_risk import ENFORCEMENT_THREAT_TYPES, WebRiskClient
-        from services.safety.providers import WebRiskProvider
+        from app.infrastructure.web_risk import ENFORCEMENT_THREAT_TYPES, WebRiskClient
+        from app.services.safety.providers import WebRiskProvider
 
         http = self._http(
             {"threat": {"threatTypes": ["SOCIAL_ENGINEERING"], "expireTime": "x"}}
@@ -165,8 +165,8 @@ class TestWebRiskProvider:
 
     @pytest.mark.asyncio
     async def test_empty_response_abstains(self):
-        from infrastructure.web_risk import ENFORCEMENT_THREAT_TYPES, WebRiskClient
-        from services.safety.providers import WebRiskProvider
+        from app.infrastructure.web_risk import ENFORCEMENT_THREAT_TYPES, WebRiskClient
+        from app.services.safety.providers import WebRiskProvider
 
         provider = WebRiskProvider(
             WebRiskClient(
@@ -177,8 +177,8 @@ class TestWebRiskProvider:
 
     @pytest.mark.asyncio
     async def test_http_error_and_exception_abstain(self):
-        from infrastructure.web_risk import ENFORCEMENT_THREAT_TYPES, WebRiskClient
-        from services.safety.providers import WebRiskProvider
+        from app.infrastructure.web_risk import ENFORCEMENT_THREAT_TYPES, WebRiskClient
+        from app.services.safety.providers import WebRiskProvider
 
         provider = WebRiskProvider(
             WebRiskClient(
@@ -230,8 +230,8 @@ class TestToxicVerdictProvider:
     async def test_toxic_verdict_gates_creation(self):
         from datetime import datetime, timezone
 
-        from schemas.models.verdict import VerdictDoc
-        from services.safety.providers import ToxicVerdictProvider
+        from app.schemas.models.verdict import VerdictDoc
+        from app.services.safety.providers import ToxicVerdictProvider
 
         repo = AsyncMock()
         repo.find_by_host = AsyncMock(
@@ -253,8 +253,8 @@ class TestToxicVerdictProvider:
     async def test_uncertain_verdict_and_miss_abstain(self):
         from datetime import datetime, timezone
 
-        from schemas.models.verdict import VerdictDoc
-        from services.safety.providers import ToxicVerdictProvider
+        from app.schemas.models.verdict import VerdictDoc
+        from app.services.safety.providers import ToxicVerdictProvider
 
         repo = AsyncMock()
         repo.find_by_host = AsyncMock(
@@ -274,7 +274,7 @@ class TestToxicVerdictProvider:
 
     @pytest.mark.asyncio
     async def test_repo_error_abstains(self):
-        from services.safety.providers import ToxicVerdictProvider
+        from app.services.safety.providers import ToxicVerdictProvider
 
         repo = AsyncMock()
         repo.find_by_host = AsyncMock(side_effect=RuntimeError("mongo down"))
@@ -292,7 +292,7 @@ class TestToxicVerdictScope:
     def _repo(self, **fields) -> AsyncMock:
         from datetime import datetime, timezone
 
-        from schemas.models.verdict import VerdictDoc
+        from app.schemas.models.verdict import VerdictDoc
 
         repo = AsyncMock()
         repo.find_by_host = AsyncMock(
@@ -308,7 +308,7 @@ class TestToxicVerdictScope:
 
     @pytest.mark.asyncio
     async def test_pattern_scope_refuses_only_matching_urls(self):
-        from services.safety.providers import ToxicVerdictProvider
+        from app.services.safety.providers import ToxicVerdictProvider
 
         repo = self._repo(
             scope="path_pattern",
@@ -332,7 +332,7 @@ class TestToxicVerdictScope:
 
     @pytest.mark.asyncio
     async def test_links_scope_refuses_only_the_judged_url(self):
-        from services.safety.providers import ToxicVerdictProvider
+        from app.services.safety.providers import ToxicVerdictProvider
 
         repo = self._repo(
             scope="links", sample_url="https://sites.google.com/view/evil/login"
@@ -357,7 +357,7 @@ class TestToxicVerdictScope:
 
     @pytest.mark.asyncio
     async def test_absent_scope_means_host_wide(self):
-        from services.safety.providers import ToxicVerdictProvider
+        from app.services.safety.providers import ToxicVerdictProvider
 
         repo = self._repo()
         assert (
@@ -382,7 +382,7 @@ class TestSharedCarrierLookup:
         """The mock keys on (feed, domain) like the real repository, so a
         lookup against a feed this instance was never configured with is a
         miss rather than a silent pass."""
-        from services.safety.providers import SharedCarrierLookup
+        from app.services.safety.providers import SharedCarrierLookup
 
         repo = AsyncMock()
         repo.contains = AsyncMock(
@@ -440,7 +440,7 @@ class TestSharedCarrierLookup:
     async def test_backend_failure_reports_not_covered(self):
         """A dead feed store must not invent a carrier, and must not raise
         into the enforcement path either."""
-        from services.safety.providers import SharedCarrierLookup
+        from app.services.safety.providers import SharedCarrierLookup
 
         repo = AsyncMock()
         repo.contains = AsyncMock(side_effect=RuntimeError("mongo down"))

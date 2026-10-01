@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from shared.client_tag import parse_client_tag
+from app.shared.client_tag import parse_client_tag
 
 
 @pytest.mark.parametrize(
@@ -58,6 +58,6 @@ def test_parse_invalid_is_absent(value):
     ],
 )
 def test_first_party_client(value, expected):
-    from shared.client_tag import first_party_client
+    from app.shared.client_tag import first_party_client
 
     assert first_party_client(value) == expected

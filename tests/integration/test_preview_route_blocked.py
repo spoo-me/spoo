@@ -15,10 +15,10 @@ from unittest.mock import AsyncMock, MagicMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from config import AppSettings
-from dependencies import get_db, get_settings
-from routes.legacy.url_shortener import router as legacy_url_router
-from schemas.models.url import EmojiUrlDoc, LegacyUrlDoc, UrlStatus, UrlV2Doc
+from app.config import AppSettings
+from app.dependencies import get_db, get_settings
+from app.routes.legacy.url_shortener import router as legacy_url_router
+from app.schemas.models.url import EmojiUrlDoc, LegacyUrlDoc, UrlStatus, UrlV2Doc
 from tests.conftest import build_test_app
 
 _DEST = "https://credential-harvest.example/login"
@@ -54,7 +54,7 @@ def _client(*, v2=None, v1=None, emoji=None) -> TestClient:
     async def find_emoji(alias):
         return emoji
 
-    import routes.legacy.url_shortener as mod
+    import app.routes.legacy.url_shortener as mod
 
     mod.UrlRepository = lambda _c: MagicMock(
         find_by_alias=AsyncMock(side_effect=find_by_alias)

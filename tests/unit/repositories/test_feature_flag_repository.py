@@ -33,7 +33,7 @@ def _flag_doc(name: str = "custom_domains") -> dict:
 
 class TestFeatureFlagRepository:
     def _repo(self, col=None):
-        from repositories.feature_flag_repository import FeatureFlagRepository
+        from app.repositories.feature_flag_repository import FeatureFlagRepository
 
         return FeatureFlagRepository(col or make_collection())
 
@@ -92,7 +92,7 @@ class TestFeatureFlagRepository:
 
 class TestPullAllowlisted:
     def _repo(self, col=None):
-        from repositories.feature_flag_repository import FeatureFlagRepository
+        from app.repositories.feature_flag_repository import FeatureFlagRepository
 
         return FeatureFlagRepository(col or make_collection())
 

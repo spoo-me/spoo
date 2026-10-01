@@ -6,8 +6,8 @@ integration tests — previously duplicated per test module.
 
 from __future__ import annotations
 
-from infrastructure.cache.url_cache import UrlCacheData
-from services.click.events import ClickEvent
+from app.infrastructure.cache.url_cache import UrlCacheData
+from app.services.click.events import ClickEvent
 
 
 def make_url_cache(**overrides) -> UrlCacheData:

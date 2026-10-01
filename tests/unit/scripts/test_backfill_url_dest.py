@@ -14,7 +14,7 @@ _SPEC.loader.exec_module(backfill)
 
 
 def test_secondary_hosts_mirror_the_shared_helper():
-    from shared.url_utils import secondary_hosts
+    from app.shared.url_utils import secondary_hosts
 
     rules = {
         "IN": "https://B.example/x",
@@ -36,7 +36,7 @@ def test_secondary_hosts_mirror_the_shared_helper():
 
 
 def test_single_destination_fields_mirror_the_shared_list():
-    from shared.url_utils import SINGLE_DESTINATION_FIELDS
+    from app.shared.url_utils import SINGLE_DESTINATION_FIELDS
 
     assert backfill.SINGLE_DESTINATION_FIELDS == SINGLE_DESTINATION_FIELDS
     assert backfill.secondary_urls(

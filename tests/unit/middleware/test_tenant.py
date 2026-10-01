@@ -9,9 +9,9 @@ from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 
-from middleware.tenant import TenantMiddleware
-from schemas.enums.domain_status import DomainStatus
-from services.tenant_resolver.protocol import TenantInfo
+from app.middleware.tenant import TenantMiddleware
+from app.schemas.enums.domain_status import DomainStatus
+from app.services.tenant_resolver.protocol import TenantInfo
 
 
 def _app(resolver=None, omit_resolver: bool = False) -> Starlette:
@@ -283,7 +283,7 @@ class TestAliasPatternEmojiCoverage:
         ],
     )
     def test_emoji_paths_match(self, path):
-        from middleware.tenant import _ALIAS_PATTERN
+        from app.middleware.tenant import _ALIAS_PATTERN
 
         assert _ALIAS_PATTERN.match(path), f"expected alias match for {path!r}"
 
@@ -292,7 +292,7 @@ class TestAliasPatternEmojiCoverage:
         ["/", "/⭐+", "/a b", "/café", "/⭐/extra", "/mylink/password/x"],
     )
     def test_non_alias_paths_rejected(self, path):
-        from middleware.tenant import _ALIAS_PATTERN
+        from app.middleware.tenant import _ALIAS_PATTERN
 
         assert not _ALIAS_PATTERN.match(path), f"expected no match for {path!r}"
 

@@ -9,14 +9,14 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from bson import ObjectId
 
-from infrastructure.safe_fetch import (
+from app.infrastructure.safe_fetch import (
     FetchDeniedError,
     FetchedBody,
     FetchHardError,
     FetchTransientError,
 )
-from services.meta_tags.events import MetaImageValidateEvent
-from services.meta_tags.validator import MetaImageValidator
+from app.services.meta_tags.events import MetaImageValidateEvent
+from app.services.meta_tags.validator import MetaImageValidator
 
 URL_ID = ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")
 
@@ -55,7 +55,7 @@ class TestConsume:
         validator, repo, cache = _validator()
         body = FetchedBody(_png_bytes(1200, 630), "image/png", "https://x/og.png")
         with patch(
-            "services.meta_tags.validator.fetch_public_image",
+            "app.services.meta_tags.validator.fetch_public_image",
             new=AsyncMock(return_value=body),
         ):
             await validator.consume(_payload())
@@ -69,7 +69,7 @@ class TestConsume:
     async def test_hard_failure_clears_image(self):
         validator, repo, cache = _validator()
         with patch(
-            "services.meta_tags.validator.fetch_public_image",
+            "app.services.meta_tags.validator.fetch_public_image",
             new=AsyncMock(side_effect=FetchHardError("content-type 'text/html'")),
         ):
             await validator.consume(_payload())
@@ -83,7 +83,7 @@ class TestConsume:
         # preview crawlers fetch with allowlisted UAs. Never clear on it.
         validator, repo, cache = _validator()
         with patch(
-            "services.meta_tags.validator.fetch_public_image",
+            "app.services.meta_tags.validator.fetch_public_image",
             new=AsyncMock(side_effect=FetchDeniedError("status 403")),
         ):
             await validator.consume(_payload())
@@ -96,7 +96,7 @@ class TestConsume:
         validator, repo, _ = _validator()
         with (
             patch(
-                "services.meta_tags.validator.fetch_public_image",
+                "app.services.meta_tags.validator.fetch_public_image",
                 new=AsyncMock(side_effect=FetchTransientError("timeout")),
             ),
             pytest.raises(FetchTransientError),
@@ -119,7 +119,7 @@ class TestConsume:
         repo.record_meta_image_validation.return_value = False
         body = FetchedBody(_png_bytes(), "image/png", "https://x/og.png")
         with patch(
-            "services.meta_tags.validator.fetch_public_image",
+            "app.services.meta_tags.validator.fetch_public_image",
             new=AsyncMock(return_value=body),
         ):
             await validator.consume(_payload())

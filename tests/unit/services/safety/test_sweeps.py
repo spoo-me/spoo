@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from config import SafetySettings
-from services.safety.sweeps import (
+from app.config import SafetySettings
+from app.services.safety.sweeps import (
     RECENT_SCREEN_TASK,
     FeedDeltaSweeper,
     SweepDeps,

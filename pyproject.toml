@@ -60,7 +60,7 @@ omit = [
     "*/test_*",
     "*/conftest.py",
     ".venv/*",
-    "main.py",
+    "app/main.py",
 ]
 
 [tool.coverage.report]
@@ -114,13 +114,13 @@ extend-immutable-calls = [
     "fastapi.File",
     "fastapi.Cookie",
     "fastapi.Security",
-    "dependencies.auth.require_scopes",
-    "dependencies.auth.optional_scopes",
-    "dependencies.auth.optional_scopes_verified",
+    "app.dependencies.auth.require_scopes",
+    "app.dependencies.auth.optional_scopes",
+    "app.dependencies.auth.optional_scopes_verified",
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app", "config", "errors", "routes", "services", "schemas", "dependencies", "middleware", "infrastructure"]
+known-first-party = ["app"]
 
 [tool.ruff.format]
 quote-style = "double"

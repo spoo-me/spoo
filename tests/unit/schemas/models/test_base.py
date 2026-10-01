@@ -3,7 +3,7 @@
 import pytest
 from bson import ObjectId
 
-from schemas.models.base import MongoBaseModel, PyObjectId
+from app.schemas.models.base import MongoBaseModel, PyObjectId
 
 from .conftest import oid
 

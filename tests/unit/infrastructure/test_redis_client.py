@@ -6,12 +6,12 @@ from unittest.mock import AsyncMock, patch
 
 from redis.exceptions import RedisError
 
-from infrastructure.cache.redis_client import create_redis_client
+from app.infrastructure.cache.redis_client import create_redis_client
 
 
 def _patched_from_url(client: AsyncMock):
     return patch(
-        "infrastructure.cache.redis_client.aioredis.from_url",
+        "app.infrastructure.cache.redis_client.aioredis.from_url",
         return_value=client,
     )
 
@@ -40,7 +40,7 @@ class TestCreateRedisClient:
 
     async def test_returns_none_when_construction_fails(self):
         with patch(
-            "infrastructure.cache.redis_client.aioredis.from_url",
+            "app.infrastructure.cache.redis_client.aioredis.from_url",
             side_effect=ValueError("bad uri"),
         ):
             assert await create_redis_client("not-a-uri") is None

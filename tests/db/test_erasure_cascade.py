@@ -13,8 +13,8 @@ from datetime import datetime, timezone
 
 from bson import ObjectId
 
-from repositories.user_repository import UserRepository
-from schemas.models.base import ANONYMOUS_OWNER_ID
+from app.repositories.user_repository import UserRepository
+from app.schemas.models.base import ANONYMOUS_OWNER_ID
 
 # Naive UTC, no microseconds: Mongo stores millisecond-truncated naive UTC,
 # so inserted values read back equal and equality asserts stay exact.

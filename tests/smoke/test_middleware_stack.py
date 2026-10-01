@@ -14,8 +14,8 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 
-from config import AppSettings
-from infrastructure.oauth_clients import OAUTH_STATE_TTL_SECONDS
+from app.config import AppSettings
+from app.infrastructure.oauth_clients import OAUTH_STATE_TTL_SECONDS
 
 
 def test_x_request_id_header_present(smoke_client: TestClient) -> None:
@@ -100,7 +100,7 @@ def _oauth_state_cookie_attrs(*, production: bool) -> set[str]:
     out of the real application and replays it over a route that writes to the
     session, so the assertions below read the header a browser would receive.
     """
-    from app import create_app
+    from app.factory import create_app
 
     settings = AppSettings()
     settings.env = "production" if production else "development"

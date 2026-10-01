@@ -2,7 +2,7 @@
 
 import pytest
 
-from shared.validators import validate_safe_redirect
+from app.shared.validators import validate_safe_redirect
 
 
 @pytest.mark.parametrize(

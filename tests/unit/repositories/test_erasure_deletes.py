@@ -10,10 +10,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from repositories.page_layout_repository import PageLayoutRepository
-from repositories.webhook_delivery_repository import WebhookDeliveryRepository
-from repositories.webhook_endpoint_repository import WebhookEndpointRepository
-from repositories.webhook_event_repository import WebhookEventRepository
+from app.repositories.page_layout_repository import PageLayoutRepository
+from app.repositories.webhook_delivery_repository import WebhookDeliveryRepository
+from app.repositories.webhook_endpoint_repository import WebhookEndpointRepository
+from app.repositories.webhook_event_repository import WebhookEventRepository
 
 from .conftest import USER_OID, make_collection
 

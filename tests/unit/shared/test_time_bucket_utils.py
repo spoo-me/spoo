@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from shared.time_bucket_utils import (
+from app.shared.time_bucket_utils import (
     BUCKET_CONFIGS,
     TimeBucketStrategy,
     determine_optimal_bucket_strategy,

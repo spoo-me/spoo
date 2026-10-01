@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from errors import ValidationError
-from services.meta_tags.images import IngestedImage, ingest_meta_image
+from app.errors import ValidationError
+from app.services.meta_tags.images import IngestedImage, ingest_meta_image
 
 OWNER = ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")
 MAX = 512_000
@@ -61,7 +61,7 @@ class TestIngest:
         assert result.image_meta["height"] == 2
         assert result.image_meta["content_type"] == "image/png"
         key = storage.put_object.call_args.args[0]
-        from services.image_ingest import owner_key_prefix
+        from app.services.image_ingest import owner_key_prefix
 
         expected_prefix = owner_key_prefix(OWNER, "")
         assert key.startswith(f"og/{expected_prefix}/") and key.endswith(".png")
@@ -92,7 +92,7 @@ class TestIngest:
 
     @pytest.mark.asyncio
     async def test_upload_pins_the_prefix_on_first_use(self):
-        from services.image_ingest import owner_key_prefix
+        from app.services.image_ingest import owner_key_prefix
 
         storage = _storage()
         user = MagicMock()
@@ -114,7 +114,7 @@ class TestIngest:
 
     @pytest.mark.asyncio
     async def test_anonymous_owner_never_touches_the_user_repo(self):
-        from schemas.models.base import ANONYMOUS_OWNER_ID
+        from app.schemas.models.base import ANONYMOUS_OWNER_ID
 
         storage = _storage()
         user_repo = MagicMock()

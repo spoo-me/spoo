@@ -14,15 +14,15 @@ from slowapi.errors import RateLimitExceeded
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import AppSettings
-from dependencies import get_contact_service, get_url_service
-from errors import AppError, ForbiddenError, ValidationError
-from middleware.error_handler import register_error_handlers
-from middleware.rate_limiter import limiter
-from routes.static_routes import router as static_router
+from app.config import AppSettings
+from app.dependencies import get_contact_service, get_url_service
+from app.errors import AppError, ForbiddenError, ValidationError
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.rate_limiter import limiter
+from app.routes.static_routes import router as static_router
 
 _STATIC_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static"
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "app", "static"
 )
 
 

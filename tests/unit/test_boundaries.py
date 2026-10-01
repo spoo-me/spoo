@@ -12,9 +12,9 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from schemas.dto.requests.auth import VerifyEmailRequest
-from schemas.dto.requests.url import CreateUrlRequest, ListUrlsQuery
-from shared.generators import generate_otp_code
+from app.schemas.dto.requests.auth import VerifyEmailRequest
+from app.schemas.dto.requests.url import CreateUrlRequest, ListUrlsQuery
+from app.shared.generators import generate_otp_code
 
 # ── Alias Length Boundaries ──────────────────────────────────────────────────
 

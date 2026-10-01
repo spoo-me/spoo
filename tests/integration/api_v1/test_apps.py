@@ -8,14 +8,14 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     get_app_grant_repo,
     get_app_registry,
     get_current_user,
     require_jwt,
 )
-from schemas.models.app import AppEntry
-from schemas.models.app_grant import AppGrantDoc
+from app.schemas.models.app import AppEntry
+from app.schemas.models.app_grant import AppGrantDoc
 
 from .conftest import _build_test_app, _make_api_key_doc, _make_user
 

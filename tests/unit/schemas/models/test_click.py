@@ -2,8 +2,8 @@
 
 from bson import ObjectId
 
-from schemas.models.base import ANONYMOUS_OWNER_ID
-from schemas.models.click import ClickDoc
+from app.schemas.models.base import ANONYMOUS_OWNER_ID
+from app.schemas.models.click import ClickDoc
 
 from .conftest import now, oid
 

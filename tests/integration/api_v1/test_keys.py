@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     get_api_key_service,
     get_current_user,
     require_jwt_verified,

@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from dependencies import get_current_user
-from infrastructure.cache.meta_fetch_cache import MetaFetchCache
-from infrastructure.safe_fetch import ChainHop, ExpandedChain, FetchHardError
-from infrastructure.web_risk import DISPLAY_THREAT_TYPES, WebRiskClient
-from services.url_expand_service import UrlExpandService
+from app.dependencies import get_current_user
+from app.infrastructure.cache.meta_fetch_cache import MetaFetchCache
+from app.infrastructure.safe_fetch import ChainHop, ExpandedChain, FetchHardError
+from app.infrastructure.web_risk import DISPLAY_THREAT_TYPES, WebRiskClient
+from app.services.url_expand_service import UrlExpandService
 
 from .conftest import _build_test_app
 
@@ -56,7 +56,7 @@ def _app(patterns=None, **kwargs):
 def test_expand_returns_chain_anonymously():
     with (
         patch(
-            "services.url_expand_service.expand_public",
+            "app.services.url_expand_service.expand_public",
             new=AsyncMock(return_value=CHAIN),
         ),
         TestClient(_app(), raise_server_exceptions=True) as client,
@@ -75,7 +75,7 @@ def test_expand_returns_chain_anonymously():
 def test_expand_flags_blocklisted_hop():
     with (
         patch(
-            "services.url_expand_service.expand_public",
+            "app.services.url_expand_service.expand_public",
             new=AsyncMock(return_value=CHAIN),
         ),
         TestClient(
@@ -95,7 +95,7 @@ def test_expand_rejects_non_http_scheme():
 def test_expand_unreachable_is_422():
     with (
         patch(
-            "services.url_expand_service.expand_public",
+            "app.services.url_expand_service.expand_public",
             new=AsyncMock(
                 side_effect=FetchHardError("resolves to a non-public address")
             ),
@@ -117,7 +117,7 @@ def test_web_risk_verdict_rides_the_wire():
     )
     with (
         patch(
-            "services.url_expand_service.expand_public",
+            "app.services.url_expand_service.expand_public",
             new=AsyncMock(return_value=CHAIN),
         ),
         TestClient(
@@ -140,7 +140,7 @@ def test_a_failed_web_risk_call_is_not_cached_as_absence():
     http.get = AsyncMock(return_value=MagicMock(status_code=503))
     with (
         patch(
-            "services.url_expand_service.expand_public",
+            "app.services.url_expand_service.expand_public",
             new=AsyncMock(return_value=CHAIN),
         ),
         TestClient(
@@ -163,7 +163,7 @@ def test_a_spent_budget_stops_asking_google():
     budget.take = AsyncMock(return_value=False)
     with (
         patch(
-            "services.url_expand_service.expand_public",
+            "app.services.url_expand_service.expand_public",
             new=AsyncMock(return_value=CHAIN),
         ),
         TestClient(
@@ -185,7 +185,7 @@ def test_a_lookup_we_declined_to_make_is_still_cached():
     budget.take = AsyncMock(return_value=False)
     with (
         patch(
-            "services.url_expand_service.expand_public",
+            "app.services.url_expand_service.expand_public",
             new=AsyncMock(return_value=CHAIN),
         ),
         TestClient(

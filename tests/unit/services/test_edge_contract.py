@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from services.edge_cache import (
+from app.services.edge_cache import (
     EdgeCacheEntry,
     EdgeCacheGeoEntry,
     cache_key,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from config import AppSettings, SafetySettings
+from app.config import AppSettings, SafetySettings
 
 
 class TestSafetySettings:

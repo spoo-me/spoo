@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from infrastructure.logging import redact_sensitive_fields
+from app.infrastructure.logging import redact_sensitive_fields
 
 REDACTED = "***REDACTED***"
 

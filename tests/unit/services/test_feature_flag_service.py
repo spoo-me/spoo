@@ -8,11 +8,11 @@ from unittest.mock import AsyncMock
 import pytest
 from bson import ObjectId
 
-from errors import ForbiddenError, NotFoundError
-from infrastructure.cache.feature_flag_cache import NEGATIVE_MISS
-from schemas.enums.rollout_type import RolloutType
-from schemas.models.feature_flag import FeatureFlagDoc
-from services.feature_flag_service import (
+from app.errors import ForbiddenError, NotFoundError
+from app.infrastructure.cache.feature_flag_cache import NEGATIVE_MISS
+from app.schemas.enums.rollout_type import RolloutType
+from app.schemas.models.feature_flag import FeatureFlagDoc
+from app.services.feature_flag_service import (
     FeatureFlagService,
     _digit_bucket,
     _stable_hash,
@@ -188,7 +188,7 @@ class TestRolloutAllowlist:
     async def test_current_user_email_field_flows_through(self):
         """CurrentUser.email (JWT "email" claim / UserDoc email) satisfies
         email-only allowlists — the real dataclass, not a stub."""
-        from dependencies.auth import CurrentUser
+        from app.dependencies.auth import CurrentUser
 
         flag = _flag(
             rollout_type=RolloutType.ALLOWLIST,
@@ -206,7 +206,7 @@ class TestRolloutAllowlist:
     async def test_current_user_mixed_case_email_matches(self):
         # Doc validator lowercases allowlist entries; is_user_in_allowlist
         # lowercases the user's email — any casing on either side matches.
-        from dependencies.auth import CurrentUser
+        from app.dependencies.auth import CurrentUser
 
         flag = _flag(
             rollout_type=RolloutType.ALLOWLIST,
@@ -222,7 +222,7 @@ class TestRolloutAllowlist:
     async def test_current_user_none_email_denied_without_error(self):
         # Old access tokens (pre-"email" claim) resolve to email=None —
         # email-only allowlists deny them, and nothing raises.
-        from dependencies.auth import CurrentUser
+        from app.dependencies.auth import CurrentUser
 
         flag = _flag(
             rollout_type=RolloutType.ALLOWLIST,
@@ -235,7 +235,7 @@ class TestRolloutAllowlist:
 
     @pytest.mark.asyncio
     async def test_current_user_none_email_still_matches_by_user_id(self):
-        from dependencies.auth import CurrentUser
+        from app.dependencies.auth import CurrentUser
 
         flag = _flag(
             rollout_type=RolloutType.ALLOWLIST,
@@ -350,7 +350,7 @@ class TestRolloutTier:
         flipping a flag ALLOWLIST→TIER at paid launch is a data change."""
         from bson import ObjectId
 
-        from dependencies.auth import CurrentUser
+        from app.dependencies.auth import CurrentUser
 
         flag = _flag(rollout_type=RolloutType.TIER, tier="PRO")
         service, _, _ = make_service(flag=flag)

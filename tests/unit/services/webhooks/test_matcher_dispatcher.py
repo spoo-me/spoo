@@ -10,11 +10,11 @@ from unittest.mock import AsyncMock
 import pytest
 from bson import ObjectId
 
-from schemas.enums.webhook import WebhookStatus
-from schemas.models.webhook import WebhookEndpointDoc, WebhookScope
-from services.events.contract import DomainEvent
-from services.webhooks.dispatcher import WebhookDispatcher
-from services.webhooks.matcher import (
+from app.schemas.enums.webhook import WebhookStatus
+from app.schemas.models.webhook import WebhookEndpointDoc, WebhookScope
+from app.services.events.contract import DomainEvent
+from app.services.webhooks.dispatcher import WebhookDispatcher
+from app.services.webhooks.matcher import (
     OwnerSubscriptionCache,
     SubscriptionMatcher,
     event_link_id,

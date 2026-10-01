@@ -1,7 +1,7 @@
 name: Edge Contract Guard
 
 # The KV entry shape and key format are a cross-language contract:
-# services/edge_cache/contract.py (Python, emits) and
+# app/services/edge_cache/contract.py (Python, emits) and
 # edge/spoo-edge-cache/ (TS, serves) must change in lockstep, pinned by
 # edge/spoo-edge-cache/contract/ (schema + fixtures). This job fails any
 # PR that edits the Python side without touching the pinning files.
@@ -9,7 +9,7 @@ name: Edge Contract Guard
 on:
   pull_request:
     paths:
-      - "services/edge_cache/contract.py"
+      - "app/services/edge_cache/contract.py"
 
 permissions:
   contents: read
@@ -30,6 +30,6 @@ jobs:
               | grep -q '^edge/spoo-edge-cache/contract/'; then
             echo "edge contract dir updated in lockstep — OK"
           else
-            echo "::error file=services/edge_cache/contract.py::Wire contract changed without updating edge/spoo-edge-cache/contract/ (schema + fixtures). Cross-language contract: update both sides in the same PR."
+            echo "::error file=app/services/edge_cache/contract.py::Wire contract changed without updating edge/spoo-edge-cache/contract/ (schema + fixtures). Cross-language contract: update both sides in the same PR."
             exit 1
           fi

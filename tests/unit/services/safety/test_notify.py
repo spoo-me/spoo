@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from services.safety.notify import ACTION_COLOR, REVIEW_COLOR, SafetyNotifier
+from app.services.safety.notify import ACTION_COLOR, REVIEW_COLOR, SafetyNotifier
 
 
 def _notifier():
@@ -154,7 +154,7 @@ class TestFutureLinks:
     def test_future_text_never_promises_the_blocklist(self):
         """A "proposed for the blocklist" claim shipped and survived two
         review rounds. Pin it out."""
-        from services.safety.notify import _FUTURE
+        from app.services.safety.notify import _FUTURE
 
         for text in _FUTURE.values():
             assert "proposed" not in text

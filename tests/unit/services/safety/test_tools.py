@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from infrastructure.browser_run import BrowserRunClient, RenderResult
-from services.safety.tools import (
+from app.infrastructure.browser_run import BrowserRunClient, RenderResult
+from app.services.safety.tools import (
     InvestigationToolDeps,
     build_investigation_tools,
     resolve_chain_impl,
@@ -54,10 +54,10 @@ class TestTrimHtml:
 class TestResolveChain:
     @pytest.mark.asyncio
     async def test_private_address_hop_is_refused(self):
-        from infrastructure.safe_fetch import FetchHardError
+        from app.infrastructure.safe_fetch import FetchHardError
 
         with patch(
-            "services.safety.tools.resolve_public_ip",
+            "app.services.safety.tools.resolve_public_ip",
             AsyncMock(side_effect=FetchHardError("not public")),
         ):
             out = await resolve_chain_impl("https://internal.example/x")
@@ -84,10 +84,10 @@ class TestResolveChain:
         client.__aexit__ = AsyncMock(return_value=False)
         with (
             patch(
-                "services.safety.tools.resolve_public_ip",
+                "app.services.safety.tools.resolve_public_ip",
                 AsyncMock(return_value="93.184.216.34"),
             ),
-            patch("services.safety.tools.httpx.AsyncClient", return_value=client),
+            patch("app.services.safety.tools.httpx.AsyncClient", return_value=client),
         ):
             out = await resolve_chain_impl("https://start-src.com/r")
         assert "hop 1" in out and "[cross-domain]" in out
@@ -108,10 +108,10 @@ class TestResolveChain:
         client.__aexit__ = AsyncMock(return_value=False)
         with (
             patch(
-                "services.safety.tools.resolve_public_ip",
+                "app.services.safety.tools.resolve_public_ip",
                 AsyncMock(return_value="93.184.216.34"),
             ),
-            patch("services.safety.tools.httpx.AsyncClient", return_value=client),
+            patch("app.services.safety.tools.httpx.AsyncClient", return_value=client),
         ):
             out = await resolve_chain_impl("https://loop.example/start")
         assert "exceeded 10 hops" in out
@@ -573,7 +573,7 @@ class TestLastRenderStash:
 
     @pytest.mark.asyncio
     async def test_fetch_page_leaves_its_screenshot_for_the_embed(self):
-        from services.safety.tools import last_render_screenshot, reset_last_render
+        from app.services.safety.tools import last_render_screenshot, reset_last_render
 
         reset_last_render()
         fetch_page = self._fetch_page({"https://x.example/p": b"px"})
@@ -587,7 +587,7 @@ class TestLastRenderStash:
         """Example 10's sequence: fetch the fake gate, then fetch the root,
         which returns "Cannot GET /". Last-wins would put the blank root
         beside a reason that describes the gate."""
-        from services.safety.tools import last_render_screenshot, reset_last_render
+        from app.services.safety.tools import last_render_screenshot, reset_last_render
 
         reset_last_render()
         fetch_page = self._fetch_page(
@@ -606,7 +606,7 @@ class TestLastRenderStash:
 
     @pytest.mark.asyncio
     async def test_unmatched_preference_falls_back_to_the_most_recent(self):
-        from services.safety.tools import last_render_screenshot, reset_last_render
+        from app.services.safety.tools import last_render_screenshot, reset_last_render
 
         reset_last_render()
         fetch_page = self._fetch_page(
@@ -619,7 +619,7 @@ class TestLastRenderStash:
 
     @pytest.mark.asyncio
     async def test_reset_clears_the_previous_investigation(self):
-        from services.safety.tools import last_render_screenshot, reset_last_render
+        from app.services.safety.tools import last_render_screenshot, reset_last_render
 
         reset_last_render()
         fetch_page = self._fetch_page({"https://x.example/p": b"px"})

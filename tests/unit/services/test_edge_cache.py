@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from config import EdgeCacheSettings
-from services.click.consumers.hotness import HotUrl
-from services.edge_cache import (
+from app.config import EdgeCacheSettings
+from app.services.click.consumers.hotness import HotUrl
+from app.services.edge_cache import (
     EdgeCacheEntry,
     PromoteToEdgeCacheAction,
     cache_key,
@@ -86,7 +86,7 @@ class TestEligibility:
     def test_ab_variant_urls_are_skipped(self):
         """No Worker entry type makes a weighted pick — variant links stay
         origin-served so every click gets its variant_index."""
-        from schemas.models.url import AbVariant
+        from app.schemas.models.url import AbVariant
 
         url = make_url_cache(
             ab_variants=[AbVariant(url="https://example.com/b", weight=50)]

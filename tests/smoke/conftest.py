@@ -14,24 +14,24 @@ from starlette.middleware.sessions import SessionMiddleware
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import AppSettings
-from middleware.error_handler import register_error_handlers
-from middleware.logging import RequestLoggingMiddleware
-from middleware.rate_limiter import limiter
-from middleware.security import (
+from app.config import AppSettings
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.logging import RequestLoggingMiddleware
+from app.middleware.rate_limiter import limiter
+from app.middleware.security import (
     MaxContentLengthMiddleware,
     SecurityHeadersMiddleware,
     configure_cors,
 )
-from routes.api_v1 import router as api_v1_router
-from routes.auth import router as auth_router
-from routes.dashboard_routes import router as dashboard_router
-from routes.health_routes import router as health_router
-from routes.legacy.stats import router as legacy_stats_router
-from routes.legacy.url_shortener import router as legacy_url_router
-from routes.oauth_routes import router as oauth_router
-from routes.redirect_routes import router as redirect_router
-from routes.static_routes import router as static_router
+from app.routes.api_v1 import router as api_v1_router
+from app.routes.auth import router as auth_router
+from app.routes.dashboard_routes import router as dashboard_router
+from app.routes.health_routes import router as health_router
+from app.routes.legacy.stats import router as legacy_stats_router
+from app.routes.legacy.url_shortener import router as legacy_url_router
+from app.routes.oauth_routes import router as oauth_router
+from app.routes.redirect_routes import router as redirect_router
+from app.routes.static_routes import router as static_router
 
 
 def _build_smoke_app() -> FastAPI:
@@ -73,7 +73,7 @@ def _build_smoke_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Middleware (same order as app.py)
+    # Middleware (same order as factory.py)
     app.add_middleware(
         SessionMiddleware, secret_key=settings.secret_key or "test-secret"
     )
@@ -89,12 +89,12 @@ def _build_smoke_app() -> FastAPI:
 
     # Static files
     _static_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static"
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "app", "static"
     )
     if os.path.isdir(_static_dir):
         app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
-    # All routers (same order as app.py)
+    # All routers (same order as factory.py)
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(oauth_router)

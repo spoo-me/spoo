@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from services.edge_cache.og_writethrough import OgEdgeWritethrough
+from app.services.edge_cache.og_writethrough import OgEdgeWritethrough
 from tests.factories import make_url_cache
 
 SYSTEM = "spoo.me"

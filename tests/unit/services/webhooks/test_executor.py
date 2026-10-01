@@ -12,28 +12,28 @@ import pytest
 from bson import ObjectId
 from structlog.testing import capture_logs
 
-from infrastructure.crypto import encrypt_secret
-from infrastructure.safe_fetch import PostResult
-from schemas.enums.webhook import (
+from app.infrastructure.crypto import encrypt_secret
+from app.infrastructure.safe_fetch import PostResult
+from app.schemas.enums.webhook import (
     DeliveryStatus,
     EndpointDisabledReason,
     WebhookFlavor,
     WebhookStatus,
 )
-from schemas.models.webhook import (
+from app.schemas.models.webhook import (
     WebhookDeliveryDoc,
     WebhookEndpointDoc,
     WebhookEventDoc,
 )
-from services.webhooks.executor import (
+from app.services.webhooks.executor import (
     RATE_LIMIT_FALLBACK_SECONDS,
     RATE_LIMIT_MAX_DEFER_SECONDS,
     RETRY_SCHEDULE_SECONDS,
     SECRET_ENC_DOMAIN,
     DeliveryExecutor,
 )
-from services.webhooks.renderers import default_renderers
-from services.webhooks.signing import (
+from app.services.webhooks.renderers import default_renderers
+from app.services.webhooks.signing import (
     HEADER_ID,
     HEADER_SIGNATURE,
     HEADER_TIMESTAMP,
@@ -111,7 +111,7 @@ class TestSuccessPath:
         endpoint = _endpoint()
         executor, deliveries, endpoints, _ = _make(endpoint)
         post = _post(204)
-        with patch("services.webhooks.executor.post_public", post):
+        with patch("app.services.webhooks.executor.post_public", post):
             await executor.attempt(_delivery())
 
         url, body = post.await_args[0]
@@ -136,7 +136,7 @@ class TestSuccessPath:
     @pytest.mark.asyncio
     async def test_renders_once_and_freezes_body(self):
         executor, deliveries, _, _events = _make(_endpoint())
-        with patch("services.webhooks.executor.post_public", _post(204)):
+        with patch("app.services.webhooks.executor.post_public", _post(204)):
             await executor.attempt(_delivery())
         deliveries.set_rendered_body.assert_awaited_once()
         body = deliveries.set_rendered_body.await_args[0][1]
@@ -147,14 +147,14 @@ class TestSuccessPath:
         """Retries resend the frozen body — the event row is not re-read."""
         executor, _, _, events = _make(_endpoint())
         row = _delivery(rendered_body='{"type":"link.clicked","data":{}}')
-        with patch("services.webhooks.executor.post_public", _post(204)):
+        with patch("app.services.webhooks.executor.post_public", _post(204)):
             await executor.attempt(row)
         events.find_by_oid.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_dropped_since_last_rides_the_payload(self):
         executor, deliveries, _, _ = _make(_endpoint())
-        with patch("services.webhooks.executor.post_public", _post(204)):
+        with patch("app.services.webhooks.executor.post_public", _post(204)):
             await executor.attempt(_delivery(dropped_since_last=42))
         body = deliveries.set_rendered_body.await_args[0][1]
         assert '"dropped_since_last":42' in body
@@ -165,7 +165,7 @@ class TestFailurePaths:
     async def test_failure_reschedules_per_ladder(self):
         executor, deliveries, _, _ = _make(_endpoint())
         before = datetime.now(timezone.utc)
-        with patch("services.webhooks.executor.post_public", _post(500)):
+        with patch("app.services.webhooks.executor.post_public", _post(500)):
             await executor.attempt(_delivery(attempt_count=1))
         next_at = deliveries.record_attempt_and_reschedule.await_args[0][2]
         # attempt 2 of the ladder → RETRY_SCHEDULE_SECONDS[2] = 300s
@@ -176,7 +176,7 @@ class TestFailurePaths:
         endpoint = _endpoint()
         executor, deliveries, endpoints, _ = _make(endpoint)
         last = len(RETRY_SCHEDULE_SECONDS) - 1
-        with patch("services.webhooks.executor.post_public", _post(500)):
+        with patch("app.services.webhooks.executor.post_public", _post(500)):
             await executor.attempt(_delivery(attempt_count=last))
         assert (
             deliveries.record_attempt_and_finish.await_args[0][2]
@@ -191,7 +191,7 @@ class TestFailurePaths:
         executor, _, endpoints, _ = _make(endpoint, max_consecutive=3)
         endpoints.record_exhausted.return_value = 3
         last = len(RETRY_SCHEDULE_SECONDS) - 1
-        with patch("services.webhooks.executor.post_public", _post(None, "boom")):
+        with patch("app.services.webhooks.executor.post_public", _post(None, "boom")):
             await executor.attempt(_delivery(attempt_count=last))
         endpoints.disable.assert_awaited_once_with(
             endpoint.id, EndpointDisabledReason.CONSECUTIVE_FAILURES
@@ -201,7 +201,7 @@ class TestFailurePaths:
     async def test_410_disables_immediately(self):
         endpoint = _endpoint()
         executor, deliveries, endpoints, _ = _make(endpoint)
-        with patch("services.webhooks.executor.post_public", _post(410)):
+        with patch("app.services.webhooks.executor.post_public", _post(410)):
             await executor.attempt(_delivery())
         endpoints.disable.assert_awaited_once_with(
             endpoint.id, EndpointDisabledReason.GONE
@@ -214,7 +214,7 @@ class TestFailurePaths:
     @pytest.mark.asyncio
     async def test_disabled_endpoint_terminal(self):
         executor, deliveries, _, _ = _make(_endpoint(status=WebhookStatus.DISABLED))
-        with patch("services.webhooks.executor.post_public", _post(204)) as post:
+        with patch("app.services.webhooks.executor.post_public", _post(204)) as post:
             await executor.attempt(_delivery())
         deliveries.mark_failed.assert_awaited_once()
         post.assert_not_awaited()
@@ -223,7 +223,7 @@ class TestFailurePaths:
     async def test_paused_endpoint_defers_instead_of_failing(self):
         """Paused is owner-controlled and temporary: the delivery waits."""
         executor, deliveries, _, _ = _make(_endpoint(status=WebhookStatus.PAUSED))
-        with patch("services.webhooks.executor.post_public", _post(204)) as post:
+        with patch("app.services.webhooks.executor.post_public", _post(204)) as post:
             await executor.attempt(_delivery())
         deliveries.defer.assert_awaited_once()
         deliveries.mark_failed.assert_not_awaited()
@@ -235,7 +235,7 @@ class TestFailurePaths:
         is terminally failed and the endpoint disabled with its own reason."""
         endpoint = _endpoint(signing_secret_enc="bm90LXJlYWwtY2lwaGVydGV4dA==")
         executor, deliveries, endpoints, _ = _make(endpoint)
-        with patch("services.webhooks.executor.post_public", _post(204)) as post:
+        with patch("app.services.webhooks.executor.post_public", _post(204)) as post:
             await executor.attempt(_delivery())
         deliveries.mark_failed.assert_awaited_once()
         assert deliveries.mark_failed.await_args[0][1] == "secret_unreadable"
@@ -251,7 +251,7 @@ class TestFailurePaths:
         must never mutate its real health."""
         endpoint = _endpoint()
         executor, deliveries, endpoints, _ = _make(endpoint)
-        with patch("services.webhooks.executor.post_public", _post(500)):
+        with patch("app.services.webhooks.executor.post_public", _post(500)):
             await executor.attempt(_delivery(is_test=True))
         assert (
             deliveries.record_attempt_and_finish.await_args[0][2]
@@ -265,7 +265,7 @@ class TestFailurePaths:
     async def test_passing_test_send_does_not_reset_streak(self):
         endpoint = _endpoint(consecutive_failures=7)
         executor, _, endpoints, _ = _make(endpoint)
-        with patch("services.webhooks.executor.post_public", _post(204)):
+        with patch("app.services.webhooks.executor.post_public", _post(204)):
             await executor.attempt(_delivery(is_test=True))
         endpoints.record_success.assert_not_awaited()
 
@@ -277,7 +277,7 @@ class TestFailurePaths:
             status=DeliveryStatus.FAILED,
             rendered_body='{"type":"link.clicked","data":{}}',
         )
-        with patch("services.webhooks.executor.post_public", _post(410)):
+        with patch("app.services.webhooks.executor.post_public", _post(410)):
             await executor.attempt(row)
         endpoints.disable.assert_not_awaited()
         deliveries.record_attempt_and_reschedule.assert_not_awaited()
@@ -286,7 +286,7 @@ class TestFailurePaths:
     async def test_event_ttl_race_terminal_not_crash(self):
         executor, deliveries, _, events = _make(_endpoint())
         events.find_by_oid.return_value = None
-        with patch("services.webhooks.executor.post_public", _post(204)) as post:
+        with patch("app.services.webhooks.executor.post_public", _post(204)) as post:
             await executor.attempt(_delivery())
         deliveries.mark_failed.assert_awaited_once()
         assert deliveries.mark_failed.await_args[0][1] == "event_expired"
@@ -302,7 +302,7 @@ class TestPendingSlotRelease:
         endpoint = _endpoint()
         executor, deliveries, endpoints, _ = _make(endpoint)
         deliveries.record_attempt_and_finish.return_value = True
-        with patch("services.webhooks.executor.post_public", _post(204)):
+        with patch("app.services.webhooks.executor.post_public", _post(204)):
             await executor.attempt(_delivery(endpoint_id=endpoint.id))
         endpoints.release_pending.assert_awaited_once_with(endpoint.id)
 
@@ -312,7 +312,7 @@ class TestPendingSlotRelease:
         executor, deliveries, endpoints, _ = _make(endpoint)
         deliveries.record_attempt_and_finish.return_value = True
         last = len(RETRY_SCHEDULE_SECONDS) - 1
-        with patch("services.webhooks.executor.post_public", _post(500)):
+        with patch("app.services.webhooks.executor.post_public", _post(500)):
             await executor.attempt(
                 _delivery(endpoint_id=endpoint.id, attempt_count=last)
             )
@@ -329,9 +329,9 @@ class TestPendingSlotRelease:
     @pytest.mark.asyncio
     async def test_reschedule_and_defer_keep_the_slot(self):
         executor, _, endpoints, _ = _make(_endpoint())
-        with patch("services.webhooks.executor.post_public", _post(500)):
+        with patch("app.services.webhooks.executor.post_public", _post(500)):
             await executor.attempt(_delivery())
-        with patch("services.webhooks.executor.post_public", _post(429)):
+        with patch("app.services.webhooks.executor.post_public", _post(429)):
             await executor.attempt(_delivery())
         endpoints.release_pending.assert_not_awaited()
 
@@ -339,7 +339,7 @@ class TestPendingSlotRelease:
     async def test_test_send_never_releases(self):
         executor, deliveries, endpoints, _ = _make(_endpoint())
         deliveries.record_attempt_and_finish.return_value = True
-        with patch("services.webhooks.executor.post_public", _post(204)):
+        with patch("app.services.webhooks.executor.post_public", _post(204)):
             await executor.attempt(_delivery(is_test=True))
         endpoints.release_pending.assert_not_awaited()
 
@@ -348,7 +348,7 @@ class TestPendingSlotRelease:
         executor, deliveries, endpoints, _ = _make(_endpoint())
         deliveries.record_attempt_and_finish.return_value = False
         row = _delivery(status=DeliveryStatus.FAILED, rendered_body="{}")
-        with patch("services.webhooks.executor.post_public", _post(204)):
+        with patch("app.services.webhooks.executor.post_public", _post(204)):
             await executor.attempt(row)
         endpoints.release_pending.assert_not_awaited()
 
@@ -365,7 +365,7 @@ class TestRotationGrace:
         )
         executor, _, _, _ = _make(endpoint)
         post = _post(204)
-        with patch("services.webhooks.executor.post_public", post):
+        with patch("app.services.webhooks.executor.post_public", post):
             await executor.attempt(_delivery())
         headers = post.await_args.kwargs["headers"]
         _, body = post.await_args[0]
@@ -383,7 +383,7 @@ class TestRateLimit:
     @pytest.mark.asyncio
     async def test_429_defers_without_ladder_or_streak(self):
         executor, deliveries, endpoints, _ = _make(_endpoint())
-        with patch("services.webhooks.executor.post_public", self._post_429(None)):
+        with patch("app.services.webhooks.executor.post_public", self._post_429(None)):
             await executor.attempt(_delivery(attempt_count=1))
         deliveries.defer.assert_awaited_once()
         assert (
@@ -397,14 +397,16 @@ class TestRateLimit:
     @pytest.mark.asyncio
     async def test_429_honors_retry_after(self):
         executor, deliveries, _, _ = _make(_endpoint())
-        with patch("services.webhooks.executor.post_public", self._post_429(5.0)):
+        with patch("app.services.webhooks.executor.post_public", self._post_429(5.0)):
             await executor.attempt(_delivery())
         assert deliveries.defer.await_args.kwargs["delay_seconds"] == 5
 
     @pytest.mark.asyncio
     async def test_429_retry_after_is_capped(self):
         executor, deliveries, _, _ = _make(_endpoint())
-        with patch("services.webhooks.executor.post_public", self._post_429(3600.0)):
+        with patch(
+            "app.services.webhooks.executor.post_public", self._post_429(3600.0)
+        ):
             await executor.attempt(_delivery())
         assert (
             deliveries.defer.await_args.kwargs["delay_seconds"]
@@ -416,7 +418,7 @@ class TestRateLimit:
         # A rate-limited test send must report its outcome synchronously,
         # not silently park the row.
         executor, deliveries, _, _ = _make(_endpoint())
-        with patch("services.webhooks.executor.post_public", self._post_429(5.0)):
+        with patch("app.services.webhooks.executor.post_public", self._post_429(5.0)):
             await executor.attempt(_delivery(is_test=True, next_attempt_at=None))
         deliveries.defer.assert_not_awaited()
         assert (
@@ -431,7 +433,7 @@ class TestDeliveryUrl:
         endpoint = _endpoint(flavor=WebhookFlavor.DISCORD)
         executor, _, _, _ = _make(endpoint)
         post = _post(204)
-        with patch("services.webhooks.executor.post_public", post):
+        with patch("app.services.webhooks.executor.post_public", post):
             await executor.attempt(_delivery())
         url = post.await_args[0][0]
         assert url == f"{endpoint.url}?with_components=true"
@@ -441,7 +443,7 @@ class TestDeliveryUrl:
         endpoint = _endpoint()
         executor, _, _, _ = _make(endpoint)
         post = _post(204)
-        with patch("services.webhooks.executor.post_public", post):
+        with patch("app.services.webhooks.executor.post_public", post):
             await executor.attempt(_delivery())
         assert post.await_args[0][0] == endpoint.url
 
@@ -457,7 +459,7 @@ class TestRenderFailures:
         executor = DeliveryExecutor(
             deliveries, endpoints, events, {}, master_secret=_MASTER
         )
-        with patch("services.webhooks.executor.post_public", _post(204)) as post:
+        with patch("app.services.webhooks.executor.post_public", _post(204)) as post:
             await executor.attempt(_delivery(endpoint_id=endpoint.id))
         assert deliveries.mark_failed.await_args[0][1].startswith("unknown_flavor:")
         endpoints.release_pending.assert_awaited_once_with(endpoint.id)
@@ -478,7 +480,7 @@ class TestRenderFailures:
             master_secret=_MASTER,
             max_payload_bytes=16,
         )
-        with patch("services.webhooks.executor.post_public", _post(204)) as post:
+        with patch("app.services.webhooks.executor.post_public", _post(204)) as post:
             await executor.attempt(_delivery(endpoint_id=endpoint.id))
         assert deliveries.mark_failed.await_args[0][1] == "payload_over_cap"
         endpoints.release_pending.assert_awaited_once_with(endpoint.id)
@@ -676,7 +678,7 @@ class TestObservabilityFields:
             created_at=datetime.now(timezone.utc) - timedelta(seconds=2),
         )
         with (
-            patch("services.webhooks.executor.post_public", _post(204)),
+            patch("app.services.webhooks.executor.post_public", _post(204)),
             capture_logs() as logs,
         ):
             await executor.attempt(row)
@@ -690,14 +692,14 @@ class TestObservabilityFields:
         executor, _, endpoints, _ = _make(endpoint, max_consecutive=99)
         last = len(RETRY_SCHEDULE_SECONDS) - 1
         with (
-            patch("services.webhooks.executor.post_public", _post(500)),
+            patch("app.services.webhooks.executor.post_public", _post(500)),
             capture_logs() as logs,
         ):
             await executor.attempt(
                 _delivery(endpoint_id=endpoint.id, attempt_count=last)
             )
         with (
-            patch("services.webhooks.executor.post_public", _post(410)),
+            patch("app.services.webhooks.executor.post_public", _post(410)),
             capture_logs() as logs_gone,
         ):
             await executor.attempt(_delivery(endpoint_id=endpoint.id))
@@ -714,7 +716,7 @@ class TestObservabilityFields:
     async def test_reschedule_is_not_a_terminal_failure(self):
         executor, _, _, _ = _make(_endpoint())
         with (
-            patch("services.webhooks.executor.post_public", _post(500)),
+            patch("app.services.webhooks.executor.post_public", _post(500)),
             capture_logs() as logs,
         ):
             await executor.attempt(_delivery())

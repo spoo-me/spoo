@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from infrastructure.cloudflare_session import CloudflareSession
+from app.infrastructure.cloudflare_session import CloudflareSession
 
 
 def _response(status_code: int, headers: dict[str, str] | None = None) -> MagicMock:
@@ -99,7 +99,7 @@ class TestRequest:
             ]
         )
         with patch(
-            "infrastructure.cloudflare_session.asyncio.sleep", new=AsyncMock()
+            "app.infrastructure.cloudflare_session.asyncio.sleep", new=AsyncMock()
         ) as sleep:
             response = await _session(http).request("GET", "/x")
         assert response.status_code == 200
@@ -114,7 +114,7 @@ class TestRequest:
             ]
         )
         with patch(
-            "infrastructure.cloudflare_session.asyncio.sleep", new=AsyncMock()
+            "app.infrastructure.cloudflare_session.asyncio.sleep", new=AsyncMock()
         ) as sleep:
             await _session(http).request("GET", "/x")
         sleep.assert_awaited_once_with(0.001)  # initial backoff, attempt 0

@@ -9,19 +9,19 @@ import pytest
 from bson import ObjectId
 from pydantic import ValidationError
 
-from schemas.dto.requests.bulk import BulkTagUrlsRequest
-from schemas.dto.requests.stats import LinkStatsQuery, StatsQuery
-from schemas.dto.requests.tag import CreateTagRequest, UpdateTagRequest
-from schemas.dto.requests.url import (
+from app.schemas.dto.requests.bulk import BulkTagUrlsRequest
+from app.schemas.dto.requests.stats import LinkStatsQuery, StatsQuery
+from app.schemas.dto.requests.tag import CreateTagRequest, UpdateTagRequest
+from app.schemas.dto.requests.url import (
     CreateUrlRequest,
     ListUrlsQuery,
     UpdateUrlRequest,
 )
-from schemas.dto.responses.tag import TagRef, TagResponse
-from schemas.dto.responses.url import UpdateUrlResponse, UrlListItem, UrlResponse
-from schemas.models.tag import TagColor, TagDoc
-from schemas.models.url import UrlV2Doc
-from shared.tags import TAGS_MAX_PER_LINK
+from app.schemas.dto.responses.tag import TagRef, TagResponse
+from app.schemas.dto.responses.url import UpdateUrlResponse, UrlListItem, UrlResponse
+from app.schemas.models.tag import TagColor, TagDoc
+from app.schemas.models.url import UrlV2Doc
+from app.shared.tags import TAGS_MAX_PER_LINK
 
 T1 = ObjectId("a" * 24)
 T2 = ObjectId("b" * 24)

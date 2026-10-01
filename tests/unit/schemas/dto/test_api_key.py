@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from schemas.dto.requests.api_key import CreateApiKeyRequest
-from schemas.dto.responses.api_key import (
+from app.schemas.dto.requests.api_key import CreateApiKeyRequest
+from app.schemas.dto.responses.api_key import (
     ApiKeyCreatedResponse,
 )
 

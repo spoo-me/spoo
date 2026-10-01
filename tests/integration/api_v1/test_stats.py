@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import get_current_user, get_stats_service, get_url_service
-from errors import NotFoundError
+from app.dependencies import get_current_user, get_stats_service, get_url_service
+from app.errors import NotFoundError
 
 from .conftest import _build_test_app, _make_api_key_doc, _make_url_doc, _make_user
 

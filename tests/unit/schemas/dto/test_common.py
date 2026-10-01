@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from schemas.dto.responses.common import ErrorResponse, HealthResponse
+from app.schemas.dto.responses.common import ErrorResponse, HealthResponse
 
 
 class TestErrorResponse:

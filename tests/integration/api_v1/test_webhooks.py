@@ -20,20 +20,28 @@ import pytest
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import get_current_user, get_feature_flag_service, get_webhook_service
-from errors import ForbiddenError
-from infrastructure.safe_fetch import PostResult
-from middleware.rate_limiter import limiter
-from routes.api_v1 import router as api_v1_router
-from schemas.enums.webhook import DeliveryStatus, WebhookStatus
-from schemas.models.webhook import (
+from app.dependencies import (
+    get_current_user,
+    get_feature_flag_service,
+    get_webhook_service,
+)
+from app.errors import ForbiddenError
+from app.infrastructure.safe_fetch import PostResult
+from app.middleware.rate_limiter import limiter
+from app.routes.api_v1 import router as api_v1_router
+from app.schemas.enums.webhook import DeliveryStatus, WebhookStatus
+from app.schemas.models.webhook import (
     WebhookDeliveryDoc,
     WebhookEndpointDoc,
     WebhookEventDoc,
 )
-from services.webhooks import DeliveryExecutor, OwnerSubscriptionCache, WebhookService
-from services.webhooks.renderers import default_renderers
-from services.webhooks.signing import verify
+from app.services.webhooks import (
+    DeliveryExecutor,
+    OwnerSubscriptionCache,
+    WebhookService,
+)
+from app.services.webhooks.renderers import default_renderers
+from app.services.webhooks.signing import verify
 from tests.conftest import build_test_app
 
 from .conftest import _make_api_key_doc, _make_user
@@ -321,9 +329,11 @@ def _create_body(**overrides: Any) -> dict[str, Any]:
     return body
 
 
-_NO_SSRF = patch("services.webhooks.service.validate_public_https_url", new=AsyncMock())
+_NO_SSRF = patch(
+    "app.services.webhooks.service.validate_public_https_url", new=AsyncMock()
+)
 _POST_OK = patch(
-    "services.webhooks.executor.post_public",
+    "app.services.webhooks.executor.post_public",
     new=AsyncMock(return_value=PostResult(204, None, None)),
 )
 
@@ -406,7 +416,7 @@ def test_send_test_delivers_signed_sample_synchronously():
     post = AsyncMock(return_value=PostResult(204, None, None))
     with (
         _NO_SSRF,
-        patch("services.webhooks.executor.post_public", post),
+        patch("app.services.webhooks.executor.post_public", post),
         TestClient(app) as c,
     ):
         created = c.post(_URL, json=_create_body()).json()
@@ -453,7 +463,7 @@ def test_send_test_flag_denied_403():
 
 
 def _flag_override_key():
-    from dependencies import get_feature_flag_service
+    from app.dependencies import get_feature_flag_service
 
     return get_feature_flag_service
 
@@ -541,7 +551,7 @@ def test_send_test_renders_discord_flavor_and_signature_covers_it():
     post = AsyncMock(return_value=PostResult(204, None, None))
     with (
         _NO_SSRF,
-        patch("services.webhooks.executor.post_public", post),
+        patch("app.services.webhooks.executor.post_public", post),
         TestClient(app) as c,
     ):
         created = c.post(_URL, json=_create_body(flavor="discord")).json()

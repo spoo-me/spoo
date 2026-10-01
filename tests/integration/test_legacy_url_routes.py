@@ -21,8 +21,8 @@ os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
 from bson import ObjectId
 
-from config import AppSettings
-from dependencies import (
+from app.config import AppSettings
+from app.dependencies import (
     get_current_user,
     get_db,
     get_redis,
@@ -30,24 +30,24 @@ from dependencies import (
     get_url_policy,
     get_url_service,
 )
-from errors import NotFoundError
-from infrastructure.cache.url_cache import UrlCacheData
-from middleware.error_handler import register_error_handlers
-from middleware.rate_limiter import limiter
-from routes.legacy.url_shortener import router as legacy_url_router
+from app.errors import NotFoundError
+from app.infrastructure.cache.url_cache import UrlCacheData
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.rate_limiter import limiter
+from app.routes.legacy.url_shortener import router as legacy_url_router
 from tests.conftest import build_test_app
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 _STATIC_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static"
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "app", "static"
 )
 
 
 def _make_gate(blocked_repo):
     """Real L0 gate over a mocked pattern repo (ttl=0 = always fresh)."""
-    from services.safety.policy import UrlPolicyService
-    from services.safety.providers import BlockedPatternProvider
+    from app.services.safety.policy import UrlPolicyService
+    from app.services.safety.providers import BlockedPatternProvider
 
     return UrlPolicyService(
         [
@@ -112,7 +112,7 @@ def test_index_renders_html():
 
 
 def test_index_redirects_authenticated_user_to_dashboard():
-    from dependencies.auth import CurrentUser
+    from app.dependencies.auth import CurrentUser
 
     user = CurrentUser(user_id=ObjectId(), email_verified=True)
     app = build_test_app(legacy_url_router, overrides={get_current_user: lambda: user})
@@ -182,8 +182,8 @@ def test_shorten_url_json_success():
 
     # Patch the BlockedUrlRepository.get_patterns and LegacyUrlRepository
     with (
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
     ):
         MockLegacyRepo.return_value.check_exists = AsyncMock(return_value=False)
         MockLegacyRepo.return_value.insert = AsyncMock(return_value=None)
@@ -224,8 +224,8 @@ def test_shorten_url_stamps_destination_parts():
     )
 
     with (
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
     ):
         MockLegacyRepo.return_value.check_exists = AsyncMock(return_value=False)
         MockLegacyRepo.return_value.insert = AsyncMock(return_value=None)
@@ -259,8 +259,8 @@ def test_shorten_url_html_success_redirects_to_result():
     )
 
     with (
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
     ):
         MockLegacyRepo.return_value.check_exists = AsyncMock(return_value=False)
         MockLegacyRepo.return_value.insert = AsyncMock(return_value=None)
@@ -302,9 +302,9 @@ def test_shorten_url_blocked_url_returns_403():
 
 def test_shorten_url_published_policy_message_reaches_the_wire():
     """The published shortener-refusal message survives the legacy route."""
-    from services.safety.feeds import SHORTENER_FEED
-    from services.safety.policy import UrlPolicyService
-    from services.safety.providers import FeedDomainProvider
+    from app.services.safety.feeds import SHORTENER_FEED
+    from app.services.safety.policy import UrlPolicyService
+    from app.services.safety.providers import FeedDomainProvider
 
     db = _mock_db()
     settings = _mock_settings()
@@ -410,8 +410,8 @@ def test_shorten_url_invalid_password_returns_400():
     )
 
     with (
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
     ):
         MockLegacyRepo.return_value.check_exists = AsyncMock(return_value=False)
         MockUrlRepo.return_value.check_alias_exists = AsyncMock(return_value=False)
@@ -441,8 +441,8 @@ def test_shorten_url_invalid_max_clicks_returns_400():
     )
 
     with (
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
     ):
         MockLegacyRepo.return_value.check_exists = AsyncMock(return_value=False)
         MockUrlRepo.return_value.check_alias_exists = AsyncMock(return_value=False)
@@ -506,7 +506,7 @@ def test_emoji_success_json():
     )
 
     with (
-        patch("routes.legacy.url_shortener.EmojiUrlRepository") as MockEmojiRepo,
+        patch("app.routes.legacy.url_shortener.EmojiUrlRepository") as MockEmojiRepo,
     ):
         MockEmojiRepo.return_value.check_exists = AsyncMock(return_value=False)
         MockEmojiRepo.return_value.insert = AsyncMock(return_value=None)
@@ -556,8 +556,8 @@ def test_preview_not_found():
     db = _mock_db()
     # Mock repos to return None
     with (
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
     ):
         MockUrlRepo.return_value.find_by_alias = AsyncMock(return_value=None)
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=None)
@@ -577,8 +577,8 @@ def test_preview_v2_url_shows_destination():
     v2_doc.password = None
 
     with (
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
     ):
         MockUrlRepo.return_value.find_by_alias = AsyncMock(return_value=v2_doc)
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=None)
@@ -593,7 +593,7 @@ def test_preview_v2_url_shows_destination():
 def test_preview_shows_custom_meta_card_next_to_destination():
     """og-links: the + page shows BOTH the owner's card and the real
     destination — the anti-phishing transparency surface."""
-    from schemas.models.url import LinkMetaTags
+    from app.schemas.models.url import LinkMetaTags
 
     db = _mock_db()
     v2_doc = MagicMock()
@@ -605,8 +605,8 @@ def test_preview_shows_custom_meta_card_next_to_destination():
     )
 
     with (
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
     ):
         MockUrlRepo.return_value.find_by_alias = AsyncMock(return_value=v2_doc)
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=None)
@@ -630,8 +630,8 @@ def test_preview_password_protected_hides_destination():
     v2_doc.password = "hashed_password"
 
     with (
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
     ):
         MockUrlRepo.return_value.find_by_alias = AsyncMock(return_value=v2_doc)
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=None)
@@ -724,8 +724,8 @@ def test_preview_geo_link_lists_every_destination():
     }
 
     with (
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
     ):
         MockUrlRepo.return_value.find_by_alias = AsyncMock(return_value=v2_doc)
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=None)
@@ -747,7 +747,7 @@ def test_preview_geo_link_lists_every_destination():
 
 
 def test_preview_variant_link_lists_every_destination():
-    from schemas.models.url import AbVariant
+    from app.schemas.models.url import AbVariant
 
     db = _mock_db()
     v2_doc = MagicMock()
@@ -758,8 +758,8 @@ def test_preview_variant_link_lists_every_destination():
     v2_doc.ab_variants = [AbVariant(url="https://b.example.net/offer", weight=40)]
 
     with (
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
     ):
         MockUrlRepo.return_value.find_by_alias = AsyncMock(return_value=v2_doc)
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=None)
@@ -785,8 +785,8 @@ def test_preview_non_geo_link_has_no_banner():
     v2_doc.geo_rules = None
 
     with (
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
     ):
         MockUrlRepo.return_value.find_by_alias = AsyncMock(return_value=v2_doc)
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=None)
@@ -811,8 +811,8 @@ def test_preview_password_protected_geo_link_hides_everything():
     v2_doc.geo_rules = {"IN": "https://secret.example.in/"}
 
     with (
-        patch("routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
-        patch("routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
+        patch("app.routes.legacy.url_shortener.UrlRepository") as MockUrlRepo,
+        patch("app.routes.legacy.url_shortener.LegacyUrlRepository") as MockLegacyRepo,
     ):
         MockUrlRepo.return_value.find_by_alias = AsyncMock(return_value=v2_doc)
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=None)

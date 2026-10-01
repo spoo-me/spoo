@@ -11,17 +11,17 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from openpyxl import load_workbook
 
-from errors import NotFoundError, ValidationError
-from schemas.dto.requests.stats import ExportQuery
-from schemas.results import ExportResult
-from services.export import ExportService, default_formatters
-from services.export.formatters import (
+from app.errors import NotFoundError, ValidationError
+from app.schemas.dto.requests.stats import ExportQuery
+from app.schemas.results import ExportResult
+from app.services.export import ExportService, default_formatters
+from app.services.export.formatters import (
     CsvFormatter,
     JsonFormatter,
     XlsxFormatter,
     XmlFormatter,
 )
-from services.stats_service import StatsService
+from app.services.stats_service import StatsService
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -269,7 +269,7 @@ class TestDelegation:
 def _make_url_doc(alias="mylink"):
     from bson import ObjectId
 
-    from schemas.models.url import UrlV2Doc
+    from app.schemas.models.url import UrlV2Doc
 
     return UrlV2Doc(
         **{
@@ -285,7 +285,7 @@ def _make_url_doc(alias="mylink"):
 
 
 def _link_export_query(fmt="json"):
-    from schemas.dto.requests.stats import LinkExportQuery
+    from app.schemas.dto.requests.stats import LinkExportQuery
 
     return LinkExportQuery(
         format=fmt,

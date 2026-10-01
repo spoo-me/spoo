@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from infrastructure.oauth_clients import (
+from app.infrastructure.oauth_clients import (
     DiscordStrategy,
     GitHubStrategy,
     GoogleStrategy,

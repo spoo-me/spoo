@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from services.click.events import (
+from app.services.click.events import (
     EVENT_TYPE_CLICK,
     STREAM_FIELD_DATA,
     STREAM_FIELD_TYPE,
     ClickEvent,
 )
-from services.click.sinks import InlineSink, RedisStreamSink
+from app.services.click.sinks import InlineSink, RedisStreamSink
 from tests.factories import make_click_event as make_event
 
 

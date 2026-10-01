@@ -7,13 +7,13 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from schemas.dto.requests.stats import (
+from app.schemas.dto.requests.stats import (
     ExportQuery,
     LinkExportQuery,
     LinkStatsQuery,
     StatsQuery,
 )
-from schemas.dto.responses.stats import (
+from app.schemas.dto.responses.stats import (
     StatsResponse,
     StatsSummary,
     StatsTimeRange,

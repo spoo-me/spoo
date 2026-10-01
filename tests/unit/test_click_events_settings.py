@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from config import AppSettings, ClickEventsSettings
+from app.config import AppSettings, ClickEventsSettings
 
 
 class TestClickEventsSettings:

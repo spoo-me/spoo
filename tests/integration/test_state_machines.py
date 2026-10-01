@@ -16,13 +16,13 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from errors import ForbiddenError, ValidationError
-from infrastructure.crypto import hash_token
-from schemas.dto.requests.url import UpdateUrlRequest
-from schemas.models.token import TOKEN_TYPE_EMAIL_VERIFY
-from schemas.models.url import UrlStatus, UrlV2Doc
-from services.auth.otp import MAX_VERIFICATION_ATTEMPTS, OtpService
-from services.url_service import UrlService
+from app.errors import ForbiddenError, ValidationError
+from app.infrastructure.crypto import hash_token
+from app.schemas.dto.requests.url import UpdateUrlRequest
+from app.schemas.models.token import TOKEN_TYPE_EMAIL_VERIFY
+from app.schemas.models.url import UrlStatus, UrlV2Doc
+from app.services.auth.otp import MAX_VERIFICATION_ATTEMPTS, OtpService
+from app.services.url_service import UrlService
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -88,8 +88,8 @@ def make_url_service() -> tuple[UrlService, AsyncMock, AsyncMock, AsyncMock]:
 
 
 def _make_gate(blocked_url_repo):
-    from services.safety.policy import UrlPolicyService
-    from services.safety.providers import BlockedPatternProvider
+    from app.services.safety.policy import UrlPolicyService
+    from app.services.safety.providers import BlockedPatternProvider
 
     return UrlPolicyService(
         [

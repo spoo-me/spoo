@@ -118,7 +118,7 @@ def main() -> int:
     lines.append(",\n".join(body))
     lines.append("  ]")
     lines.append("}")
-    dest = Path(__file__).resolve().parent.parent / "data" / "emoji_groups.json"
+    dest = Path(__file__).resolve().parent.parent / "app" / "data" / "emoji_groups.json"
     dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {dest} — {len(groups)} groups, {len(entries)} single-cp entries")
     return 0

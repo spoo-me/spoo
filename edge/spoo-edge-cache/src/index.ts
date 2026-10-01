@@ -2,7 +2,7 @@
  * spoo-edge-cache — pure-reader edge cache for hot short URLs.
  *
  * The Worker makes NO decisions: origin promotes eligible hot URLs into
- * KV (services/edge_cache.py) and this Worker serves
+ * KV (app/services/edge_cache/) and this Worker serves
  * whatever it finds there. Miss, excluded path, unknown entry type, or
  * any internal error → passthrough to origin, which is exactly today's
  * request path. Entries self-expire via KV TTL (invalidation v1).
@@ -36,7 +36,7 @@ const EXCLUDED_PREFIXES = [
 
 /**
  * Single-segment page paths that are never short codes — the reserved
- * alias list (shared/reserved_aliases.py) guarantees no code can take
+ * alias list (app/shared/reserved_aliases.py) guarantees no code can take
  * these names, so skipping KV is free. Exact matches only: "aboutus"
  * is a legal alias and keeps its lookup. Drift from the Python list is
  * benign — a missing entry costs one wasted KV read, nothing more.

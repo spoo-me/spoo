@@ -11,17 +11,17 @@ os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
 from bson import ObjectId
 
-from errors import R2StorageError
-from services.account_erasure_service import (
+from app.errors import R2StorageError
+from app.services.account_erasure_service import (
     ERASURE_SWEEP_TASK,
     AccountErasureService,
     NoopErasureMailer,
     NoopPostHogEraser,
     erasure_sweep_task,
 )
-from services.image_ingest import owner_key_prefix
-from services.scheduler.tasks import build_task_registry
-from services.url_service import OwnerUrlErasure
+from app.services.image_ingest import owner_key_prefix
+from app.services.scheduler.tasks import build_task_registry
+from app.services.url_service import OwnerUrlErasure
 
 UID = ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")
 UID2 = ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")

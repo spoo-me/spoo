@@ -3,7 +3,7 @@ routing, and embed formatting (owned here, not by the calling services)."""
 
 from unittest.mock import AsyncMock, MagicMock
 
-from infrastructure.ops_notify import DiscordOpsNotifier
+from app.infrastructure.ops_notify import DiscordOpsNotifier
 
 _CONTACT_URL = "https://discord.com/api/webhooks/123/contact"
 _REPORT_URL = "https://discord.com/api/webhooks/123/report"
@@ -187,6 +187,6 @@ class TestSendEmbed:
         http.post.assert_not_awaited()
 
     async def test_short_field_is_untouched(self):
-        from infrastructure.ops_notify import _bound_field
+        from app.infrastructure.ops_notify import _bound_field
 
         assert _bound_field("```ok```") == "```ok```"

@@ -10,8 +10,8 @@ os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import dependencies
-from config import AppSettings
+from app import dependencies
+from app.config import AppSettings
 
 # All dependency functions that should be importable from dependencies.py
 _DEPENDENCY_NAMES = [
@@ -78,7 +78,7 @@ def test_current_user_dataclass_importable() -> None:
     """CurrentUser dataclass should be importable with expected fields."""
     from dataclasses import fields as dc_fields
 
-    from dependencies import CurrentUser
+    from app.dependencies import CurrentUser
 
     field_names = {f.name for f in dc_fields(CurrentUser)}
     assert "user_id" in field_names

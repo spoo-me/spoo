@@ -2,7 +2,7 @@ name: Deploy Edge Worker
 
 # Production deploys ride release publish — the same cadence as the app
 # image (deploy.yml). The two share a wire contract
-# (services/edge_cache/contract.py ⇄ edge/spoo-edge-cache/contract/),
+# (app/services/edge_cache/contract.py ⇄ edge/spoo-edge-cache/contract/),
 # so deploying the worker on merge while the app waits for a release
 # would open a contract-skew window. Releases without edge changes
 # redeploy the same worker code — idempotent and cheap.

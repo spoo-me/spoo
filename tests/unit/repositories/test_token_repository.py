@@ -12,7 +12,7 @@ from .conftest import TOKEN_OID, USER_OID, make_collection
 
 class TestTokenRepository:
     def _repo(self, col=None):
-        from repositories.token_repository import TokenRepository
+        from app.repositories.token_repository import TokenRepository
 
         return TokenRepository(col or make_collection())
 
@@ -90,7 +90,7 @@ class TestTokenRepository:
 
 class TestTokenRepositoryErasure:
     def _repo(self, col=None):
-        from repositories.token_repository import TokenRepository
+        from app.repositories.token_repository import TokenRepository
 
         return TokenRepository(col or make_collection())
 

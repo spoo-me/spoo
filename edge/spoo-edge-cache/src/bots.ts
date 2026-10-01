@@ -1,9 +1,9 @@
 /**
  * Preview-crawler classification for custom meta-tags serving.
  *
- * Mirror of wants_preview() in services/click/bot_detection.py — both
+ * Mirror of wants_preview() in app/services/click/bot_detection.py — both
  * runtimes consume the same JSON (../contract/preview_bots.json, byte-
- * identical to data/preview_bots.json; pinned by tests on both sides).
+ * identical to app/data/preview_bots.json; pinned by tests on both sides).
  *
  * Positive allowlist only — NOT generic bot detection. A missed preview
  * bot follows the redirect and shows the destination's own tags (today's

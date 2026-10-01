@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from dependencies import get_db
-from routes.legacy.stats import router as legacy_stats_router
+from app.dependencies import get_db
+from app.routes.legacy.stats import router as legacy_stats_router
 from tests.conftest import build_test_app
 
 
@@ -84,7 +84,7 @@ def test_stats_post_missing_short_code_returns_400():
 def test_stats_post_url_not_found_renders_form():
     db = _mock_db()
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=None)
 
         app = build_test_app(legacy_stats_router, overrides={get_db: lambda: db})
@@ -98,7 +98,7 @@ def test_stats_post_password_required_renders_prompt():
     db = _mock_db()
     doc = _mock_legacy_doc(password="secret123")
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=doc)
 
         app = build_test_app(legacy_stats_router, overrides={get_db: lambda: db})
@@ -112,7 +112,7 @@ def test_stats_post_wrong_password_renders_error():
     db = _mock_db()
     doc = _mock_legacy_doc(password="secret123")
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=doc)
 
         app = build_test_app(legacy_stats_router, overrides={get_db: lambda: db})
@@ -128,7 +128,7 @@ def test_stats_post_correct_password_redirects():
     db = _mock_db()
     doc = _mock_legacy_doc(password="secret123")
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=doc)
 
         app = build_test_app(legacy_stats_router, overrides={get_db: lambda: db})
@@ -144,7 +144,7 @@ def test_stats_post_no_password_redirects():
     db = _mock_db()
     doc = _mock_legacy_doc(password=None)
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.find_by_id = AsyncMock(return_value=doc)
 
         app = build_test_app(legacy_stats_router, overrides={get_db: lambda: db})
@@ -162,7 +162,7 @@ def test_analytics_get_not_found_returns_404_html():
     cursor = MagicMock()
     cursor.to_list = AsyncMock(return_value=[])
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(return_value=None)
 
         app = build_test_app(legacy_stats_router, overrides={get_db: lambda: db})
@@ -175,7 +175,7 @@ def test_analytics_get_not_found_returns_404_html():
 def test_analytics_post_not_found_returns_404_json():
     db = _mock_db()
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(return_value=None)
 
         app = build_test_app(legacy_stats_router, overrides={get_db: lambda: db})
@@ -189,7 +189,7 @@ def test_analytics_post_wrong_password_returns_400():
     db = _mock_db()
     url_data = {**SAMPLE_URL_DATA, "password": "secret123"}
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(return_value=url_data)
 
         app = build_test_app(legacy_stats_router, overrides={get_db: lambda: db})
@@ -202,7 +202,7 @@ def test_analytics_post_wrong_password_returns_400():
 def test_analytics_post_returns_json():
     db = _mock_db()
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(
             return_value=dict(SAMPLE_URL_DATA)
         )
@@ -226,7 +226,7 @@ def test_analytics_post_missing_avg_redirection_time_stays_numeric_zero():
     url_data = dict(SAMPLE_URL_DATA)
     del url_data["average_redirection_time"]
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(return_value=url_data)
 
         app = build_test_app(legacy_stats_router, overrides={get_db: lambda: db})
@@ -239,7 +239,7 @@ def test_analytics_post_missing_avg_redirection_time_stays_numeric_zero():
 def test_analytics_get_renders_stats_page():
     db = _mock_db()
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(
             return_value=dict(SAMPLE_URL_DATA)
         )
@@ -275,7 +275,7 @@ def test_export_invalid_format_post_returns_400_json():
 def test_export_not_found_post_returns_404_json():
     db = _mock_db()
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(return_value=None)
 
         app = build_test_app(legacy_stats_router, overrides={get_db: lambda: db})
@@ -289,7 +289,7 @@ def test_export_wrong_password_post_returns_400():
     db = _mock_db()
     url_data = {**SAMPLE_URL_DATA, "password": "secret123"}
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(return_value=url_data)
 
         app = build_test_app(legacy_stats_router, overrides={get_db: lambda: db})
@@ -302,7 +302,7 @@ def test_export_wrong_password_post_returns_400():
 def test_export_json_format():
     db = _mock_db()
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(
             return_value=dict(SAMPLE_URL_DATA)
         )
@@ -318,7 +318,7 @@ def test_export_json_format():
 def test_export_csv_format():
     db = _mock_db()
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(
             return_value=dict(SAMPLE_URL_DATA)
         )
@@ -334,7 +334,7 @@ def test_export_csv_format():
 def test_export_xlsx_format():
     db = _mock_db()
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(
             return_value=dict(SAMPLE_URL_DATA)
         )
@@ -350,7 +350,7 @@ def test_export_xlsx_format():
 def test_export_xml_format():
     db = _mock_db()
 
-    with patch("routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
+    with patch("app.routes.legacy.stats.LegacyUrlRepository") as MockLegacyRepo:
         MockLegacyRepo.return_value.aggregate = AsyncMock(
             return_value=dict(SAMPLE_URL_DATA)
         )

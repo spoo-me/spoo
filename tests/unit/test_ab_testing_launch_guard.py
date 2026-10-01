@@ -11,9 +11,9 @@ from __future__ import annotations
 import inspect
 import typing
 
-from config import AppSettings
-from schemas.models.url import UrlDestination
-from shared.url_utils import link_destination_urls_for
+from app.config import AppSettings
+from app.schemas.models.url import UrlDestination
+from app.shared.url_utils import link_destination_urls_for
 
 _FLAGS = ("ab_testing_enabled", "ab_variants_enabled")
 

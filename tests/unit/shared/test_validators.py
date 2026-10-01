@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from shared.validators import (
+from app.shared.validators import (
     validate_alias,
     validate_blocked_url,
     validate_url,
@@ -173,5 +173,5 @@ def test_validate_blocked_url(url, patterns, expected):
 
 def test_validate_blocked_url_timeout_fails_open(mocker):
     """Timed-out patterns must fail open (URL stays allowed)."""
-    mocker.patch("shared.validators.regex.search", side_effect=TimeoutError)
+    mocker.patch("app.shared.validators.regex.search", side_effect=TimeoutError)
     assert validate_blocked_url("https://example.com", [r"any_pattern"]) is True

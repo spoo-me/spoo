@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from errors import ForbiddenError, ValidationError
-from services.click.consumers import (
+from app.errors import ForbiddenError, ValidationError
+from app.services.click.consumers import (
     HotUrl,
     HotUrlDetector,
     LogHotUrlAction,

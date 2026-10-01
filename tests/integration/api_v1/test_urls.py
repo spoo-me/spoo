@@ -8,15 +8,15 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from config import AppSettings
-from dependencies import (
+from app.config import AppSettings
+from app.dependencies import (
     get_current_user,
     get_settings,
     get_url_service,
     require_auth,
 )
-from errors import NotFoundError
-from schemas.dto.responses.url import UrlListItem
+from app.errors import NotFoundError
+from app.schemas.dto.responses.url import UrlListItem
 
 from .conftest import _build_test_app, _make_api_key_doc, _make_url_doc, _make_user
 

@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import pytest
 
-from shared.app_registry import load_app_registry
+from app.shared.app_registry import load_app_registry
 
 
 @pytest.fixture()

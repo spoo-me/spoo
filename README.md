@@ -82,7 +82,7 @@ The backend is FastAPI on MongoDB and Redis, with a Cloudflare Worker in front f
 - **Redirects.** The app resolves an alias through a two-tier cache before it touches MongoDB. Links that cross a click threshold get promoted to Workers KV, and the Worker serves them from the Cloudflare edge without reaching the origin.
 - **Clicks.** A redirect writes a click event to a Redis stream and returns. A separate worker consumes the stream to record stats, promote hot links, and run safety analysis, so a slow database never slows a redirect.
 - **Degrades instead of failing.** If the queue Redis is down, clicks are recorded inline. If the cache Redis is down, reads go to MongoDB. Without Cloudflare credentials the origin serves everything. A self-hosted instance needs MongoDB and Redis and nothing else.
-- **Layered code.** Requests go `routes` to `services` to `repositories` to MongoDB, with dependencies wired in one place (`dependencies/wiring.py`).
+- **Layered code.** Requests go `routes` to `services` to `repositories` to MongoDB, with dependencies wired in one place (`app/dependencies/wiring.py`).
 
 ## 🧩 Ecosystem
 
@@ -204,7 +204,7 @@ To run without Docker, you need Python 3.10+, [uv](https://docs.astral.sh/uv/), 
 
 ```bash
 uv sync
-uv run main.py
+uv run uvicorn app.main:app
 ```
 
 ## 🛠️ Development

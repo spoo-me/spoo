@@ -13,7 +13,7 @@ from .conftest import URL_OID, USER_OID, make_collection
 
 class TestClickRepository:
     def _repo(self, col=None):
-        from repositories.click_repository import ClickRepository
+        from app.repositories.click_repository import ClickRepository
 
         return ClickRepository(col or make_collection())
 
@@ -101,7 +101,7 @@ class TestClickRepository:
 
     @pytest.mark.asyncio
     async def test_delete_by_owner_refuses_anonymous_sentinel(self):
-        from schemas.models.base import ANONYMOUS_OWNER_ID
+        from app.schemas.models.base import ANONYMOUS_OWNER_ID
 
         col = make_collection()
         with pytest.raises(ValueError):

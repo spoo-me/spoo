@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import geoip2.errors
 
-from infrastructure.geoip import GeoIPService
+from app.infrastructure.geoip import GeoIPService
 
 
 class TestGeoIPService:

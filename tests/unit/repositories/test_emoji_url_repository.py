@@ -12,7 +12,7 @@ from .conftest import _legacy_url_doc, make_collection
 
 class TestEmojiUrlRepository:
     def _repo(self, col=None):
-        from repositories.legacy.emoji_url_repository import EmojiUrlRepository
+        from app.repositories.legacy.emoji_url_repository import EmojiUrlRepository
 
         return EmojiUrlRepository(col or make_collection())
 
@@ -139,7 +139,7 @@ class TestEmojiUrlRepository:
 class TestCountByDestHost:
     @pytest.mark.asyncio
     async def test_filters_on_stamped_dest_host(self):
-        from repositories.legacy.emoji_url_repository import EmojiUrlRepository
+        from app.repositories.legacy.emoji_url_repository import EmojiUrlRepository
 
         col = AsyncMock()
         col.name = "emojis"
@@ -154,7 +154,7 @@ class TestEmojiSafetyBlockSurface:
     these pins keep its hand-mirrored safety surface from drifting."""
 
     def _repo(self, col):
-        from repositories.legacy.emoji_url_repository import EmojiUrlRepository
+        from app.repositories.legacy.emoji_url_repository import EmojiUrlRepository
 
         col.name = "emojis"
         return EmojiUrlRepository(col)
