@@ -26,6 +26,8 @@ class Resolved(BaseModel):
     status: SubscriptionStatus | None = None
     until: datetime | None = None
     founding: bool = False
+    # True only for an active recurring term; prepaid terms end, they do not renew.
+    renews: bool = False
     values: dict[str, bool | int]
     version: int
     # True when this answer came from a fallback because the stores were

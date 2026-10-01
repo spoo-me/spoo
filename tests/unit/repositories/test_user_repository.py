@@ -183,6 +183,24 @@ class TestUserRepository:
         ok = await self._repo(col).set_storage_prefix_if_absent(USER_OID, "abc123")
         assert ok is False
 
+    # ── Pro tour ──────────────────────────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_mark_pro_onboarded_is_first_wins(self):
+        col = make_collection()
+        col.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
+        assert await self._repo(col).mark_pro_onboarded(USER_OID) is True
+        query, ops = col.update_one.await_args.args
+        assert query == {"_id": USER_OID, "pro_onboarded_at": None}
+        assert set(ops) == {"$set"} and set(ops["$set"]) == {"pro_onboarded_at"}
+        assert ops["$set"]["pro_onboarded_at"].tzinfo is not None
+
+    @pytest.mark.asyncio
+    async def test_mark_pro_onboarded_noops_once_stamped(self):
+        col = make_collection()
+        col.update_one = AsyncMock(return_value=MagicMock(modified_count=0))
+        assert await self._repo(col).mark_pro_onboarded(USER_OID) is False
+
     # ── Pending deletion ──────────────────────────────────────────────────────
 
     @pytest.mark.asyncio

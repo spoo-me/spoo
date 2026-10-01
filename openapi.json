@@ -8042,6 +8042,81 @@
         }
       }
     },
+    "/api/v1/me/pro-onboarding": {
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Complete Pro Onboarding",
+        "description": "Record that this account has seen the Pro tour. Idempotent: the first\ncompletion is kept, and it is read back as `user.pro_onboarded_at` on\n`GET /auth/me`.\n\n**Authentication**: Required. 403 on the free plan.",
+        "operationId": "completeProOnboarding",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Bad Request \u2014 invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 insufficient permissions or scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict \u2014 resource already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/layouts/{page}": {
       "get": {
         "tags": [
@@ -13900,6 +13975,12 @@
             "title": "Founding",
             "description": "Founding cohort member",
             "default": false
+          },
+          "renews": {
+            "type": "boolean",
+            "title": "Renews",
+            "description": "True when the term renews on its own at `until`; false when it ends",
+            "default": false
           }
         },
         "type": "object",
@@ -16711,6 +16792,18 @@
             ],
             "title": "Onboarded At",
             "description": "When the user completed onboarding (null = never)"
+          },
+          "pro_onboarded_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pro Onboarded At",
+            "description": "When the user completed the Pro tour (null = not yet)"
           },
           "auth_providers": {
             "items": {

@@ -23,7 +23,11 @@ from repositories.entitlement_override_repository import (
     EntitlementOverrideRepository,
 )
 from repositories.subscription_repository import SubscriptionRepository
-from schemas.models.subscription import SubscriptionDoc, SubscriptionStatus
+from schemas.models.subscription import (
+    SubscriptionDoc,
+    SubscriptionKind,
+    SubscriptionStatus,
+)
 from services.entitlements.over_limit import OverLimitService
 from services.entitlements.resolver import ANONYMOUS, Resolved, for_plan, resolve
 from services.entitlements.state_machine import SubscriptionEvent, next_status
@@ -100,6 +104,11 @@ class EntitlementService:
             status=sub.status if sub else None,
             until=sub.until if sub else None,
             founding=bool(sub and sub.founding),
+            renews=bool(
+                sub
+                and sub.kind is SubscriptionKind.RECURRING
+                and sub.status is SubscriptionStatus.ACTIVE
+            ),
             values=resolve(plan, overrides),
             version=version,
         )

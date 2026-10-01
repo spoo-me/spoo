@@ -117,6 +117,8 @@ class UserDoc(MongoBaseModel):
     onboarded_at: datetime | None = None
     # HDYHAU attribution, captured once at onboarding completion.
     heard_from: str | None = None
+    # First Pro tour completion; null = not yet.
+    pro_onboarded_at: datetime | None = None
     status: UserStatus = UserStatus.ACTIVE
     # Account deletion (GDPR erasure): both set on PENDING_DELETION, both
     # cleared on restore. Null on every account that never requested deletion.

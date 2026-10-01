@@ -76,6 +76,10 @@ class UserProfileResponse(ResponseBase):
         default=None,
         description="When the user completed onboarding (null = never)",
     )
+    pro_onboarded_at: UtcDatetime | None = Field(
+        default=None,
+        description="When the user completed the Pro tour (null = not yet)",
+    )
     auth_providers: list[AuthProviderInfo] = Field(description="Linked OAuth providers")
     # pfp is absent from the JSON when None (route handlers use exclude_none=True)
     pfp: UserPfp | None = Field(
@@ -97,6 +101,7 @@ class UserProfileResponse(ResponseBase):
             plan=plan,
             password_set=user.password_set,
             onboarded_at=user.onboarded_at,
+            pro_onboarded_at=user.pro_onboarded_at,
             auth_providers=[
                 AuthProviderInfo(
                     provider=p.provider,

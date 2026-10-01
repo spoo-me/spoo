@@ -20,6 +20,10 @@ class PlanBlock(ResponseBase):
         description="Term end, or the grace end while in grace; null when nothing ends",
     )
     founding: bool = Field(default=False, description="Founding cohort member")
+    renews: bool = Field(
+        default=False,
+        description="True when the term renews on its own at `until`; false when it ends",
+    )
 
 
 class LimitBlock(ResponseBase):
