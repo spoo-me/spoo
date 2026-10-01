@@ -2,7 +2,11 @@
 
 from services.entitlements.resolver import ANONYMOUS, Resolved, for_plan, resolve
 from services.entitlements.service import EntitlementService
-from services.entitlements.state_machine import SubscriptionEvent, next_status
+from services.entitlements.state_machine import (
+    SubscriptionEvent,
+    is_noop,
+    next_status,
+)
 
 __all__ = [
     "ANONYMOUS",
@@ -10,6 +14,7 @@ __all__ = [
     "Resolved",
     "SubscriptionEvent",
     "for_plan",
+    "is_noop",
     "next_status",
     "resolve",
 ]

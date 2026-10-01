@@ -1,0 +1,43 @@
+{
+  "event_id": "evt_adj_refund_0008",
+  "event_type": "adjustment.updated",
+  "occurred_at": "2026-09-06T08:54:10.646377Z",
+  "notification_id": "ntf_adj_refund_0008",
+  "data": {
+    "id": "adj_refund_0008",
+    "action": "refund",
+    "type": "full",
+    "status": "approved",
+    "reason": "error",
+    "transaction_id": "txn_recurring_0006",
+    "subscription_id": "sub_01hv8x29kz0t586xy6zn1a62ny",
+    "customer_id": "ctm_01hv6y1jedq4p1n0yqn5ba3ky4",
+    "currency_code": "USD",
+    "credit_applied_to_balance": null,
+    "totals": {
+      "subtotal": "900",
+      "tax": "0",
+      "total": "900",
+      "fee": "95",
+      "earnings": "805",
+      "retained_fee": "95",
+      "currency_code": "USD"
+    },
+    "items": [
+      {
+        "id": "adjitm_0008",
+        "item_id": "txnitm_0006",
+        "type": "full",
+        "amount": "900",
+        "totals": {
+          "subtotal": "900",
+          "tax": "0",
+          "total": "900"
+        },
+        "proration": null
+      }
+    ],
+    "created_at": "2026-09-06T08:48:20Z",
+    "updated_at": "2026-09-06T08:54:10Z"
+  }
+}

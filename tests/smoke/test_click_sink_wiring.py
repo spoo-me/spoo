@@ -40,6 +40,7 @@ _COLLECTIONS = (
     "subscriptions",
     "entitlement_overrides",
     "entitlement_events",
+    "billing_events",
 )
 
 

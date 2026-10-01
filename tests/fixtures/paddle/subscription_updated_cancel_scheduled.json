@@ -1,0 +1,72 @@
+{
+  "event_id": "evt_cancelsched_0004",
+  "event_type": "subscription.updated",
+  "occurred_at": "2026-09-20T09:00:00Z",
+  "notification_id": "ntf_cancelsched_0004",
+  "data": {
+    "id": "sub_01hv8x29kz0t586xy6zn1a62ny",
+    "status": "active",
+    "customer_id": "ctm_01hv6y1jedq4p1n0yqn5ba3ky4",
+    "address_id": "add_01hv8gq3318ktkfengj2r75gfx",
+    "business_id": null,
+    "currency_code": "USD",
+    "created_at": "2026-09-04T10:18:48.831Z",
+    "updated_at": "2026-09-04T10:18:48.831Z",
+    "started_at": "2026-09-04T10:18:47.635628Z",
+    "first_billed_at": "2026-09-04T10:18:47.635628Z",
+    "next_billed_at": "2026-10-04T10:18:47.635628Z",
+    "paused_at": null,
+    "canceled_at": null,
+    "custom_data": {
+      "user_id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+      "cadence": "monthly",
+      "return_to": "/dashboard/links",
+      "founding": true
+    },
+    "billing_cycle": {
+      "interval": "month",
+      "frequency": 1
+    },
+    "current_billing_period": {
+      "starts_at": "2026-09-04T10:18:47.635628Z",
+      "ends_at": "2026-10-04T10:18:47.635628Z"
+    },
+    "collection_mode": "automatic",
+    "billing_details": null,
+    "discount": {
+      "id": "dsc_founding_first_test",
+      "starts_at": "2026-09-04T10:18:47Z",
+      "ends_at": null,
+      "type": "flat"
+    },
+    "scheduled_change": {
+      "action": "cancel",
+      "effective_at": "2026-10-04T10:18:47.635628Z",
+      "resume_at": null
+    },
+    "consent_requirements": [],
+    "import_meta": null,
+    "items": [
+      {
+        "price": {
+          "id": "pri_pro_monthly_test",
+          "product_id": "pro_spoo_pro",
+          "name": "Pro monthly",
+          "type": "standard",
+          "status": "active",
+          "billing_cycle": {
+            "interval": "month",
+            "frequency": 1
+          },
+          "unit_price": {
+            "amount": "1500",
+            "currency_code": "USD"
+          }
+        },
+        "status": "active",
+        "quantity": 1,
+        "recurring": true
+      }
+    ]
+  }
+}

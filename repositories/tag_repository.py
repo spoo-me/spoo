@@ -12,6 +12,9 @@ from schemas.models.tag import TagDoc
 log = get_logger(__name__)
 
 
+_BY_CREATION = [("created_at", 1)]
+
+
 class TagRepository(BaseRepository[TagDoc]):
     async def insert(self, doc: dict) -> ObjectId:
         """Insert one tag. ``DuplicateKeyError`` (the (owner, name) unique
@@ -23,38 +26,34 @@ class TagRepository(BaseRepository[TagDoc]):
     ) -> TagDoc | None:
         return await self._find_one({"_id": tag_id, "owner_id": owner_id})
 
-    async def _find_many(self, query: dict) -> list[TagDoc]:
-        try:
-            docs = (
-                await self._col.find(query).sort("created_at", 1).to_list(length=None)
-            )
-            return [TagDoc.from_mongo(d) for d in docs]
-        except PyMongoError as exc:
-            log.error(
-                "repo_find_many_failed",
-                collection=self._collection_name,
-                error=str(exc),
-            )
-            raise
-
     async def find_by_ids_and_owner(
         self, tag_ids: list[ObjectId], owner_id: ObjectId
     ) -> list[TagDoc]:
         """The subset of *tag_ids* the owner has; foreign ids simply don't return."""
         if not tag_ids:
             return []
-        return await self._find_many({"_id": {"$in": tag_ids}, "owner_id": owner_id})
+        return await self._find_many(
+            {"_id": {"$in": tag_ids}, "owner_id": owner_id},
+            sort=_BY_CREATION,
+            limit=None,
+        )
 
     async def find_by_names_and_owner(
         self, names: list[str], owner_id: ObjectId
     ) -> list[TagDoc]:
         if not names:
             return []
-        return await self._find_many({"owner_id": owner_id, "name": {"$in": names}})
+        return await self._find_many(
+            {"owner_id": owner_id, "name": {"$in": names}},
+            sort=_BY_CREATION,
+            limit=None,
+        )
 
     async def list_by_owner(self, owner_id: ObjectId) -> list[TagDoc]:
         """Every tag the owner has, oldest first (a stable order for the UI)."""
-        return await self._find_many({"owner_id": owner_id})
+        return await self._find_many(
+            {"owner_id": owner_id}, sort=_BY_CREATION, limit=None
+        )
 
     async def count_by_owner(self, owner_id: ObjectId) -> int:
         return await self._count({"owner_id": owner_id})

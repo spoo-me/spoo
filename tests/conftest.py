@@ -108,6 +108,8 @@ def build_test_app(
         app.state.entitlement_service.usage_for = AsyncMock(return_value={})
         app.state.entitlement_service.plan_hint_for = AsyncMock(return_value="free")
         app.state.entitlement_service.over_limit_for = AsyncMock(return_value={})
+        app.state.billing_service = AsyncMock()
+        app.state.billing_service.founding_status = AsyncMock(return_value=(0, None))
         app.state.tenant_resolver = AsyncMock()
         # A REAL permissive L0 gate (no providers): valid URLs pass,
         # invalid/self-links reject — matches the pre-gate route behavior.
@@ -137,6 +139,10 @@ def build_test_app(
     )
     application.state.entitlement_service.usage_for = AsyncMock(return_value={})
     application.state.entitlement_service.over_limit_for = AsyncMock(return_value={})
+    application.state.billing_service = AsyncMock()
+    application.state.billing_service.founding_status = AsyncMock(
+        return_value=(0, None)
+    )
     application.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     register_error_handlers(application)
 

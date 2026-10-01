@@ -50,6 +50,7 @@ def _wire(custom_domains: CustomDomainSettings):
         "subscriptions": MagicMock(name="subscriptions"),
         "entitlement_overrides": MagicMock(name="entitlement_overrides"),
         "entitlement_events": MagicMock(name="entitlement_events"),
+        "billing_events": MagicMock(name="billing_events"),
     }
     app.state.http_client = MagicMock()
     app.state.geoip = MagicMock()

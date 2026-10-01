@@ -34,6 +34,7 @@ from infrastructure.web_risk import (
 )
 from repositories.api_key_repository import ApiKeyRepository
 from repositories.app_grant_repository import AppGrantRepository
+from repositories.billing_event_repository import BillingEventRepository
 from repositories.blocked_domain_repository import BlockedDomainRepository
 from repositories.blocked_url_repository import BlockedUrlRepository
 from repositories.click_repository import ClickRepository
@@ -77,6 +78,12 @@ from services.auth.device import DeviceAuthService
 from services.auth.otp import OtpService
 from services.auth.password import PasswordService
 from services.auth.verification import EmailVerificationService
+from services.billing import (
+    BillingProvider,
+    BillingService,
+    NullBillingProvider,
+    PaddleProvider,
+)
 from services.bulk_url_service import BulkUrlService
 from services.cf_saas_backend import CfSaasBackend
 from services.click import ClickService, LegacyClickHandler, V2ClickHandler
@@ -323,6 +330,37 @@ def build_entitlement_service(
     )
 
 
+def build_billing_service(
+    db,
+    settings: AppSettings,
+    redis_client,
+    *,
+    http_client,
+    entitlements: EntitlementService,
+    subscriptions: SubscriptionRepository,
+) -> BillingService:
+    billing = settings.billing
+    provider: BillingProvider
+    if billing.provider == "paddle":
+        provider = PaddleProvider(
+            http_client,
+            api_key=billing.paddle_api_key,
+            webhook_secret=billing.paddle_webhook_secret,
+            env=billing.paddle_env,
+        )
+    else:
+        provider = NullBillingProvider()
+    return BillingService(
+        provider,
+        entitlements,
+        subscriptions,
+        BillingEventRepository(db["billing_events"]),
+        redis_client,
+        billing,
+        app_url=settings.app_url,
+    )
+
+
 def build_account_erasure_service(
     db,
     settings: AppSettings,
@@ -478,6 +516,14 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
     _, ent_events, subscription_repo, override_repo = ent_store
     app.state.entitlement_service = build_entitlement_service(
         db, settings, redis_client, store=ent_store
+    )
+    app.state.billing_service = build_billing_service(
+        db,
+        settings,
+        redis_client,
+        http_client=http_client,
+        entitlements=app.state.entitlement_service,
+        subscriptions=subscription_repo,
     )
 
     # ── Infrastructure ───────────────────────────────────────────────────

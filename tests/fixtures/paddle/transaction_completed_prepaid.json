@@ -1,0 +1,37 @@
+{
+  "event_id": "evt_txn_prepaid_0007",
+  "event_type": "transaction.completed",
+  "occurred_at": "2026-09-04T10:18:49.658605Z",
+  "notification_id": "ntf_txn_prepaid_0007",
+  "data": {
+    "id": "txn_prepaid_0007",
+    "status": "completed",
+    "customer_id": "ctm_01hv6y1jedq4p1n0yqn5ba3ky4",
+    "subscription_id": null,
+    "origin": "web",
+    "custom_data": {
+      "user_id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+      "cadence": "year",
+      "return_to": "/dashboard/links",
+      "founding": true
+    },
+    "currency_code": "USD",
+    "discount_id": "dsc_founding_first_test",
+    "billed_at": "2026-09-04T11:00:00Z",
+    "items": [
+      {
+        "price": {
+          "id": "pri_pro_year_test"
+        },
+        "quantity": 1
+      }
+    ],
+    "details": {
+      "totals": {
+        "grand_total": "9000"
+      }
+    },
+    "created_at": "2026-09-04T10:58:00Z",
+    "updated_at": "2026-09-04T11:00:01Z"
+  }
+}

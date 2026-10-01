@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from dependencies import Settings
+from dependencies import BillingSvc, Settings
 from middleware.rate_limiter import Limits, limiter
 from schemas.dto.responses.entitlements import (
     FoundingBlock,
@@ -31,7 +31,9 @@ _CURRENCY = "USD"
     summary="List Plans",
 )
 @limiter.limit(Limits.API_ANON)
-async def list_plans(request: Request, settings: Settings) -> PlansResponse:
+async def list_plans(
+    request: Request, settings: Settings, billing: BillingSvc
+) -> PlansResponse:
     """Return the free and pro plans with their features, limits and prices.
 
     A self-hosted deployment has nothing to sell: `prices` is empty and
@@ -39,7 +41,7 @@ async def list_plans(request: Request, settings: Settings) -> PlansResponse:
 
     **Authentication**: Not required.
     """
-    billing = settings.billing
+    prices = settings.billing
     plans = [
         PlanEntry(
             name=plan.value,
@@ -48,17 +50,20 @@ async def list_plans(request: Request, settings: Settings) -> PlansResponse:
         )
         for plan in _PUBLIC_PLANS
     ]
-    if billing.selfhost:
+    if prices.selfhost:
         return PlansResponse(plans=plans)
+    seats_left, until = await billing.founding_status()
     return PlansResponse(
         plans=plans,
         prices={
-            "monthly": PriceBlock(amount=billing.pro_monthly_usd, currency=_CURRENCY),
-            "year": PriceBlock(amount=billing.pro_year_usd, currency=_CURRENCY),
+            "monthly": PriceBlock(amount=prices.pro_monthly_usd, currency=_CURRENCY),
+            "year": PriceBlock(amount=prices.pro_year_usd, currency=_CURRENCY),
         },
         founding=FoundingBlock(
-            monthly=PriceBlock(amount=billing.founding_monthly_usd, currency=_CURRENCY),
-            year=PriceBlock(amount=billing.founding_year_usd, currency=_CURRENCY),
-            seats_total=billing.founding_seats,
+            monthly=PriceBlock(amount=prices.founding_monthly_usd, currency=_CURRENCY),
+            year=PriceBlock(amount=prices.founding_year_usd, currency=_CURRENCY),
+            seats_total=prices.founding_seats,
+            seats_left=seats_left if until is not None else None,
+            until=until,
         ),
     )

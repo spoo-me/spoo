@@ -10,6 +10,7 @@ from services.entitlements.state_machine import (
     SubscriptionEvent as E,
 )
 from services.entitlements.state_machine import (
+    is_noop,
     next_status,
 )
 
@@ -104,8 +105,10 @@ def test_every_state_times_every_event(current, event, expected):
     if expected == REJECT:
         with pytest.raises(InvalidTransitionError):
             next_status(current, event)
+        assert is_noop(current, event) is False
     else:
         assert next_status(current, event) is expected
+        assert is_noop(current, event) is (expected == current)
 
 
 def test_table_covers_every_state_and_event():

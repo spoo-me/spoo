@@ -77,6 +77,9 @@ class Limits:
     API_KEY_READ = "60 per minute"
     API_KEY_DELETE = "30 per minute"
 
+    # Billing: checkout and portal links are cheap to mint, expensive to spam.
+    BILLING_WRITE = "10 per minute"
+
     # Per-user page layouts (client debounces writes)
     LAYOUT_READ = "120 per minute"
     LAYOUT_WRITE = "60 per minute"

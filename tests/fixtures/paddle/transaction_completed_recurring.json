@@ -1,0 +1,37 @@
+{
+  "event_id": "evt_txn_recurring_0006",
+  "event_type": "transaction.completed",
+  "occurred_at": "2026-09-04T10:18:49.658605Z",
+  "notification_id": "ntf_txn_recurring_0006",
+  "data": {
+    "id": "txn_recurring_0006",
+    "status": "completed",
+    "customer_id": "ctm_01hv6y1jedq4p1n0yqn5ba3ky4",
+    "subscription_id": "sub_01hv8x29kz0t586xy6zn1a62ny",
+    "origin": "web",
+    "custom_data": {
+      "user_id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+      "cadence": "monthly",
+      "return_to": "/dashboard/links",
+      "founding": true
+    },
+    "currency_code": "USD",
+    "discount_id": "dsc_founding_first_test",
+    "billed_at": "2026-09-04T10:18:48.294633Z",
+    "items": [
+      {
+        "price": {
+          "id": "pri_pro_monthly_test"
+        },
+        "quantity": 1
+      }
+    ],
+    "details": {
+      "totals": {
+        "grand_total": "900"
+      }
+    },
+    "created_at": "2026-09-04T10:12:33.2014Z",
+    "updated_at": "2026-09-04T10:18:49.738971238Z"
+  }
+}
