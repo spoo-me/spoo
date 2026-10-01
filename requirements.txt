@@ -54,7 +54,7 @@ markdown-it-py==4.2.0
 markupsafe==3.0.3
 maxminddb==3.2.0
 mdurl==0.1.2
-multidict==6.9.1
+multidict==7.0.0
 nodeenv==1.11.0
 openai==3.22.1
 openpyxl==3.1.5
@@ -70,7 +70,7 @@ pycountry==26.2.16
 pycparser==3.0
 pydantic==2.13.5
 pydantic-ai-slim==2.52.0
-pydantic-core==2.46.5
+pydantic-core==2.49.0
 pydantic-graph==2.52.0
 pydantic-settings==2.15.0
 pygments==2.21.0
