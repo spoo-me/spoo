@@ -141,6 +141,20 @@ class ZeptoMailProvider:
         )
         return await self._send(email, user_name, subject, html_body, text_body)
 
+    async def send_html(
+        self,
+        to_email: str,
+        subject: str,
+        template_name: str,
+        context: dict,
+        text_body: str,
+    ) -> bool:
+        """Render ``templates/emails/<template_name>`` with ``context`` and send it."""
+        html_body = self._jinja.get_template(template_name).render(
+            app_url=self._app_url, **context
+        )
+        return await self._send(to_email, None, subject, html_body, text_body)
+
     async def send_deletion_requested(
         self, email: str, purge_after: datetime, restore_token: str | None = None
     ) -> bool:

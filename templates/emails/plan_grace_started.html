@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block preview %}Your spoo.me Pro term has ended; you keep Pro until {{ grace_date }}{% endblock %}
+
+{% block content %}<table align="center" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation"
+                        style="margin-bottom:32px">
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <h1
+                                        style="color:rgb(227,235,242);font-size:24px;font-weight:700;text-align:center;margin-bottom:16px !important;margin:0px">
+                                        Your Pro term has ended</h1>
+                                    <p
+                                        style="color:rgb(227,235,242);font-size:16px;line-height:24px;margin-bottom:16px;margin:0px">
+                                        Hello,</p>
+                                    <p
+                                        style="color:rgb(227,235,242);font-size:16px;line-height:24px;margin-bottom:16px;margin:0px">
+                                        Your paid term has ended. You keep every Pro feature until {{ grace_date }}. After that the account goes back to Free. Nothing is deleted.</p>
+                                    {% if domains %}<p
+                                        style="color:rgb(227,235,242);font-size:16px;line-height:24px;margin-bottom:16px;margin:0px">
+                                        Links on {{ domains | join(", ") }} stop resolving on {{ grace_date }}. Domain settings and links stay saved.</p>{% endif %}
+                                    <p
+                                        style="color:rgb(227,235,242);font-size:16px;line-height:24px;margin-bottom:16px;margin:0px">
+                                        Renew any time before then to carry on without a gap: <a href="{{ app_url }}/upgrade"
+                                            style="color:rgb(124,58,237);text-decoration-line:none"
+                                            target="_blank">{{ app_url }}/upgrade</a></p>
+                                    <p
+                                        style="color:rgb(227,235,242);font-size:16px;line-height:24px;margin:0px;margin-top:16px">
+                                        Support Team, spoo.me</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>{% endblock %}

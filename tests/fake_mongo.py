@@ -1,8 +1,8 @@
 """A tiny in-memory stand-in for a pymongo AsyncCollection.
 
 Enough of the query language for the repositories under test: equality on
-top-level and dotted keys, ``$ne``, ``$in``, ``$gt``, ``$gte``, ``$lt``,
-``$lte``, ``$exists`` and ``$or``; updates with ``$set``, ``$setOnInsert``
+top-level and dotted keys, ``$ne``, ``$in``, ``$nin``, ``$gt``, ``$gte``,
+``$lt``, ``$lte``, ``$exists`` and ``$or``; updates with ``$set``, ``$setOnInsert``
 and ``$unset``; one unique key per collection so DuplicateKeyError behaves.
 """
 
@@ -30,6 +30,8 @@ def _match_value(actual: Any, expected: Any) -> bool:
             if op == "$ne" and actual == arg:
                 return False
             if op == "$in" and actual not in arg:
+                return False
+            if op == "$nin" and actual in arg:
                 return False
             if op == "$exists" and (actual is not None) != bool(arg):
                 return False
@@ -124,6 +126,10 @@ class FakeCollection:
 
     async def count_documents(self, query: dict):
         return sum(1 for d in self.docs if _matches(d, query))
+
+    async def distinct(self, key: str, query: dict | None = None):
+        values = [_get(d, key) for d in self.docs if _matches(d, query or {})]
+        return list(dict.fromkeys(values))
 
     def _apply(self, doc: dict, ops: dict, *, inserting: bool) -> bool:
         changed = False

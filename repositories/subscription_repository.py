@@ -145,6 +145,84 @@ class SubscriptionRepository(BaseRepository[SubscriptionDoc]):
         await self._cache.invalidate(user_id)
         return after
 
+    async def find_term_ended(self, now: datetime) -> list[SubscriptionDoc]:
+        """Paid terms that have run out: a scheduled cancel past its period
+        end, or a prepaid year past its end."""
+        return await self._find_many(
+            {
+                "$or": [
+                    {
+                        "status": SubscriptionStatus.CANCEL_AT_PERIOD_END.value,
+                        "current_period_end": {"$lte": now},
+                    },
+                    {
+                        "status": SubscriptionStatus.ACTIVE.value,
+                        "kind": "prepaid",
+                        "prepaid_until": {"$lte": now},
+                    },
+                ]
+            }
+        )
+
+    async def find_grace_ended(self, now: datetime) -> list[SubscriptionDoc]:
+        return await self._find_many(
+            {"status": SubscriptionStatus.GRACE.value, "grace_until": {"$lte": now}}
+        )
+
+    async def find_in_grace(self) -> list[SubscriptionDoc]:
+        return await self._find_many({"status": SubscriptionStatus.GRACE.value})
+
+    async def find_lapsed_since(
+        self, since: datetime, *, not_by: str
+    ) -> list[SubscriptionDoc]:
+        """Lapsed recently enough to still be owed the lapsed email, except
+        those lapsed by ``not_by``; a lapsed document's last write is the lapse."""
+        return await self._find_many(
+            {
+                "status": SubscriptionStatus.LAPSED.value,
+                "updated_at": {"$gte": since},
+                "lapsed_by": {"$ne": not_by},
+            }
+        )
+
+    async def find_past_due_older_than(self, cutoff: datetime) -> list[SubscriptionDoc]:
+        return await self._find_many(
+            {
+                "status": SubscriptionStatus.PAST_DUE.value,
+                "current_period_end": {"$lte": cutoff},
+            }
+        )
+
+    async def find_terms_ending_before(self, until: datetime) -> list[SubscriptionDoc]:
+        """Subscriptions whose paid term ends before ``until`` and will not
+        renew: prepaid years and scheduled cancels."""
+        return await self._find_many(
+            {
+                "$or": [
+                    {
+                        "status": SubscriptionStatus.CANCEL_AT_PERIOD_END.value,
+                        "current_period_end": {"$lte": until},
+                    },
+                    {
+                        "status": SubscriptionStatus.ACTIVE.value,
+                        "kind": "prepaid",
+                        "prepaid_until": {"$lte": until},
+                    },
+                ]
+            }
+        )
+
+    async def find_provider_live(self, provider: str) -> list[SubscriptionDoc]:
+        """Every non-lapsed recurring subscription of a provider, for reconcile."""
+        return await self._find_many(
+            {
+                "provider": provider,
+                "kind": "recurring",
+                "status": {"$ne": SubscriptionStatus.LAPSED.value},
+            },
+            limit=5000,
+        )
+
     async def find_by_provider_subscription(
         self, subscription_id: str
     ) -> SubscriptionDoc | None:

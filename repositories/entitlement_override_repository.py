@@ -153,6 +153,45 @@ class EntitlementOverrideRepository(BaseRepository[EntitlementOverrideDoc]):
         await self._cache.invalidate(user_id)
         return True
 
+    async def find_expired(
+        self, now: datetime, *, limit: int = 500
+    ) -> list[EntitlementOverrideDoc]:
+        cursor = self._col.find({"expires_at": {"$ne": None, "$lte": now}}).limit(limit)
+        docs = await cursor.to_list(length=limit)
+        return [EntitlementOverrideDoc.from_mongo(d) for d in docs]  # type: ignore[misc]
+
+    async def revoke_expired(
+        self,
+        user_id: ObjectId,
+        key: str,
+        now: datetime,
+        *,
+        actor: str,
+        reason: str,
+    ) -> bool:
+        """Revoke only while still expired: an extension granted in between wins."""
+        existing = await self._find_one({"user_id": user_id, "key": key})
+        if existing is None or existing.expires_at is None:
+            return False
+        deleted = await self._delete(
+            {"_id": existing.id, "expires_at": {"$ne": None, "$lte": now}}
+        )
+        if not deleted:
+            return False
+        await self._events.append(
+            EntitlementEventDoc(
+                user_id=user_id,
+                kind=EntitlementEventKind.OVERRIDE_REVOKED,
+                actor=actor,
+                reason=reason,
+                before=_snapshot(existing),
+                after=None,
+                at=now,
+            )
+        )
+        await self._cache.invalidate(user_id)
+        return True
+
     async def delete_by_user(self, user_id: ObjectId) -> int:
         deleted = await self._delete_many({"user_id": user_id})
         if deleted:
