@@ -92,23 +92,23 @@ Everything below is built on the public API. The web app is [spoo-me/frontend](h
 
 <table>
   <tr>
-    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-ts"><img src="https://spoo.me/og/apps/sdk-typescript.jpg" alt="TypeScript"></a><br>TypeScript</td>
-    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-py"><img src="https://spoo.me/og/apps/sdk-python.jpg" alt="Python"></a><br>Python</td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-ts"><img src="https://spoo.me/og/apps/sdk-typescript.jpg" alt="TypeScript"></a><br><a href="https://github.com/spoo-me/spoo-ts">TypeScript</a></td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-py"><img src="https://spoo.me/og/apps/sdk-python.jpg" alt="Python"></a><br><a href="https://github.com/spoo-me/spoo-py">Python</a></td>
   </tr>
   <tr>
     <td width='50%' align='center'><code>npm install spoo.me</code></td>
     <td width='50%' align='center'><code>pip install spoo</code></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-go"><img src="https://spoo.me/og/apps/sdk-go.jpg" alt="Go"></a><br>Go</td>
-    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-rust"><img src="https://spoo.me/og/apps/sdk-rust.jpg" alt="Rust"></a><br>Rust</td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-go"><img src="https://spoo.me/og/apps/sdk-go.jpg" alt="Go"></a><br><a href="https://github.com/spoo-me/spoo-go">Go</a></td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-rust"><img src="https://spoo.me/og/apps/sdk-rust.jpg" alt="Rust"></a><br><a href="https://github.com/spoo-me/spoo-rust">Rust</a></td>
   </tr>
   <tr>
     <td width='50%' align='center'><code>go get github.com/spoo-me/spoo-go</code></td>
     <td width='50%' align='center'><code>cargo add spoo-me</code></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-kotlin"><img src="https://spoo.me/og/apps/sdk-kotlin.jpg" alt="Kotlin"></a><br>Kotlin</td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-kotlin"><img src="https://spoo.me/og/apps/sdk-kotlin.jpg" alt="Kotlin"></a><br><a href="https://github.com/spoo-me/spoo-kotlin">Kotlin</a></td>
     <td width="50%"></td>
   </tr>
   <tr>
@@ -121,16 +121,16 @@ Everything below is built on the public API. The web app is [spoo-me/frontend](h
 
 <table>
   <tr>
-    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-cli"><img src="https://spoo.me/og/apps/spoo-cli.jpg" alt="CLI"></a><br>CLI</td>
-    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-android"><img src="https://spoo.me/og/apps/android.jpg" alt="Android"></a><br>Android</td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-cli"><img src="https://spoo.me/og/apps/spoo-cli.jpg" alt="CLI"></a><br><a href="https://github.com/spoo-me/spoo-cli">CLI</a></td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-android"><img src="https://spoo.me/og/apps/android.jpg" alt="Android"></a><br><a href="https://github.com/spoo-me/spoo-android">Android</a></td>
   </tr>
   <tr>
     <td width='50%' align='center'><code>brew install spoo-me/tap/spoo</code></td>
     <td width='50%' align='center'><a href="https://github.com/spoo-me/spoo-android/releases/latest">GitHub releases</a></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-raycast"><img src="https://spoo.me/og/apps/spoo-raycast.jpg" alt="Raycast"></a><br>Raycast</td>
-    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-bot"><img src="https://spoo.me/og/apps/spoo-discord.jpg" alt="Discord bot"></a><br>Discord bot</td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-raycast"><img src="https://spoo.me/og/apps/spoo-raycast.jpg" alt="Raycast"></a><br><a href="https://github.com/spoo-me/spoo-raycast">Raycast</a></td>
+    <td width="50%" align="center"><a href="https://github.com/spoo-me/spoo-bot"><img src="https://spoo.me/og/apps/spoo-discord.jpg" alt="Discord bot"></a><br><a href="https://github.com/spoo-me/spoo-bot">Discord bot</a></td>
   </tr>
   <tr>
     <td width='50%' align='center'><a href="https://github.com/spoo-me/spoo-raycast">From source</a></td>
