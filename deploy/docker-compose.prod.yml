@@ -111,7 +111,7 @@ services:
     restart: always
     # Caddy terminates TLS for CF orange-cloud requests using a Cloudflare
     # Origin CA certificate (mounted from ./caddy/origin.{crt,key}). UFW on
-    # the host (see app/infrastructure/ufw-cloudflare.sh) restricts inbound 443
+    # the host (see deploy/ufw-cloudflare.sh) restricts inbound 443
     # to CF IP ranges only — so any request reaching Caddy came from CF.
     #
     # Architecturally this replaces cloudflared. CF Tunnel routed all traffic
