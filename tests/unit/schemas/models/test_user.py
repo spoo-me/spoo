@@ -16,7 +16,6 @@ class TestUserDoc:
         assert doc.email == "user@example.com"
         assert doc.email_verified is False
         assert doc.password_set is False
-        assert doc.plan == "free"
         assert doc.status == "ACTIVE"
         assert doc.auth_providers == []
 

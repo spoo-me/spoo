@@ -24,4 +24,3 @@ class RolloutType(str, Enum):
     ALLOWLIST = "allowlist"
     PERCENTAGE = "percentage"
     HEX_DIGIT = "hex_digit"
-    TIER = "tier"

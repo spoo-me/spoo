@@ -204,11 +204,12 @@ class TestJWTHelpers:
         with pytest.raises(AuthenticationError):
             tf.verify_token("not.a.valid.token", token_type="access")
 
-    def test_issue_tokens_returns_valid_pair(self):
+    @pytest.mark.asyncio
+    async def test_issue_tokens_returns_valid_pair(self):
         tf = make_token_factory()
         settings = make_jwt_settings()
         user = make_user_doc()
-        access, refresh = tf.issue_tokens(user, "google")
+        access, refresh = await tf.issue_tokens(user, "google")
         # Access token has no type field
         access_payload = pyjwt.decode(
             access,
@@ -893,12 +894,12 @@ class TestGetUserProfile:
         from schemas.dto.responses.auth import UserProfileResponse
 
         user = make_user_doc()
-        profile = UserProfileResponse.from_user(user)
+        profile = UserProfileResponse.from_user(user, plan="pro")
         assert profile.id == str(USER_OID)
+        assert profile.plan == "pro"
         assert profile.email == "test@example.com"
         assert profile.email_verified is True
         assert profile.user_name == "Test User"
-        assert profile.plan == "free"
         assert profile.password_set is False
         assert profile.auth_providers == []
 
@@ -928,7 +929,7 @@ class TestGetUserProfile:
             "status": "ACTIVE",
         }
         user = UserDoc.from_mongo(user_doc)
-        profile = UserProfileResponse.from_user(user)
+        profile = UserProfileResponse.from_user(user, plan="free")
         assert len(profile.auth_providers) == 1
         assert profile.auth_providers[0].provider == "google"
         assert profile.auth_providers[0].linked_at == now
@@ -949,7 +950,7 @@ class TestGetUserProfile:
             "status": "ACTIVE",
         }
         user = UserDoc.from_mongo(user_doc)
-        profile = UserProfileResponse.from_user(user)
+        profile = UserProfileResponse.from_user(user, plan="free")
         assert profile.pfp.url == "https://img.url"
         assert profile.pfp.source == "google"
 

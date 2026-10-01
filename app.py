@@ -30,6 +30,7 @@ from infrastructure.logging import get_logger
 from infrastructure.oauth_clients import OAUTH_STATE_TTL_SECONDS, init_oauth
 from infrastructure.queue_redis import connect_queue_redis
 from infrastructure.templates import configure_template_globals, templates
+from middleware.entitlements import EntitlementsVersionMiddleware
 from middleware.error_handler import register_error_handlers
 from middleware.logging import RequestLoggingMiddleware
 from middleware.openapi import (
@@ -314,6 +315,9 @@ def create_app(settings: AppSettings | None = None) -> FastAPI:
     #    writes view_rate_limit into shared scope state during endpoint
     #    execution, before any response starts flowing outward
     app.add_middleware(RateLimitHeadersMiddleware)
+    # 8. Entitlement version header on authenticated responses; reads the
+    #    version the Entitled dependency stored, or one cache lookup.
+    app.add_middleware(EntitlementsVersionMiddleware)
 
     # ── Error handlers + rate limiter ────────────────────────────────────
     app.state.limiter = limiter

@@ -7884,7 +7884,7 @@
           "Me"
         ],
         "summary": "Get Feature Availability",
-        "description": "Return the availability state of every gated feature for this account.\n\nStates: `enabled` (render it), `hidden` (the feature doesn't exist for\nthis account), `locked` (reserved \u2014 render as upgrade-gated once plans\nship). Treat features missing from the map as `hidden`. Never used for\nenforcement \u2014 the write endpoints enforce the same gates server-side.\n\n**Authentication**: Required.",
+        "description": "Return the availability state of every gated feature for this account.\n\nStates: `enabled` (render it), `hidden` (the feature doesn't exist for\nthis account), `locked` (render it upgrade-gated: the plan does not\ninclude it). Treat features missing from the map as `hidden`. Never used\nfor enforcement \u2014 the write endpoints enforce the same gates server-side.\n\n**Authentication**: Required.",
         "operationId": "getMyFeatures",
         "responses": {
           "200": {
@@ -7893,6 +7893,88 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FeaturesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request \u2014 invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized \u2014 missing or invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden \u2014 insufficient permissions or scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict \u2014 resource already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/entitlements": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "My Entitlements",
+        "description": "Return the account's plan, feature states, limits with live usage, and\nthe entitlement version.\n\n`version` changes on every subscription or override write. After a\ncheckout, poll until it changes; on every authenticated response,\ncompare it with the `X-Entitlements-Version` header and refetch when\nthey differ.\n\n**Authentication**: Required.",
+        "operationId": "getMyEntitlements",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntitlementsResponse"
                 }
               }
             }
@@ -8643,6 +8725,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/plans": {
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "List Plans",
+        "description": "Return the free and pro plans with their features, limits and prices.\n\nA self-hosted deployment has nothing to sell: `prices` is empty and\n`founding` is null there.\n\n**Authentication**: Not required.",
+        "operationId": "listPlans",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlansResponse"
                 }
               }
             }
@@ -12399,6 +12503,52 @@
         "title": "EmojiSetResponse",
         "description": "The accepted emoji catalogue and its policy caps.\n\nEmoji values are RAW characters in canonical form (no ``U+FE0F``). Each\ncarries its canonical Unicode category (``g``) and the array is ordered by\ncanonical group and within-group order, so a picker can render category\ntabs and open on Smileys rather than symbols."
       },
+      "EntitlementsResponse": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Owner entitlement version",
+            "examples": [
+              3
+            ]
+          },
+          "plan": {
+            "$ref": "#/components/schemas/PlanBlock"
+          },
+          "features": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FeatureState"
+            },
+            "type": "object",
+            "title": "Features",
+            "description": "Per-feature UI state; treat missing keys as hidden"
+          },
+          "limits": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/LimitBlock"
+            },
+            "type": "object",
+            "title": "Limits"
+          },
+          "over_limit": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/OverLimitBlock"
+            },
+            "type": "object",
+            "title": "Over Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "plan",
+          "features",
+          "limits"
+        ],
+        "title": "EntitlementsResponse",
+        "description": "Everything the dashboard needs to render plan state in one call.\n\n``version`` changes on every effective subscription or override write;\nclients poll it after checkout and compare it with the\n``X-Entitlements-Version`` header on every authenticated response."
+      },
       "ErrorResponse": {
         "properties": {
           "error": {
@@ -12582,6 +12732,51 @@
         "title": "FeaturesResponse",
         "description": "Per-feature availability for the authenticated account.\n\nKeys are the exposed feature names (``services.feature_flag_service.\nEXPOSED_FEATURES``); values tell the client what to render. Clients\nmust treat unknown keys as informational and missing keys as HIDDEN,\nso the feature list can grow without breaking older frontends."
       },
+      "FoundingBlock": {
+        "properties": {
+          "monthly": {
+            "$ref": "#/components/schemas/PriceBlock"
+          },
+          "year": {
+            "$ref": "#/components/schemas/PriceBlock"
+          },
+          "seats_total": {
+            "type": "integer",
+            "title": "Seats Total"
+          },
+          "seats_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seats Left",
+            "description": "Null until billing reports the count"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until",
+            "description": "Null until the checkout window opens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "monthly",
+          "year",
+          "seats_total"
+        ],
+        "title": "FoundingBlock"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -12665,6 +12860,38 @@
         },
         "type": "object",
         "title": "LayoutResponse"
+      },
+      "LimitBlock": {
+        "properties": {
+          "max": {
+            "type": "integer",
+            "title": "Max",
+            "description": "Plan maximum; -1 means unlimited",
+            "examples": [
+              5
+            ]
+          },
+          "used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used",
+            "description": "Live count for countable limits; null for windows and rates",
+            "examples": [
+              2
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "max"
+        ],
+        "title": "LimitBlock"
       },
       "LinkStatsResponse": {
         "properties": {
@@ -13377,6 +13604,141 @@
         "title": "OnboardingStateResponse",
         "description": "Response body for GET/PUT /auth/onboarding (200).\n\nA resume pointer, nothing more. Empty (step=null) means nothing to\nresume: never started, expired, or already completed \u2014 completion is\na permanent account fact exposed as ``user.onboarded_at`` on\n/auth/me, not part of this cache."
       },
+      "OverLimitBlock": {
+        "properties": {
+          "paused": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paused",
+            "description": "Ids of items paused because the limit shrank below them"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paused"
+        ],
+        "title": "OverLimitBlock"
+      },
+      "PlanBlock": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Effective plan",
+            "examples": [
+              "pro"
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Subscription status; null on the free plan",
+            "examples": [
+              "active"
+            ]
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until",
+            "description": "Term end, or the grace end while in grace; null when nothing ends"
+          },
+          "founding": {
+            "type": "boolean",
+            "title": "Founding",
+            "description": "Founding cohort member",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "PlanBlock"
+      },
+      "PlanEntry": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "examples": [
+              "pro"
+            ]
+          },
+          "features": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Features"
+          },
+          "limits": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Limits",
+            "description": "-1 means unlimited"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "features",
+          "limits"
+        ],
+        "title": "PlanEntry"
+      },
+      "PlansResponse": {
+        "properties": {
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/PlanEntry"
+            },
+            "type": "array",
+            "title": "Plans"
+          },
+          "prices": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PriceBlock"
+            },
+            "type": "object",
+            "title": "Prices",
+            "description": "Keyed by cadence: monthly (recurring), year (one-time); empty on a self-hosted deployment"
+          },
+          "founding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FoundingBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "plans"
+        ],
+        "title": "PlansResponse",
+        "description": "Public projection of the feature catalog plus display prices."
+      },
       "PreviewDestination": {
         "properties": {
           "url": {
@@ -13476,6 +13838,31 @@
         ],
         "title": "PreviewVariantDestination",
         "description": "One A/B variant destination with its traffic share in percent."
+      },
+      "PriceBlock": {
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "title": "Amount",
+            "description": "Whole units",
+            "examples": [
+              15
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "examples": [
+              "USD"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount",
+          "currency"
+        ],
+        "title": "PriceBlock"
       },
       "ProfilePictureMessageResponse": {
         "properties": {
@@ -16026,7 +16413,7 @@
           "plan": {
             "type": "string",
             "title": "Plan",
-            "description": "Subscription plan",
+            "description": "Effective plan",
             "examples": [
               "free"
             ]

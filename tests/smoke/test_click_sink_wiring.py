@@ -37,6 +37,9 @@ _COLLECTIONS = (
     "safety_verdicts",
     "safety_feed_domains",
     "scheduled_tasks",
+    "subscriptions",
+    "entitlement_overrides",
+    "entitlement_events",
 )
 
 

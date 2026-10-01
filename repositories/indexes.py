@@ -187,6 +187,19 @@ async def ensure_indexes(
     feature_flags_col = db["feature_flags"]
     await feature_flags_col.create_index([("name", 1)], unique=True)
 
+    # ── entitlements ───────────────────────────────────────────────────
+    # One per user; the status+date pairs are the lifecycle job's query shape.
+    subscriptions_col = db["subscriptions"]
+    await subscriptions_col.create_index([("user_id", 1)], unique=True)
+    await subscriptions_col.create_index([("status", 1), ("current_period_end", 1)])
+    await subscriptions_col.create_index([("status", 1), ("prepaid_until", 1)])
+    await subscriptions_col.create_index([("status", 1), ("grace_until", 1)])
+    overrides_col = db["entitlement_overrides"]
+    await overrides_col.create_index([("user_id", 1), ("key", 1)], unique=True)
+    await overrides_col.create_index([("expires_at", 1)], sparse=True)
+    ent_events_col = db["entitlement_events"]
+    await ent_events_col.create_index([("user_id", 1), ("at", -1)])
+
     # ── reports ────────────────────────────────────────────────────────
     # One doc per reported (domain, code) — domain is null for the system
     # default, so the compound unique still keys correctly. Velocity

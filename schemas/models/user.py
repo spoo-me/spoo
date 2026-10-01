@@ -39,12 +39,6 @@ class OAuthAction(str, Enum):
     LINK = "link"
 
 
-class UserPlan(str, Enum):
-    """User subscription plans."""
-
-    FREE = "free"
-
-
 class OAuthProvider(str, Enum):
     """Supported OAuth providers."""
 
@@ -104,7 +98,6 @@ class UserDoc(MongoBaseModel):
     Document model for the `users` collection.
 
     status: UserStatus enum (ACTIVE, INACTIVE, PENDING_DELETION)
-    plan: UserPlan enum (FREE)
     """
 
     email: str
@@ -114,7 +107,6 @@ class UserDoc(MongoBaseModel):
     user_name: str | None = None
     pfp: ProfilePicture | None = None
     auth_providers: list[AuthProviderEntry] = []  # noqa: RUF012
-    plan: UserPlan = UserPlan.FREE
     signup_ip: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

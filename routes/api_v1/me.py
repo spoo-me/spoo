@@ -1,6 +1,7 @@
 """
 DELETE /api/v1/me                — request account deletion (grace period)
-GET    /api/v1/me/features       — per-account feature availability
+GET    /api/v1/me/entitlements   — plan, feature states, limits, version
+GET    /api/v1/me/features       — the features map alone
 GET    /api/v1/me/layouts/{page} — fetch the saved dashboard layout (null = default)
 PUT    /api/v1/me/layouts/{page} — save the layout document verbatim
 DELETE /api/v1/me/layouts/{page} — reset to default (idempotent)
@@ -23,6 +24,8 @@ from fastapi import APIRouter, Path, Request
 
 from dependencies import (
     AccountDeletionSvc,
+    Entitled,
+    EntitlementSvc,
     FeatureFlagSvc,
     JwtUser,
     PageLayoutSvc,
@@ -37,12 +40,18 @@ from schemas.dto.requests.profile_pictures import (
     UploadProfilePictureRequest,
 )
 from schemas.dto.responses.account import AccountDeletionResponse
+from schemas.dto.responses.entitlements import (
+    EntitlementsResponse,
+    LimitBlock,
+    PlanBlock,
+)
 from schemas.dto.responses.features import FeaturesResponse
 from schemas.dto.responses.layouts import LayoutResponse
 from schemas.dto.responses.profile_pictures import (
     AvailablePicturesResponse,
     ProfilePictureMessageResponse,
 )
+from services.features.catalog import int_features
 
 router = APIRouter(prefix="/me", tags=["Me"])
 
@@ -103,17 +112,60 @@ async def get_my_features(
     request: Request,
     user: JwtUser,
     flag_service: FeatureFlagSvc,
+    entitlements: Entitled,
 ) -> FeaturesResponse:
     """Return the availability state of every gated feature for this account.
 
     States: `enabled` (render it), `hidden` (the feature doesn't exist for
-    this account), `locked` (reserved — render as upgrade-gated once plans
-    ship). Treat features missing from the map as `hidden`. Never used for
-    enforcement — the write endpoints enforce the same gates server-side.
+    this account), `locked` (render it upgrade-gated: the plan does not
+    include it). Treat features missing from the map as `hidden`. Never used
+    for enforcement — the write endpoints enforce the same gates server-side.
 
     **Authentication**: Required.
     """
-    return FeaturesResponse(features=await flag_service.states_for(user))
+    return FeaturesResponse(features=await flag_service.states_for(user, entitlements))
+
+
+@router.get(
+    "/entitlements",
+    responses=AUTH_RESPONSES,
+    operation_id="getMyEntitlements",
+    summary="My Entitlements",
+)
+@limiter.limit(Limits.DASHBOARD_READ)
+async def get_my_entitlements(
+    request: Request,
+    user: JwtUser,
+    flag_service: FeatureFlagSvc,
+    entitlements: Entitled,
+    entitlement_service: EntitlementSvc,
+) -> EntitlementsResponse:
+    """Return the account's plan, feature states, limits with live usage, and
+    the entitlement version.
+
+    `version` changes on every subscription or override write. After a
+    checkout, poll until it changes; on every authenticated response,
+    compare it with the `X-Entitlements-Version` header and refetch when
+    they differ.
+
+    **Authentication**: Required.
+    """
+    features = await flag_service.states_for(user, entitlements)
+    used = await entitlement_service.usage_for(user.user_id)
+    return EntitlementsResponse(
+        version=entitlements.version,
+        plan=PlanBlock(
+            name=entitlements.plan.value,
+            status=entitlements.status.value if entitlements.status else None,
+            until=entitlements.until,
+            founding=entitlements.founding,
+        ),
+        features=features,
+        limits={
+            f.key: LimitBlock(max=entitlements.limit(f.key), used=used.get(f.key))
+            for f in int_features()
+        },
+    )
 
 
 # Closed set: every dashboard board the frontend actually renders. An

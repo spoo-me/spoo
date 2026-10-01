@@ -104,7 +104,11 @@ def test_is_production_true_for_production() -> None:
     """is_production should return True when env is 'production'."""
     with patch.dict(
         os.environ,
-        {"ENV": "production", "CUSTOM_DOMAINS_MOCK_DCV": "false"},
+        {
+            "ENV": "production",
+            "CUSTOM_DOMAINS_MOCK_DCV": "false",
+            "BILLING_PROVIDER": "none",
+        },
         clear=False,
     ):
         settings = AppSettings()

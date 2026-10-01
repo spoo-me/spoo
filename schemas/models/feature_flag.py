@@ -40,10 +40,6 @@ class FeatureFlagDoc(MongoBaseModel):
     # users. Stable hash places each user in exactly one bucket per flag.
     enabled_digits: list[str] = Field(default_factory=list)
 
-    # TIER field — defensive lookup via ``getattr(user, "tier", None)``.
-    # Null when not in TIER mode.
-    tier: str | None = None
-
     # Free-form note for the engineer editing Mongo. Not surfaced to users.
     description: str = ""
 

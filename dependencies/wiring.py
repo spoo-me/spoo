@@ -12,6 +12,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from config import AppSettings
+from infrastructure.cache.entitlement_cache import EntitlementCache
 from infrastructure.cache.feature_flag_cache import FeatureFlagCache
 from infrastructure.cache.meta_fetch_cache import MetaFetchCache
 from infrastructure.cache.onboarding_cache import OnboardingCache
@@ -37,6 +38,10 @@ from repositories.blocked_domain_repository import BlockedDomainRepository
 from repositories.blocked_url_repository import BlockedUrlRepository
 from repositories.click_repository import ClickRepository
 from repositories.custom_domain_repository import CustomDomainRepository
+from repositories.entitlement_event_repository import EntitlementEventRepository
+from repositories.entitlement_override_repository import (
+    EntitlementOverrideRepository,
+)
 from repositories.feature_flag_repository import FeatureFlagRepository
 from repositories.feed_domain_repository import FeedDomainRepository
 from repositories.legacy.emoji_url_repository import EmojiUrlRepository
@@ -47,6 +52,7 @@ from repositories.report_repository import (
     ReportSubmissionRepository,
 )
 from repositories.scheduled_task_repository import ScheduledTaskRepository
+from repositories.subscription_repository import SubscriptionRepository
 from repositories.tag_repository import TagRepository
 from repositories.token_repository import TokenRepository
 from repositories.url_repository import UrlRepository
@@ -79,6 +85,7 @@ from services.contact_service import ContactService
 from services.custom_domain_service import CustomDomainService
 from services.domain_intel_service import DomainIntelService
 from services.edge_cache.og_writethrough import OgEdgeWritethrough
+from services.entitlements import EntitlementService
 from services.events.sinks import (
     InlineDomainEventSink,
     NullDomainEventSink,
@@ -87,6 +94,7 @@ from services.events.sinks import (
 from services.export.formatters import default_formatters
 from services.export.service import ExportService
 from services.feature_flag_service import FeatureFlagService
+from services.features.catalog import validate_override
 from services.meta_tags.sinks import NullMetaImageSink, RedisStreamMetaImageSink
 from services.mock_dcv_backend import MockDcvBackend
 from services.oauth_service import OAuthService
@@ -258,6 +266,49 @@ def build_posthog_eraser(settings: AppSettings, http_client) -> PostHogEraser:
     )
 
 
+def build_entitlement_store(
+    db, redis_client
+) -> tuple[
+    EntitlementCache,
+    EntitlementEventRepository,
+    SubscriptionRepository,
+    EntitlementOverrideRepository,
+]:
+    """The three entitlement repositories sharing one cache, so every write
+    to subscriptions or overrides invalidates the same ``ent:{id}`` key."""
+    cache = EntitlementCache(redis_client)
+    events = EntitlementEventRepository(db["entitlement_events"])
+    subscriptions = SubscriptionRepository(db["subscriptions"], events, cache)
+    overrides = EntitlementOverrideRepository(
+        db["entitlement_overrides"], events, cache, check=validate_override
+    )
+    return cache, events, subscriptions, overrides
+
+
+def build_entitlement_service(
+    db, settings: AppSettings, redis_client, *, store=None
+) -> EntitlementService:
+    cache, events, subscriptions, overrides = store or build_entitlement_store(
+        db, redis_client
+    )
+    return EntitlementService(
+        subscriptions,
+        overrides,
+        events,
+        cache,
+        selfhost=settings.billing.selfhost,
+        usage={
+            "custom_domains_max": CustomDomainRepository(
+                db["custom_domains"]
+            ).count_by_owner,
+            "webhook_endpoints_max": WebhookEndpointRepository(
+                db["webhook-endpoints"]
+            ).count_by_user,
+            "api_keys_max": ApiKeyRepository(db["api-keys"]).count_by_user,
+        },
+    )
+
+
 def build_account_erasure_service(
     db,
     settings: AppSettings,
@@ -355,6 +406,9 @@ def build_account_erasure_service(
         redis_client=redis_client,
         url_service=url_service,
     )
+    _, ent_events, subscription_repo, override_repo = build_entitlement_store(
+        db, redis_client
+    )
 
     return AccountErasureService(
         user_repo=user_repo,
@@ -372,6 +426,9 @@ def build_account_erasure_service(
         report_repo=ReportRepository(db["reports"]),
         report_submission_repo=ReportSubmissionRepository(db["report_submissions"]),
         feature_flag_repo=FeatureFlagRepository(db["feature_flags"]),
+        subscription_repo=subscription_repo,
+        override_repo=override_repo,
+        entitlement_event_repo=ent_events,
         r2_storage=r2_storage,
         posthog=build_posthog_eraser(settings, http_client),
         mailer=build_erasure_mailer(settings, http_client),
@@ -403,6 +460,11 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
     blocked_url_repo = BlockedUrlRepository(db["blocked-urls"])
     app_grant_repo = AppGrantRepository(db["app-grants"])
     feature_flag_repo = FeatureFlagRepository(db["feature_flags"])
+    ent_store = build_entitlement_store(db, redis_client)
+    _, ent_events, subscription_repo, override_repo = ent_store
+    app.state.entitlement_service = build_entitlement_service(
+        db, settings, redis_client, store=ent_store
+    )
 
     # ── Infrastructure ───────────────────────────────────────────────────
     url_cache = UrlCache(redis_client, ttl_seconds=settings.redis.redis_ttl_seconds)
@@ -773,7 +835,9 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
         max_active_keys=settings.max_active_api_keys,
     )
     app.state.page_layout_service = PageLayoutService(page_layout_repo)
-    token_factory = TokenFactory(settings.jwt)
+    token_factory = TokenFactory(
+        settings.jwt, plan_of=app.state.entitlement_service.plan_hint_for
+    )
     otp_service = OtpService(token_repo)
 
     app.state.user_repo = user_repo
@@ -1012,6 +1076,9 @@ def wire_services(app: FastAPI, settings: AppSettings, redis_client) -> None:
         report_repo=report_repo,
         report_submission_repo=report_submission_repo,
         feature_flag_repo=feature_flag_repo,
+        subscription_repo=subscription_repo,
+        override_repo=override_repo,
+        entitlement_event_repo=ent_events,
         r2_storage=r2_storage,
         posthog=build_posthog_eraser(settings, http_client),
         mailer=erasure_mailer,

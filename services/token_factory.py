@@ -7,6 +7,7 @@ and the PyJWT library. No database or email I/O happens here.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from typing import Any
 
@@ -22,10 +23,17 @@ class TokenFactory:
 
     Args:
         settings: JWT configuration (issuer, audience, keys, TTLs).
+        plan_of:  Async lookup of the user's plan name for the ``plan``
+                  claim. Optional; ``"free"`` when absent or failing.
     """
 
-    def __init__(self, settings: JWTSettings) -> None:
+    def __init__(
+        self,
+        settings: JWTSettings,
+        plan_of: Callable[[Any], Awaitable[str]] | None = None,
+    ) -> None:
         self._settings = settings
+        self._plan_of = plan_of
 
     # ── Key / algorithm helpers ───────────────────────────────────────────────
 
@@ -55,6 +63,7 @@ class TokenFactory:
         amr: str,
         app_id: str | None = None,
         scopes: list[str] | None = None,
+        plan: str = "free",
     ) -> str:
         """Issue a signed JWT access token for *user*.
 
@@ -68,6 +77,8 @@ class TokenFactory:
             email          — lowercased email from the user document (consumed
                              by feature-flag email allowlists via CurrentUser)
             email_verified — bool from the user document
+            plan           — plan name at issue time; a hint for the client
+                             and the resolver's last fallback, never authority
             app_id         — connected-app id (device auth flow only)
             scp            — granted scope slugs (device auth flow only;
                              omitted entirely for unrestricted tokens)
@@ -82,6 +93,7 @@ class TokenFactory:
             "amr": [amr],
             "email": user.email.lower(),
             "email_verified": user.email_verified,
+            "plan": plan,
         }
         if app_id:
             payload["app_id"] = app_id
@@ -115,7 +127,7 @@ class TokenFactory:
             payload["app_id"] = app_id
         return pyjwt.encode(payload, self._signing_key(), algorithm=self._algorithm())
 
-    def issue_tokens(
+    async def issue_tokens(
         self,
         user: UserDoc,
         amr: str,
@@ -132,8 +144,16 @@ class TokenFactory:
         Returns:
             (access_token, refresh_token)
         """
+        plan = "free"
+        if self._plan_of is not None:
+            try:
+                plan = await self._plan_of(user.id)
+            except Exception:
+                plan = "free"
         return (
-            self.generate_access_token(user, amr=amr, app_id=app_id, scopes=scopes),
+            self.generate_access_token(
+                user, amr=amr, app_id=app_id, scopes=scopes, plan=plan
+            ),
             self.generate_refresh_token(user, amr=amr, app_id=app_id),
         )
 

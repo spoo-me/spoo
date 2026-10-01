@@ -35,6 +35,9 @@ class TestEnsureIndexes:
         safety_verdicts_col = AsyncMock()
         feed_domains_col = AsyncMock()
         scheduled_tasks_col = AsyncMock()
+        subscriptions_col = AsyncMock()
+        overrides_col = AsyncMock()
+        ent_events_col = AsyncMock()
 
         db.__getitem__ = lambda self, name: {
             "users": users_col,
@@ -57,6 +60,9 @@ class TestEnsureIndexes:
             "safety_verdicts": safety_verdicts_col,
             "safety_feed_domains": feed_domains_col,
             "scheduled_tasks": scheduled_tasks_col,
+            "subscriptions": subscriptions_col,
+            "entitlement_overrides": overrides_col,
+            "entitlement_events": ent_events_col,
         }[name]
 
         # create_collection raises CollectionInvalid when collection already exists
@@ -66,6 +72,11 @@ class TestEnsureIndexes:
 
         # Check a few critical indexes
         users_col.create_index.assert_any_await([("email", 1)], unique=True)
+        subscriptions_col.create_index.assert_any_await([("user_id", 1)], unique=True)
+        overrides_col.create_index.assert_any_await(
+            [("user_id", 1), ("key", 1)], unique=True
+        )
+        ent_events_col.create_index.assert_any_await([("user_id", 1), ("at", -1)])
         # Erasure sweep: partial — holds only PENDING_DELETION/ERASING docs.
         users_col.create_index.assert_any_await(
             [("status", 1), ("purge_after", 1)],

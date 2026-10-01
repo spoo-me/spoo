@@ -24,7 +24,7 @@ from infrastructure.email.protocol import EmailProvider
 from infrastructure.logging import get_logger
 from repositories.user_repository import UserRepository
 from schemas.models.token import TOKEN_TYPE_EMAIL_VERIFY
-from schemas.models.user import UserDoc, UserPlan, UserStatus
+from schemas.models.user import UserDoc, UserStatus
 from schemas.results import AuthResult
 from services.auth.otp import OtpService
 from services.token_factory import TokenFactory
@@ -97,7 +97,7 @@ class CredentialService:
             raise AccountPendingDeletionError("this account is scheduled for deletion")
 
         svc_log.info("login_success", user_id=str(user.id), auth_method="password")
-        access_token, refresh_token = self._tokens.issue_tokens(user, "pwd")
+        access_token, refresh_token = await self._tokens.issue_tokens(user, "pwd")
         return AuthResult(
             user=user, access_token=access_token, refresh_token=refresh_token
         )
@@ -143,7 +143,6 @@ class CredentialService:
             user_name=user_name,
             pfp=None,
             auth_providers=[],
-            plan=UserPlan.FREE,
             signup_ip=signup_ip,
             created_at=now,
             updated_at=now,
@@ -166,7 +165,7 @@ class CredentialService:
             has_username=bool(user_name),
         )
 
-        access_token, refresh_token = self._tokens.issue_tokens(user_doc, "pwd")
+        access_token, refresh_token = await self._tokens.issue_tokens(user_doc, "pwd")
 
         # Send verification email — non-fatal, do not fail registration on error
         verification_sent = False
@@ -232,7 +231,7 @@ class CredentialService:
         amr = claims.get("amr", ["pwd"])[0]
 
         svc_log.info("token_refreshed", user_id=user_id, amr=amr)
-        new_access, new_refresh = self._tokens.issue_tokens(user, amr)
+        new_access, new_refresh = await self._tokens.issue_tokens(user, amr)
         return AuthResult(
             user=user,
             access_token=new_access,

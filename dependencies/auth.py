@@ -64,10 +64,9 @@ class CurrentUser:
     # access tokens minted before the claim existed; those users match by
     # user_id only until their next token refresh.
     email: str | None = field(default=None)
-    # UserDoc.plan value (e.g. "FREE") — consumed by FeatureFlagService's
-    # TIER rollout via getattr(user, "tier"). Populated from the DB on the
-    # API-key path and from the (future) "plan" claim on the JWT path.
-    tier: str | None = field(default=None)
+    # The JWT "plan" claim: a hint for the fail mode only, never authority.
+    # None on the API-key path; the resolver reads the owner's plan by id.
+    plan_claim: str | None = field(default=None)
 
 
 async def get_current_user(
@@ -189,7 +188,6 @@ async def get_current_user(
                 # The owning UserDoc is already fetched above for
                 # email_verified — no extra DB hit to carry the email.
                 email=user.email.lower() if user and user.email else None,
-                tier=user.plan.value if user and user.plan else None,
             )
 
     # ── JWT path ──────────────────────────────────────────────────────────────
@@ -246,9 +244,7 @@ async def get_current_user(
             email_verified=email_verified,
             amr=amr,
             email=email,
-            # Not issued yet — the paid-plans launch adds the claim; TIER
-            # flag rollouts become a pure data change at that point.
-            tier=claims.get("plan"),
+            plan_claim=claims.get("plan"),
             scopes=scopes,
             app_id=claims.get("app_id"),
         )

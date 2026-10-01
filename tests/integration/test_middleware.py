@@ -255,7 +255,8 @@ def test_cors_public_route_exposes_headers():
         )
     assert resp.headers.get("access-control-expose-headers") == (
         "X-Request-ID, X-Error-Code, X-Spoo-Hint, X-RateLimit-Limit, "
-        "X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After"
+        "X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After, "
+        "X-Entitlements-Version"
     )
 
 
@@ -274,7 +275,8 @@ def test_cors_private_route_exposes_headers():
         )
     assert resp.headers.get("access-control-expose-headers") == (
         "X-Request-ID, X-Error-Code, X-Spoo-Hint, X-RateLimit-Limit, "
-        "X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After"
+        "X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After, "
+        "X-Entitlements-Version"
     )
 
 

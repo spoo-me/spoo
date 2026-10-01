@@ -24,7 +24,8 @@ _ALLOWED_HEADERS = "Authorization, Content-Type, Accept, X-Request-ID, X-Spoo-Cl
 # Content-Type, Expires, Last-Modified, Pragma) is readable without it.
 _EXPOSED_HEADERS = (
     "X-Request-ID, X-Error-Code, X-Spoo-Hint, X-RateLimit-Limit, "
-    "X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After"
+    "X-RateLimit-Remaining, X-RateLimit-Reset, Retry-After, "
+    "X-Entitlements-Version"
 )
 
 

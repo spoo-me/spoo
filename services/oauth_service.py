@@ -40,7 +40,6 @@ from schemas.models.user import (
     ProviderInfo,
     ProviderProfile,
     UserDoc,
-    UserPlan,
     UserStatus,
 )
 from schemas.results import AuthResult
@@ -180,7 +179,6 @@ class OAuthService:
                     linked_at=now,
                 )
             ],
-            plan=UserPlan.FREE,
             signup_ip=signup_ip,
             created_at=now,
             updated_at=now,
@@ -215,9 +213,9 @@ class OAuthService:
                 error_type=type(exc).__name__,
             )
 
-    def _make_tokens(self, user: UserDoc, provider_key: str) -> tuple[str, str]:
+    async def _make_tokens(self, user: UserDoc, provider_key: str) -> tuple[str, str]:
         """Issue access + refresh tokens for an OAuth user."""
-        return self._token_factory.issue_tokens(user, provider_key)
+        return await self._token_factory.issue_tokens(user, provider_key)
 
     @staticmethod
     def _ensure_not_pending_deletion(user: UserDoc, provider_key: str) -> None:
@@ -341,7 +339,9 @@ class OAuthService:
                 "oauth_account_linked", user_id=link_user_id, provider=provider_key
             )
             updated_user = await self._user_repo.find_by_id(ObjectId(link_user_id))
-            access_token, refresh_token = self._make_tokens(updated_user, provider_key)
+            access_token, refresh_token = await self._make_tokens(
+                updated_user, provider_key
+            )
             return AuthResult(
                 user=updated_user,
                 access_token=access_token,
@@ -361,7 +361,7 @@ class OAuthService:
                 provider=provider_key,
                 action="login",
             )
-            access_token, refresh_token = self._make_tokens(
+            access_token, refresh_token = await self._make_tokens(
                 existing_oauth_user, provider_key
             )
             return AuthResult(
@@ -399,7 +399,7 @@ class OAuthService:
                     provider=provider_key,
                 )
                 updated_user = await self._user_repo.find_by_id(existing_email_user.id)
-                access_token, refresh_token = self._make_tokens(
+                access_token, refresh_token = await self._make_tokens(
                     updated_user, provider_key
                 )
                 return AuthResult(
@@ -444,7 +444,7 @@ class OAuthService:
             )
 
         new_user = await self._user_repo.find_by_id(new_user_id)
-        access_token, refresh_token = self._make_tokens(new_user, provider_key)
+        access_token, refresh_token = await self._make_tokens(new_user, provider_key)
         return AuthResult(
             user=new_user,
             access_token=access_token,

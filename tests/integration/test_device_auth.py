@@ -170,6 +170,8 @@ def _app_factory():
             app.state.http_client = MagicMock()
             app.state.oauth_providers = {}
             app.state.app_registry = _TEST_APP_REGISTRY
+            app.state.entitlement_service = AsyncMock()
+            app.state.entitlement_service.plan_hint_for = AsyncMock(return_value="free")
             yield
 
         app = FastAPI(lifespan=lifespan)
