@@ -5,7 +5,8 @@ updates:
     schedule:
       interval: "daily"
 
-  - package-ecosystem: "pip"
+  # uv, not pip: the image, CI and Render install from uv.lock.
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
