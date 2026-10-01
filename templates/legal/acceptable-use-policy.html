@@ -1,0 +1,96 @@
+{% extends "legal/base.html" %}
+
+{% block title %}Acceptable Use Policy - spoo.me{% endblock %}
+
+{% block content %}
+    <span><img alt="Shield emoji" class="emoji"
+            src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Shield/Flat/shield_flat.svg"></span>
+    <h1>Acceptable Use Policy</h1>
+    <br>
+
+    <p>Effective 2026-09-XX.</p>
+
+    <p>This policy says what you may not do with spoo.me. It applies to every link, custom domain, API key, connected app, and account, free or paid. It is part of our <a href="/terms-of-service">Terms of Service</a>. If you break it, we may block your links, slow your account down, or close it.</p>
+
+    <br>
+
+    <h2 id="links-you-may-not-create">Links you may not create</h2>
+
+    <p>Do not shorten, share, or promote links that:</p>
+
+    <ul>
+        <li>lead to phishing, malware, or pages built to deceive, such as fake login pages, fake stores, or fake virus warnings</li>
+        <li>are used for spam, unsolicited bulk messaging, or other commercial abuse</li>
+        <li>point to illegal content, or break the laws that apply to you or to the people you send there</li>
+        <li>infringe copyright, trademarks, or other rights of others</li>
+        <li>harass, threaten, or defame a person</li>
+        <li>exist to get past filters such as Google Safe Browsing, Spamhaus, PhishTank, or similar, including by creating fresh links faster than they can be flagged</li>
+    </ul>
+
+    <br>
+
+    <h2 id="every-destination-is-checked">Every destination is checked</h2>
+
+    <p>We screen every destination when a link is created and again over its lifetime. That includes the destination for each country when you set geo rules, every variant of a link, links behind a password, and links on custom domains.</p>
+
+    <p>Screening uses our own rules plus outside sources. We may block, remove, or report a link on our own judgement, even if no outside blocklist has flagged it yet. A blocked link shows a notice instead of redirecting.</p>
+
+    <br>
+
+    <h2 id="your-account">Your account</h2>
+
+    <ul>
+        <li>Keep your login and API keys to yourself. Do not share them.</li>
+        <li>Do not create extra accounts to get around a limit or a ban.</li>
+        <li>Do not try to get into other accounts or into our systems.</li>
+        <li>Do not scrape, overload, probe, or otherwise interfere with the service.</li>
+        <li>Do not work around rate limits or security measures.</li>
+        <li>Use the API for your own projects. Do not resell or redistribute API access.</li>
+    </ul>
+
+    <br>
+
+    <h2 id="paid-plans">Paid plans</h2>
+
+    <p><strong>No reselling.</strong> Pro is for you and your own projects or business. Do not sell access to your account, offer spoo.me link creation as a paid service of your own, or sublicense the API. If you want to build a product on top of spoo.me, email us first.</p>
+
+    <p><strong>Unlimited links, in good faith.</strong> There is no cap on how many links you create for real use. Automated use that looks like abuse, such as link farms, creating and discarding links at machine speed, or using us as a load-testing target, may be throttled. Throttling slows down creating new links. It never stops your existing legitimate links from redirecting.</p>
+
+    <p><strong>Custom domains you own.</strong> You may only connect a domain you own or are authorised to manage, and we verify that through DNS. Do not connect a domain that impersonates a brand, a person, or a service you do not represent. If a domain stops being yours, links on it stop and we may remove it.</p>
+
+    <p><strong>Screening still applies.</strong> Paying for Pro does not exempt any destination, geo rule, or variant from the checks above.</p>
+
+    <br>
+
+    <h2 id="what-we-do-about-it">What we do about it</h2>
+
+    <p>Depending on how serious it is, we may warn you, throttle your account, block the links involved, or suspend or close the account. When people are being harmed, we act first and tell you afterwards. Where the law requires it or the harm is serious, we report to the relevant authorities and blocklists.</p>
+
+    <p>If you think we got it wrong, email <a href="mailto:support@spoo.me">support@spoo.me</a> with the link and we will look again.</p>
+
+    <br>
+
+    <h2 id="reporting-abuse">Reporting abuse</h2>
+
+    <p>If you find a spoo.me link that breaks this policy, report it at <a href="/report">spoo.me/report</a> or email <a href="mailto:support@spoo.me">support@spoo.me</a>. Reports are handled ahead of everything else.</p>
+
+    <br>
+
+    <h2 id="governing-law">Governing law</h2>
+
+    <p>This policy is part of our <a href="/terms-of-service">Terms of Service</a> and follows the same governing law, the laws of the Netherlands. If you live in the EU, nothing here affects your rights under the consumer protection laws of your country of residence.</p>
+
+    <br>
+
+    <h2 id="changes-to-this-policy">Changes to this policy</h2>
+
+    <p>We may update this policy. When we do, we change the effective date at the top, and we notify registered users of changes that matter.</p>
+
+    <br>
+
+    <h2 id="contact">Contact</h2>
+
+    <p>Questions about this policy go to <a href="mailto:support@spoo.me">support@spoo.me</a>.</p>
+
+    <p>Support Team, spoo.me</p>
+{% endblock %}
