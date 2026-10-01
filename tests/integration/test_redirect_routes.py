@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from dependencies import get_click_sink, get_url_service
-from errors import (
+from app.dependencies import get_click_sink, get_url_service
+from app.errors import (
     BlockedUrlError,
     ForbiddenError,
     GoneError,
@@ -22,10 +22,10 @@ from errors import (
     NotYetLiveError,
     ValidationError,
 )
-from infrastructure.cache.url_cache import UrlCacheData
-from routes.redirect_routes import router as redirect_router
-from schemas.models.url import AbVariant
-from services.click.events import ClickEvent
+from app.infrastructure.cache.url_cache import UrlCacheData
+from app.routes.redirect_routes import router as redirect_router
+from app.schemas.models.url import AbVariant
+from app.services.click.events import ClickEvent
 from tests.conftest import build_test_app
 from tests.factories import make_url_cache
 
@@ -431,7 +431,7 @@ class TestAbVariantRedirect:
     def test_roll_picks_variant_and_stamps_event(
         self, monkeypatch, roll, location, index
     ):
-        monkeypatch.setattr("routes.redirect_routes.randrange", lambda n: roll)
+        monkeypatch.setattr("app.routes.redirect_routes.randrange", lambda n: roll)
         url_data = _make_url_cache(
             long_url="https://example.com/default", ab_variants=AB_VARIANTS
         )
@@ -460,9 +460,9 @@ class TestAbVariantRedirect:
         assert 15 <= d <= 70, d
 
     def test_matched_geo_rule_wins_over_variants(self, monkeypatch):
-        from dependencies import get_geoip_service
+        from app.dependencies import get_geoip_service
 
-        monkeypatch.setattr("routes.redirect_routes.randrange", lambda n: 0)
+        monkeypatch.setattr("app.routes.redirect_routes.randrange", lambda n: 0)
         url_data = _make_url_cache(
             long_url="https://example.com/default",
             geo_rules={"IN": "https://example.in/"},
@@ -487,7 +487,7 @@ class TestAbVariantRedirect:
         assert event.variant_index is None
 
     def test_head_request_picks_a_variant_without_event(self, monkeypatch):
-        monkeypatch.setattr("routes.redirect_routes.randrange", lambda n: 0)
+        monkeypatch.setattr("app.routes.redirect_routes.randrange", lambda n: 0)
         url_data = _make_url_cache(ab_variants=AB_VARIANTS)
         sink = _mock_click_sink()
         with TestClient(self._app(url_data, sink), follow_redirects=False) as client:
@@ -518,7 +518,7 @@ def _mock_geoip(country_code=None):
 
 
 def _build_geo_app(url_svc, click_sink=None, geoip=None):
-    from dependencies import get_geoip_service
+    from app.dependencies import get_geoip_service
 
     return build_test_app(
         redirect_router,

@@ -21,18 +21,18 @@ import pytest
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     CurrentUser,
     get_account_deletion_service,
     get_credential_service,
     require_jwt,
 )
-from errors import AccountPendingDeletionError, AuthenticationError
-from infrastructure.crypto import hash_password
-from routes.api_v1 import router as api_v1_router
-from routes.auth import router as auth_router
-from schemas.models.user import UserDoc
-from services.account_deletion_service import AccountDeletionService
+from app.errors import AccountPendingDeletionError, AuthenticationError
+from app.infrastructure.crypto import hash_password
+from app.routes.api_v1 import router as api_v1_router
+from app.routes.auth import router as auth_router
+from app.schemas.models.user import UserDoc
+from app.services.account_deletion_service import AccountDeletionService
 from tests.conftest import build_test_app
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -694,7 +694,7 @@ async def test_restore_token_double_restore_race_single_winner():
     the uniform 403, and only the winner consumes the token."""
     from types import SimpleNamespace
 
-    from errors import ForbiddenError
+    from app.errors import ForbiddenError
 
     token_repo = AsyncMock()
     token_repo.find_valid_by_hash.return_value = SimpleNamespace(
@@ -828,7 +828,7 @@ def test_delete_me_password_set_without_hash_fails_closed():
 async def test_restore_unknown_email_burns_dummy_verify(monkeypatch):
     """Early-failure paths run a verify against the module's dummy hash so
     timing can't distinguish "no such account" from "wrong password"."""
-    import services.account_deletion_service as ads
+    import app.services.account_deletion_service as ads
 
     verified_hashes = []
     monkeypatch.setattr(
@@ -839,7 +839,7 @@ async def test_restore_unknown_email_burns_dummy_verify(monkeypatch):
     svc, repo = make_service(_pending_user(hash_password(PASSWORD)))
     repo.find_by_email.return_value = None
 
-    from errors import ForbiddenError
+    from app.errors import ForbiddenError
 
     with pytest.raises(ForbiddenError):
         await svc.restore("gone@example.com", PASSWORD)
@@ -849,7 +849,7 @@ async def test_restore_unknown_email_burns_dummy_verify(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_restore_oauth_only_burns_dummy_verify(monkeypatch):
-    import services.account_deletion_service as ads
+    import app.services.account_deletion_service as ads
 
     verified_hashes = []
     monkeypatch.setattr(
@@ -862,7 +862,7 @@ async def test_restore_oauth_only_burns_dummy_verify(monkeypatch):
         password_set=False, password_hash=None, status="PENDING_DELETION"
     )
 
-    from errors import ForbiddenError
+    from app.errors import ForbiddenError
 
     with pytest.raises(ForbiddenError):
         await svc.restore("test@example.com", PASSWORD)

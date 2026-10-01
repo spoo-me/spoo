@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from shared.ip_utils import get_client_ip
+from app.shared.ip_utils import get_client_ip
 
 from .conftest import _make_request
 

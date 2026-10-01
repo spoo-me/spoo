@@ -6,16 +6,16 @@ from datetime import datetime, timezone
 
 from bson import ObjectId
 
-from infrastructure.cache.url_cache import UrlCacheData
-from schemas.models.base import ANONYMOUS_OWNER_ID
-from schemas.models.url import UrlV2Doc
-from services.click.events import ClickEvent
-from services.webhooks.payloads import (
+from app.infrastructure.cache.url_cache import UrlCacheData
+from app.schemas.models.base import ANONYMOUS_OWNER_ID
+from app.schemas.models.url import UrlV2Doc
+from app.services.click.events import ClickEvent
+from app.services.webhooks.payloads import (
     build_link_clicked,
     build_link_expired,
     link_snapshot,
 )
-from services.webhooks.registry import validate_payload
+from app.services.webhooks.registry import validate_payload
 
 _OWNER = ObjectId()
 
@@ -71,7 +71,7 @@ class TestLinkSnapshot:
     def test_snapshot_keys_match_the_registry_model(self):
         """The registry drives the webhook docs; a snapshot key it does not
         declare would ship undocumented."""
-        from services.webhooks.registry import LinkSnapshot, _sample_link
+        from app.services.webhooks.registry import LinkSnapshot, _sample_link
 
         declared = set(LinkSnapshot.model_fields)
         assert set(link_snapshot(_doc())) <= declared
@@ -127,8 +127,8 @@ class TestLinkClicked:
 
 class TestEventChanges:
     def test_meta_tags_change_strips_internal_fields(self):
-        from schemas.models.url import LinkMetaTags
-        from services.webhooks.payloads import event_changes
+        from app.schemas.models.url import LinkMetaTags
+        from app.services.webhooks.payloads import event_changes
 
         existing = _doc()
         update_ops = {
@@ -171,7 +171,7 @@ class TestEventChanges:
 
 
 def test_link_snapshot_carries_schedule_fields():
-    from services.webhooks.payloads import link_snapshot
+    from app.services.webhooks.payloads import link_snapshot
 
     doc = _doc()
     assert link_snapshot(doc)["starts_at"] is None

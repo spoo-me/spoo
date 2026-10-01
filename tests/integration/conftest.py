@@ -11,7 +11,7 @@ import pytest
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from middleware.rate_limiter import limiter
+from app.middleware.rate_limiter import limiter
 
 
 @pytest.fixture

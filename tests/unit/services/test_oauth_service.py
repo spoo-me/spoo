@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock
 import pytest
 from bson import ObjectId
 
-from errors import ConflictError, NotFoundError, ValidationError
-from schemas.models.user import ProviderInfo, UserDoc
-from schemas.results import AuthResult
+from app.errors import ConflictError, NotFoundError, ValidationError
+from app.schemas.models.user import ProviderInfo, UserDoc
+from app.schemas.results import AuthResult
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -23,7 +23,7 @@ OTHER_OID = ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")
 
 
 def make_jwt_settings():
-    from config import JWTSettings
+    from app.config import JWTSettings
 
     return JWTSettings(
         jwt_issuer="spoo.me",
@@ -81,13 +81,13 @@ def make_provider_info(
 
 def make_token_factory():
     """Create a real TokenFactory with working token generation."""
-    from services.token_factory import TokenFactory
+    from app.services.token_factory import TokenFactory
 
     return TokenFactory(make_jwt_settings())
 
 
 def make_oauth_service(token_factory=None):
-    from services.oauth_service import OAuthService
+    from app.services.oauth_service import OAuthService
 
     if token_factory is None:
         token_factory = make_token_factory()
@@ -152,7 +152,7 @@ class TestHandleCallbackExistingOAuthUser:
 class TestHandleCallbackPendingDeletion:
     @pytest.mark.asyncio
     async def test_existing_oauth_user_login_blocked_when_pending_deletion(self):
-        from errors import AccountPendingDeletionError
+        from app.errors import AccountPendingDeletionError
 
         svc = make_oauth_service()
         user = make_user_doc(status="PENDING_DELETION")
@@ -173,7 +173,7 @@ class TestHandleCallbackPendingDeletion:
     @pytest.mark.asyncio
     async def test_existing_oauth_user_login_blocked_when_erasing(self):
         """ERASING is gated identically — the cascade claimed the account."""
-        from errors import AccountPendingDeletionError
+        from app.errors import AccountPendingDeletionError
 
         svc = make_oauth_service()
         user = make_user_doc(status="ERASING")
@@ -190,7 +190,7 @@ class TestHandleCallbackPendingDeletion:
 
     @pytest.mark.asyncio
     async def test_auto_link_blocked_when_pending_deletion(self):
-        from errors import AccountPendingDeletionError
+        from app.errors import AccountPendingDeletionError
 
         svc = make_oauth_service()
         svc._user_repo.find_by_oauth_provider.return_value = None
@@ -389,7 +389,7 @@ class TestHandleCallbackLink:
         """The LINK branch mints tokens like the login paths, so it gets the
         same status gate — a still-valid access token must not mint fresh
         tokens (or link a provider) for an account scheduled for erasure."""
-        from errors import AccountPendingDeletionError
+        from app.errors import AccountPendingDeletionError
 
         svc = make_oauth_service()
         svc._user_repo.find_by_id.return_value = make_user_doc(status=status)

@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-from infrastructure.posthog_erasure import HttpPostHogEraser
+from app.infrastructure.posthog_erasure import HttpPostHogEraser
 
 
 class TestHttpPostHogEraser:

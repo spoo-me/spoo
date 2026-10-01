@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock
 import pytest
 from bson import ObjectId
 
-from schemas.models.base import ANONYMOUS_OWNER_ID
-from schemas.models.url import UrlV2Doc
-from services.safety.enforcer import SafetyEnforcer
+from app.schemas.models.base import ANONYMOUS_OWNER_ID
+from app.schemas.models.url import UrlV2Doc
+from app.services.safety.enforcer import SafetyEnforcer
 
 
 def _owned_doc(alias: str) -> UrlV2Doc:

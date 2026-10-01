@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from routes.oauth_routes import resolve_post_auth_redirect
+from app.routes.oauth_routes import resolve_post_auth_redirect
 
 
 def test_new_account_goes_to_onboarding_when_enabled():

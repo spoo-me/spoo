@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 
-from services.webhooks.signing import (
+from app.services.webhooks.signing import (
     SECRET_PREFIX,
     generate_signing_secret,
     new_webhook_id,

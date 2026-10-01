@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from shared.datetime_utils import (
+from app.shared.datetime_utils import (
     convert_to_gmt,
     parse_datetime,
     to_unix_timestamp,

@@ -64,37 +64,39 @@ uv run pytest -v
 
 ```bash
 spoo/
-├── main.py                     # Application entry point
-├── app.py                      # FastAPI app factory
-├── config.py                   # Pydantic settings
-├── errors.py                   # Domain error classes
-├── routes/                     # Route handlers
-│   ├── api_v1/                 # V2 JSON API (shorten, stats, exports, keys)
-│   ├── legacy/                 # V1 form-based endpoints
-│   ├── auth_routes.py          # Authentication (register, login, refresh)
-│   ├── oauth_routes.py         # OAuth2 providers
-│   ├── redirect_routes.py      # Short URL redirection
-│   └── health_routes.py        # Health check endpoint
-├── services/                   # Business logic layer
-├── repositories/               # Data access layer (MongoDB)
-├── schemas/                    # Pydantic models and DTOs
-│   ├── models/                 # Database document models
-│   └── dto/                    # Request/response schemas
-├── infrastructure/             # External service integrations
-│   ├── cache/                  # Redis caching (URL cache, dual cache)
-│   ├── email/                  # Email provider
-│   ├── geoip.py                # GeoIP lookups
-│   └── oauth_clients.py        # OAuth2 client setup
-├── dependencies/               # FastAPI dependency injection
-├── middleware/                  # Error handlers, rate limiting, logging
-├── shared/                     # Cross-cutting utilities
+├── app/                        # Application package
+│   ├── main.py                 # Entry point (uvicorn app.main:app)
+│   ├── factory.py              # FastAPI app factory
+│   ├── config.py               # Pydantic settings
+│   ├── errors.py               # Domain error classes
+│   ├── routes/                 # Route handlers
+│   │   ├── api_v1/             # V2 JSON API (shorten, stats, exports, keys)
+│   │   ├── legacy/             # V1 form-based endpoints
+│   │   ├── auth_routes.py      # Authentication (register, login, refresh)
+│   │   ├── oauth_routes.py     # OAuth2 providers
+│   │   ├── redirect_routes.py  # Short URL redirection
+│   │   └── health_routes.py    # Health check endpoint
+│   ├── services/               # Business logic layer
+│   ├── repositories/           # Data access layer (MongoDB)
+│   ├── schemas/                # Pydantic models and DTOs
+│   │   ├── models/             # Database document models
+│   │   └── dto/                # Request/response schemas
+│   ├── infrastructure/         # External service integrations
+│   │   ├── cache/              # Redis caching (URL cache, dual cache)
+│   │   ├── email/              # Email provider
+│   │   ├── geoip.py            # GeoIP lookups
+│   │   └── oauth_clients.py    # OAuth2 client setup
+│   ├── dependencies/           # FastAPI dependency injection
+│   ├── middleware/             # Error handlers, rate limiting, logging
+│   ├── shared/                 # Cross-cutting utilities
+│   ├── data/                   # GeoIP databases, seed lists, apps.yaml
+│   ├── templates/              # Jinja2 HTML templates
+│   └── static/                 # CSS, JS, images
 ├── tests/                      # Test suite
 │   ├── unit/                   # Unit tests (mocked dependencies)
 │   ├── integration/            # Integration tests (TestClient)
 │   ├── shorten.py              # Smoke test (URL shortening)
 │   └── stats.py                # Smoke test (statistics)
-├── templates/                  # Jinja2 HTML templates
-├── static/                     # CSS, JS, images
 ├── docker-compose.yml          # Local development stack
 ├── dockerfile                  # Container image
 └── pyproject.toml              # Project config, dependencies, tool settings

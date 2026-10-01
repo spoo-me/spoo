@@ -4,7 +4,7 @@ import hashlib
 
 import pytest
 
-from infrastructure.crypto import hash_password, hash_token, verify_password
+from app.infrastructure.crypto import hash_password, hash_token, verify_password
 
 
 class TestHashPassword:
@@ -58,7 +58,7 @@ def test_hash_token_distinct_inputs():
 
 class TestPkceS256Challenge:
     def test_rfc7636_appendix_b_vector(self):
-        from infrastructure.crypto import pkce_s256_challenge
+        from app.infrastructure.crypto import pkce_s256_challenge
 
         assert (
             pkce_s256_challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk")
@@ -66,7 +66,7 @@ class TestPkceS256Challenge:
         )
 
     def test_challenge_is_43_chars_unpadded_base64url(self):
-        from infrastructure.crypto import pkce_s256_challenge
+        from app.infrastructure.crypto import pkce_s256_challenge
 
         challenge = pkce_s256_challenge("a" * 43)
         assert len(challenge) == 43
@@ -75,6 +75,6 @@ class TestPkceS256Challenge:
         assert "/" not in challenge
 
     def test_different_verifiers_differ(self):
-        from infrastructure.crypto import pkce_s256_challenge
+        from app.infrastructure.crypto import pkce_s256_challenge
 
         assert pkce_s256_challenge("a" * 43) != pkce_s256_challenge("b" * 43)

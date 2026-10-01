@@ -13,13 +13,13 @@ from typing import Any
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import get_current_user
-from dependencies.services import get_public_stats_service
-from infrastructure.crypto import hash_password
-from schemas.models.url import UrlV2Doc
-from services.public_link_resolver import PublicLinkResolver
-from services.public_stats_service import PublicStatsService
-from services.stats_service import StatsService
+from app.dependencies import get_current_user
+from app.dependencies.services import get_public_stats_service
+from app.infrastructure.crypto import hash_password
+from app.schemas.models.url import UrlV2Doc
+from app.services.public_link_resolver import PublicLinkResolver
+from app.services.public_stats_service import PublicStatsService
+from app.services.stats_service import StatsService
 
 from .conftest import _build_test_app, _make_user
 

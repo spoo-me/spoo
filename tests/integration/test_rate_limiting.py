@@ -24,18 +24,18 @@ os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
 import pytest
 
-from config import AppSettings
-from middleware.error_handler import register_error_handlers
-from middleware.rate_limiter import (
+from app.config import AppSettings
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.rate_limiter import (
     Limits,
     RateLimitHeadersMiddleware,
     limiter,
     rate_limit_key,
 )
-from routes.health_routes import router as health_router
+from app.routes.health_routes import router as health_router
 
 _STATIC_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static"
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "app", "static"
 )
 
 

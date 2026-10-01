@@ -18,10 +18,10 @@ import pytest
 from bson import ObjectId
 from pymongo.errors import PyMongoError
 
-from errors import ConflictError, ForbiddenError, NotFoundError, ValidationError
-from schemas.dto.requests.url import UpdateUrlRequest
-from schemas.models.url import UrlStatus
-from services.bulk_url_service import BulkBatch, BulkUrlService
+from app.errors import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.schemas.dto.requests.url import UpdateUrlRequest
+from app.schemas.models.url import UrlStatus
+from app.services.bulk_url_service import BulkBatch, BulkUrlService
 
 from .test_url_service import (
     SYSTEM_DEFAULT_DOMAIN,
@@ -54,7 +54,7 @@ def make_bulk_service(
 
 
 def _make_gate():
-    from services.safety.policy import UrlPolicyService
+    from app.services.safety.policy import UrlPolicyService
 
     return UrlPolicyService([], blocked_self_domains=[SYSTEM_DEFAULT_DOMAIN])
 
@@ -335,7 +335,7 @@ class TestBulkSetStatus:
         svc = make_bulk_service(url_repo, kv=kv)
 
         with patch(
-            "services.bulk_url_service.build_og_entry",
+            "app.services.bulk_url_service.build_og_entry",
             return_value=(f"cache:{SYSTEM_DEFAULT_DOMAIN}:og", "{}"),
         ) as build:
             report = await svc.bulk_set_status(
@@ -429,7 +429,7 @@ class TestBulkSetExpiry:
         svc = make_bulk_service(url_repo, kv=kv)
 
         with patch(
-            "services.bulk_url_service.build_og_entry",
+            "app.services.bulk_url_service.build_og_entry",
             return_value=(f"cache:{SYSTEM_DEFAULT_DOMAIN}:dead", "{}"),
         ) as build:
             report = await svc.bulk_set_expiry([_oid(1), _oid(2)], FUTURE, USER_OID)
@@ -471,7 +471,7 @@ class TestBulkSetExpiry:
 
 
 def make_single_item_service(url_repo, url_cache, og_writethrough=None, edge_kv=None):
-    from services.url_service import UrlService
+    from app.services.url_service import UrlService
 
     return UrlService(
         url_repo=url_repo,
@@ -829,7 +829,9 @@ class TestBulkMoveDomain:
         url_repo.find_by_ids_and_owner.return_value = [doc]
         svc = make_bulk_service(url_repo)
 
-        with patch("services.bulk_url_service.is_reserved_alias", return_value=True):
+        with patch(
+            "app.services.bulk_url_service.is_reserved_alias", return_value=True
+        ):
             report = await svc.bulk_move_domain([_oid(1)], None, USER_OID)
 
         row = report.results[0]
@@ -927,7 +929,7 @@ class TestBulkMoveDomain:
         svc2 = make_bulk_service(url_repo2, kv=kv2)
 
         with patch(
-            "services.bulk_url_service.build_og_entry",
+            "app.services.bulk_url_service.build_og_entry",
             return_value=(f"cache:{SYSTEM_DEFAULT_DOMAIN}:incoming", "{}"),
         ) as build:
             await svc2.bulk_move_domain([_oid(3)], None, USER_OID)
@@ -1011,7 +1013,7 @@ class TestMoveDomainParity:
         single_repo2.find_by_id.return_value = tenant_doc
         single2 = make_single_item_service(single_repo2, AsyncMock())
         with (
-            patch("services.url_service.is_reserved_alias", return_value=True),
+            patch("app.services.url_service.is_reserved_alias", return_value=True),
             pytest.raises(
                 ValidationError,
                 match=f"Alias 'login2' is reserved on {SYSTEM_DEFAULT_DOMAIN}",
@@ -1022,7 +1024,9 @@ class TestMoveDomainParity:
         bulk_repo2 = AsyncMock()
         bulk_repo2.find_by_ids_and_owner.return_value = [tenant_doc]
         bulk2 = make_bulk_service(bulk_repo2)
-        with patch("services.bulk_url_service.is_reserved_alias", return_value=True):
+        with patch(
+            "app.services.bulk_url_service.is_reserved_alias", return_value=True
+        ):
             report2 = await bulk2.bulk_move_domain([_oid(2)], None, USER_OID)
         row2 = report2.results[0]
         assert row2.error_code == "validation_error"

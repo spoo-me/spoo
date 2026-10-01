@@ -8,20 +8,20 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     get_bulk_url_service,
     get_current_user,
     get_tag_service,
     get_url_service,
     require_auth,
 )
-from errors import ConflictError, NotFoundError
-from schemas.dto.responses.bulk import (
+from app.errors import ConflictError, NotFoundError
+from app.schemas.dto.responses.bulk import (
     BulkOperationSummary,
     BulkUrlOperationResponse,
     BulkUrlResultRow,
 )
-from schemas.models.tag import TagDoc
+from app.schemas.models.tag import TagDoc
 
 from .conftest import _build_test_app, _make_api_key_doc, _make_url_doc, _make_user
 

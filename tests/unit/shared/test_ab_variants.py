@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from schemas.models.url import AbVariant
-from shared.ab_variants import pick_variant
+from app.schemas.models.url import AbVariant
+from app.shared.ab_variants import pick_variant
 
 VARIANTS = [
     AbVariant(url="https://example.com/b", weight=60),

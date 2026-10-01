@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from schemas.models.url import SchemaVersion
-from shared.alias_dispatch import (
+from app.schemas.models.url import SchemaVersion
+from app.shared.alias_dispatch import (
     emoji_lookup_candidates,
     is_emoji_shaped,
     resolution_order,

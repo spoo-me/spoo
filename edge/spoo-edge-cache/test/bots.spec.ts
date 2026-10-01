@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import canonical from "../../../data/preview_bots.json";
+import canonical from "../../../app/data/preview_bots.json";
 import edgeCopy from "../contract/preview_bots.json";
 import { wantsPreview } from "../src/bots";
 
@@ -80,7 +80,7 @@ describe("wantsPreview", () => {
 });
 
 describe("preview_bots.json copies", () => {
-  it("edge copy matches the canonical data/preview_bots.json", () => {
+  it("edge copy matches the canonical app/data/preview_bots.json", () => {
     expect(edgeCopy).toEqual(canonical);
   });
 });

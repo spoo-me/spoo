@@ -12,7 +12,7 @@ from .conftest import _legacy_url_doc, make_collection
 
 class TestLegacyUrlRepository:
     def _repo(self, col=None):
-        from repositories.legacy.legacy_url_repository import LegacyUrlRepository
+        from app.repositories.legacy.legacy_url_repository import LegacyUrlRepository
 
         return LegacyUrlRepository(col or make_collection())
 
@@ -133,7 +133,7 @@ class TestLegacyUrlRepository:
 class TestCountByDestHost:
     @pytest.mark.asyncio
     async def test_filters_on_stamped_dest_host(self):
-        from repositories.legacy.legacy_url_repository import LegacyUrlRepository
+        from app.repositories.legacy.legacy_url_repository import LegacyUrlRepository
 
         col = AsyncMock()
         col.name = "urls"
@@ -145,7 +145,7 @@ class TestCountByDestHost:
 
 class TestSafetyBlockSurface:
     def _repo(self, col):
-        from repositories.legacy.legacy_url_repository import LegacyUrlRepository
+        from app.repositories.legacy.legacy_url_repository import LegacyUrlRepository
 
         col.name = "urls"
         return LegacyUrlRepository(col)

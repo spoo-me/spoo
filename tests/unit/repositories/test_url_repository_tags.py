@@ -14,13 +14,13 @@ T1 = ObjectId("1" * 24)
 
 
 def _url_repo(col):
-    from repositories.url_repository import UrlRepository
+    from app.repositories.url_repository import UrlRepository
 
     return UrlRepository(col)
 
 
 def _tag_repo(col):
-    from repositories.tag_repository import TagRepository
+    from app.repositories.tag_repository import TagRepository
 
     return TagRepository(col)
 

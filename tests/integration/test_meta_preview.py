@@ -12,9 +12,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 from fastapi.testclient import TestClient
 
-from dependencies import get_click_sink, get_url_service
-from infrastructure.cache.url_cache import UrlCacheData
-from routes.redirect_routes import router as redirect_router
+from app.dependencies import get_click_sink, get_url_service
+from app.infrastructure.cache.url_cache import UrlCacheData
+from app.routes.redirect_routes import router as redirect_router
 from tests.conftest import build_test_app
 from tests.factories import make_url_cache
 

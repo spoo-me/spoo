@@ -9,13 +9,13 @@ import jwt as pyjwt
 import pytest
 from bson import ObjectId
 
-from errors import (
+from app.errors import (
     AuthenticationError,
     ConflictError,
     NotFoundError,
     ValidationError,
 )
-from schemas.models.user import UserDoc
+from app.schemas.models.user import UserDoc
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -26,7 +26,7 @@ USER_OID = ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")
 
 
 def make_jwt_settings():
-    from config import JWTSettings
+    from app.config import JWTSettings
 
     return JWTSettings(
         jwt_issuer="spoo.me",
@@ -66,19 +66,19 @@ def make_user_doc(
 
 
 def make_token_factory():
-    from services.token_factory import TokenFactory
+    from app.services.token_factory import TokenFactory
 
     return TokenFactory(make_jwt_settings())
 
 
 def make_otp_service():
-    from services.auth.otp import OtpService
+    from app.services.auth.otp import OtpService
 
     return OtpService(token_repo=AsyncMock())
 
 
 def make_credential_service():
-    from services.auth.credentials import CredentialService
+    from app.services.auth.credentials import CredentialService
 
     otp = make_otp_service()
     return CredentialService(
@@ -90,7 +90,7 @@ def make_credential_service():
 
 
 def make_verification_service():
-    from services.auth.verification import EmailVerificationService
+    from app.services.auth.verification import EmailVerificationService
 
     otp = make_otp_service()
     return EmailVerificationService(
@@ -102,7 +102,7 @@ def make_verification_service():
 
 
 def make_password_service():
-    from services.auth.password import PasswordService
+    from app.services.auth.password import PasswordService
 
     otp = make_otp_service()
     return PasswordService(
@@ -113,7 +113,7 @@ def make_password_service():
 
 
 def make_device_auth_service(app_registry=None):
-    from services.auth.device import DeviceAuthService
+    from app.services.auth.device import DeviceAuthService
 
     return DeviceAuthService(
         user_repo=AsyncMock(),
@@ -237,7 +237,7 @@ class TestJWTHelpers:
 class TestLogin:
     @pytest.mark.asyncio
     async def test_login_success(self):
-        from infrastructure.crypto import hash_password
+        from app.infrastructure.crypto import hash_password
 
         svc = make_credential_service()
         hashed = hash_password("ValidPass1!")
@@ -270,7 +270,7 @@ class TestLogin:
 
     @pytest.mark.asyncio
     async def test_login_wrong_password_raises(self):
-        from infrastructure.crypto import hash_password
+        from app.infrastructure.crypto import hash_password
 
         svc = make_credential_service()
         hashed = hash_password("CorrectPass1!")
@@ -282,8 +282,8 @@ class TestLogin:
 
     @pytest.mark.asyncio
     async def test_login_blocked_when_pending_deletion(self):
-        from errors import AccountPendingDeletionError
-        from infrastructure.crypto import hash_password
+        from app.errors import AccountPendingDeletionError
+        from app.infrastructure.crypto import hash_password
 
         svc = make_credential_service()
         hashed = hash_password("ValidPass1!")
@@ -301,8 +301,8 @@ class TestLogin:
     async def test_login_blocked_when_erasing(self):
         """ERASING (cascade claimed) answers exactly like PENDING_DELETION —
         a fresh session must never outlive the erasure."""
-        from errors import AccountPendingDeletionError
-        from infrastructure.crypto import hash_password
+        from app.errors import AccountPendingDeletionError
+        from app.infrastructure.crypto import hash_password
 
         svc = make_credential_service()
         hashed = hash_password("ValidPass1!")
@@ -317,7 +317,7 @@ class TestLogin:
     async def test_login_pending_deletion_hidden_behind_password_proof(self):
         """Wrong password on a pending account answers like any wrong
         password — strangers can't probe deletion state."""
-        from infrastructure.crypto import hash_password
+        from app.infrastructure.crypto import hash_password
 
         svc = make_credential_service()
         hashed = hash_password("ValidPass1!")
@@ -332,7 +332,7 @@ class TestLogin:
     @pytest.mark.asyncio
     async def test_login_invalid_creds_same_message_for_both_failures(self):
         """No user enumeration — both failure cases return identical message."""
-        from infrastructure.crypto import hash_password
+        from app.infrastructure.crypto import hash_password
 
         svc = make_credential_service()
 
@@ -480,8 +480,11 @@ class TestRefreshToken:
 
 class TestVerifyEmail:
     def _make_token_doc(self, user_id, otp_code, expired=False, used=False, attempts=0):
-        from infrastructure.crypto import hash_token
-        from schemas.models.token import TOKEN_TYPE_EMAIL_VERIFY, VerificationTokenDoc
+        from app.infrastructure.crypto import hash_token
+        from app.schemas.models.token import (
+            TOKEN_TYPE_EMAIL_VERIFY,
+            VerificationTokenDoc,
+        )
 
         now = datetime.now(timezone.utc)
         expires = now - timedelta(seconds=1) if expired else now + timedelta(minutes=10)
@@ -627,7 +630,7 @@ class TestSendVerification:
     @pytest.mark.asyncio
     async def test_send_verification_rate_limited_by_service(self):
         """Service-level rate limit: raises when MAX_TOKENS_PER_HOUR exceeded."""
-        from errors import RateLimitError
+        from app.errors import RateLimitError
 
         svc = make_verification_service()
         svc._user_repo.find_by_id.return_value = make_user_doc(email_verified=False)
@@ -647,8 +650,8 @@ class TestOTPRateLimit:
     @pytest.mark.asyncio
     async def test_create_otp_at_limit_raises(self):
         """create_otp raises RateLimitError when count_recent >= MAX_TOKENS_PER_HOUR."""
-        from errors import RateLimitError
-        from schemas.models.token import TOKEN_TYPE_EMAIL_VERIFY
+        from app.errors import RateLimitError
+        from app.schemas.models.token import TOKEN_TYPE_EMAIL_VERIFY
 
         svc = make_otp_service()
         svc._token_repo.count_recent.return_value = 3
@@ -660,7 +663,7 @@ class TestOTPRateLimit:
 
     @pytest.mark.asyncio
     async def test_create_otp_below_limit_succeeds(self):
-        from schemas.models.token import TOKEN_TYPE_EMAIL_VERIFY
+        from app.schemas.models.token import TOKEN_TYPE_EMAIL_VERIFY
 
         svc = make_otp_service()
         svc._token_repo.count_recent.return_value = 2
@@ -675,8 +678,8 @@ class TestOTPRateLimit:
     @pytest.mark.asyncio
     async def test_create_otp_password_reset_rate_limit_message(self):
         """Password reset rate limit has a different error message."""
-        from errors import RateLimitError
-        from schemas.models.token import TOKEN_TYPE_PASSWORD_RESET
+        from app.errors import RateLimitError
+        from app.schemas.models.token import TOKEN_TYPE_PASSWORD_RESET
 
         svc = make_otp_service()
         svc._token_repo.count_recent.return_value = 3
@@ -754,8 +757,11 @@ class TestRequestPasswordReset:
 
 class TestResetPassword:
     def _make_token_doc(self, user_id, otp_code, expired=False):
-        from infrastructure.crypto import hash_token
-        from schemas.models.token import TOKEN_TYPE_PASSWORD_RESET, VerificationTokenDoc
+        from app.infrastructure.crypto import hash_token
+        from app.schemas.models.token import (
+            TOKEN_TYPE_PASSWORD_RESET,
+            VerificationTokenDoc,
+        )
 
         now = datetime.now(timezone.utc)
         expires = now - timedelta(seconds=1) if expired else now + timedelta(minutes=10)
@@ -890,7 +896,7 @@ class TestSetPassword:
 
 class TestGetUserProfile:
     def test_basic_profile(self):
-        from schemas.dto.responses.auth import UserProfileResponse
+        from app.schemas.dto.responses.auth import UserProfileResponse
 
         user = make_user_doc()
         profile = UserProfileResponse.from_user(user)
@@ -903,7 +909,7 @@ class TestGetUserProfile:
         assert profile.auth_providers == []
 
     def test_profile_with_oauth_provider(self):
-        from schemas.dto.responses.auth import UserProfileResponse
+        from app.schemas.dto.responses.auth import UserProfileResponse
 
         now = datetime(2024, 6, 1, tzinfo=timezone.utc)
         user_doc = {
@@ -934,7 +940,7 @@ class TestGetUserProfile:
         assert profile.auth_providers[0].linked_at == now
 
     def test_profile_with_pfp(self):
-        from schemas.dto.responses.auth import UserProfileResponse
+        from app.schemas.dto.responses.auth import UserProfileResponse
 
         user_doc = {
             "_id": USER_OID,
@@ -968,8 +974,8 @@ def _make_device_token_doc(
     code_challenge: str | None = PKCE_CHALLENGE,
     app_id: str | None = None,
 ):
-    from infrastructure.crypto import hash_token
-    from schemas.models.token import TOKEN_TYPE_DEVICE_AUTH, VerificationTokenDoc
+    from app.infrastructure.crypto import hash_token
+    from app.schemas.models.token import TOKEN_TYPE_DEVICE_AUTH, VerificationTokenDoc
 
     now = datetime.now(timezone.utc)
     return VerificationTokenDoc.from_mongo(
@@ -990,7 +996,7 @@ def _make_device_token_doc(
 
 
 def _make_grant_doc(app_id: str = "spoo-cli", scopes=None):
-    from schemas.models.app_grant import AppGrantDoc
+    from app.schemas.models.app_grant import AppGrantDoc
 
     return AppGrantDoc.from_mongo(
         {
@@ -1128,7 +1134,7 @@ class TestExtensionAuth:
 
     @pytest.mark.asyncio
     async def test_exchange_legacy_grant_falls_back_to_registry_scopes(self):
-        from schemas.models.app import AppEntry, AppStatus, AppType
+        from app.schemas.models.app import AppEntry, AppStatus, AppType
 
         registry = {
             "spoo-cli": AppEntry(

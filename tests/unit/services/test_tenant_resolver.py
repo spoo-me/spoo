@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from schemas.enums.domain_status import DomainStatus, VerificationMethod
-from schemas.models.custom_domain import CustomDomainDoc
-from services.tenant_resolver.cached_mongo import CachedMongoTenantResolver
+from app.schemas.enums.domain_status import DomainStatus, VerificationMethod
+from app.schemas.models.custom_domain import CustomDomainDoc
+from app.services.tenant_resolver.cached_mongo import CachedMongoTenantResolver
 
 
 def _doc(fqdn="links.acme.com"):

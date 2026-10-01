@@ -22,12 +22,12 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from config import AppSettings
-from dependencies import get_contact_service
-from infrastructure.ops_notify import DiscordOpsNotifier
-from middleware.rate_limiter import limiter
-from routes.api_v1 import router as api_v1_router
-from services.contact_service import ContactService
+from app.config import AppSettings
+from app.dependencies import get_contact_service
+from app.infrastructure.ops_notify import DiscordOpsNotifier
+from app.middleware.rate_limiter import limiter
+from app.routes.api_v1 import router as api_v1_router
+from app.services.contact_service import ContactService
 from tests.conftest import build_test_app
 
 _URL = "/api/v1/contact"

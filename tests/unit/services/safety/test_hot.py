@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from services.click.consumers.hotness import HotUrl
-from services.safety.hot import HotLinkScreen
+from app.services.click.consumers.hotness import HotUrl
+from app.services.safety.hot import HotLinkScreen
 
 
 def _hot(short_code="abc1234", domain="default", count=50) -> HotUrl:
@@ -114,7 +114,7 @@ class TestHotLinkScreenSecondaryDestinations:
 
     @pytest.mark.asyncio
     async def test_variant_destinations_each_get_an_event(self):
-        from schemas.models.url import AbVariant
+        from app.schemas.models.url import AbVariant
 
         doc = MagicMock(
             long_url="https://clean.example/",

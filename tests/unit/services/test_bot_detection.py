@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from services.click.bot_detection import (
+from app.services.click.bot_detection import (
     is_bot_request,
     should_block_bot,
     wants_preview,
@@ -138,7 +138,7 @@ class TestWantsPreview:
 
     def test_tokens_match_edge_copy(self):
         root = Path(__file__).resolve().parents[3]
-        a = (root / "data" / "preview_bots.json").read_bytes()
+        a = (root / "app" / "data" / "preview_bots.json").read_bytes()
         b = (
             root / "edge" / "spoo-edge-cache" / "contract" / "preview_bots.json"
         ).read_bytes()

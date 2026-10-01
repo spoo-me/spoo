@@ -9,8 +9,8 @@ import pytest
 from bson import ObjectId
 from pymongo.errors import PyMongoError
 
-from errors import ValidationError
-from schemas.models.tag import TagDoc
+from app.errors import ValidationError
+from app.schemas.models.tag import TagDoc
 
 from .test_bulk_url_service import _CapturingSink, _oid, make_bulk_service
 from .test_url_service import USER_OID, make_url_v2_doc

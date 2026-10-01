@@ -1,6 +1,6 @@
 """Unit tests for ApiKeyDoc."""
 
-from schemas.models.api_key import ApiKeyDoc
+from app.schemas.models.api_key import ApiKeyDoc
 
 from .conftest import now, oid
 

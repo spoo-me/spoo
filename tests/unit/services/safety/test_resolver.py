@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from infrastructure.safe_fetch import FetchHardError
-from services.safety.resolver import resolve_terminal_url
+from app.infrastructure.safe_fetch import FetchHardError
+from app.services.safety.resolver import resolve_terminal_url
 
 
 def _client(responses):
@@ -32,11 +32,11 @@ class TestResolveTerminalUrl:
         ]
         with (
             patch(
-                "services.safety.resolver.resolve_public_ip",
+                "app.services.safety.resolver.resolve_public_ip",
                 AsyncMock(return_value="93.184.216.34"),
             ),
             patch(
-                "services.safety.resolver.httpx.AsyncClient",
+                "app.services.safety.resolver.httpx.AsyncClient",
                 return_value=_client(responses),
             ),
         ):
@@ -48,7 +48,7 @@ class TestResolveTerminalUrl:
     @pytest.mark.asyncio
     async def test_private_hop_is_unresolved(self):
         with patch(
-            "services.safety.resolver.resolve_public_ip",
+            "app.services.safety.resolver.resolve_public_ip",
             AsyncMock(side_effect=FetchHardError("not public")),
         ):
             assert await resolve_terminal_url("https://t.co/abc") is None
@@ -62,11 +62,11 @@ class TestResolveTerminalUrl:
         )
         with (
             patch(
-                "services.safety.resolver.resolve_public_ip",
+                "app.services.safety.resolver.resolve_public_ip",
                 AsyncMock(return_value="93.184.216.34"),
             ),
             patch(
-                "services.safety.resolver.httpx.AsyncClient",
+                "app.services.safety.resolver.httpx.AsyncClient",
                 return_value=_client([loop] * 10),
             ),
         ):

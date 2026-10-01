@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import get_current_user, get_url_service
-from errors import ConflictError, ForbiddenError, ValidationError
-from schemas.models.url import AbVariant
+from app.dependencies import get_current_user, get_url_service
+from app.errors import ConflictError, ForbiddenError, ValidationError
+from app.schemas.models.url import AbVariant
 
 from .conftest import _build_test_app, _make_api_key_doc, _make_url_doc, _make_user
 
@@ -282,7 +282,7 @@ class TestShortenWithCustomDomain:
     """``domain`` field on POST /shorten triggers owner+ACTIVE check."""
 
     def test_anonymous_user_cannot_use_custom_domain(self):
-        from dependencies import get_custom_domain_service
+        from app.dependencies import get_custom_domain_service
 
         url_svc = AsyncMock()
         custom_svc = AsyncMock()
@@ -307,7 +307,7 @@ class TestShortenWithCustomDomain:
         url_svc.create.assert_not_called()
 
     def test_authed_user_with_owned_active_domain_succeeds(self):
-        from dependencies import get_custom_domain_service
+        from app.dependencies import get_custom_domain_service
 
         user = _make_user(email_verified=True)
         url_doc = _make_url_doc(owner_id=user.user_id)
@@ -355,7 +355,7 @@ class TestCheckAliasWithCustomDomain:
     once the user picks a custom domain in the picker."""
 
     def test_anonymous_user_cannot_check_against_custom_domain(self):
-        from dependencies import get_custom_domain_service
+        from app.dependencies import get_custom_domain_service
 
         url_svc = AsyncMock()
         custom_svc = AsyncMock()
@@ -376,7 +376,7 @@ class TestCheckAliasWithCustomDomain:
         url_svc.check_alias.assert_not_called()
 
     def test_authed_user_check_scopes_to_custom_domain(self):
-        from dependencies import get_custom_domain_service
+        from app.dependencies import get_custom_domain_service
 
         user = _make_user(email_verified=True)
         url_svc = AsyncMock()
@@ -407,7 +407,7 @@ class TestCheckAliasWithCustomDomain:
     def test_omitted_domain_falls_back_to_system_default(self):
         """When `domain` isn't supplied (or is empty), no owner check fires
         and the service receives `domain=None` so it uses its default."""
-        from dependencies import get_custom_domain_service
+        from app.dependencies import get_custom_domain_service
 
         url_svc = AsyncMock()
         url_svc.check_alias = AsyncMock(return_value="available")
@@ -452,7 +452,7 @@ class TestShortenAbVariants:
         return svc
 
     def _app(self, user, mock_svc, flag_svc):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         return _build_test_app(
             {
@@ -543,7 +543,7 @@ class TestShortenExpiredFallback:
         return svc
 
     def _app(self, user, mock_svc, flag_svc):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         return _build_test_app(
             {
@@ -614,7 +614,7 @@ class TestShortenGeoRules:
         return svc
 
     def test_anonymous_with_geo_rules_returns_401(self):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         mock_svc = AsyncMock()
         flag_svc = self._flag_svc(True)
@@ -634,7 +634,7 @@ class TestShortenGeoRules:
         flag_svc.require.assert_not_awaited()
 
     def test_flag_off_returns_403(self):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         user = _make_user()
         mock_svc = AsyncMock()
@@ -652,7 +652,7 @@ class TestShortenGeoRules:
         mock_svc.create.assert_not_called()
 
     def test_flag_on_returns_201_with_geo_rules_echoed(self):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         user = _make_user()
         url_doc = _make_url_doc(owner_id=user.user_id)
@@ -674,7 +674,7 @@ class TestShortenGeoRules:
         assert resp.json()["geo_rules"] == {"IN": "https://example.in/"}
 
     def test_without_geo_rules_flag_never_consulted(self):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         user = _make_user()
         url_doc = _make_url_doc(owner_id=user.user_id)
@@ -748,7 +748,7 @@ class TestShortenScheduling:
         return svc
 
     def test_anonymous_returns_401_before_flag(self):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         mock_svc = AsyncMock()
         flag_svc = self._flag_svc(True)
@@ -767,7 +767,7 @@ class TestShortenScheduling:
         flag_svc.require.assert_not_awaited()
 
     def test_flag_off_returns_403(self):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         mock_svc = AsyncMock()
         application = _build_test_app(
@@ -784,7 +784,7 @@ class TestShortenScheduling:
         mock_svc.create.assert_not_called()
 
     def test_pre_start_url_alone_is_gated_too(self):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         mock_svc = AsyncMock()
         application = _build_test_app(
@@ -806,7 +806,7 @@ class TestShortenScheduling:
         assert resp.status_code == 403
 
     def test_flag_on_returns_201(self):
-        from dependencies import get_feature_flag_service
+        from app.dependencies import get_feature_flag_service
 
         mock_svc = AsyncMock()
         mock_svc.create = AsyncMock(return_value=(_make_url_doc("sched1"), None))

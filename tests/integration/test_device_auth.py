@@ -17,23 +17,23 @@ from slowapi.errors import RateLimitExceeded
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import AppSettings
-from dependencies import (
+from app.config import AppSettings
+from app.dependencies import (
     get_app_grant_repo,
     get_credential_service,
     get_current_user,
     get_device_auth_service,
     get_user_repo,
 )
-from dependencies.auth import CurrentUser
-from errors import AuthenticationError
-from middleware.error_handler import register_error_handlers
-from middleware.rate_limiter import limiter
-from routes.auth import router as auth_router
-from schemas.models.app import AppEntry, AppStatus, AppType
-from schemas.models.app_grant import AppGrantDoc
-from schemas.models.user import UserDoc
-from schemas.results import AuthResult
+from app.dependencies.auth import CurrentUser
+from app.errors import AuthenticationError
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.rate_limiter import limiter
+from app.routes.auth import router as auth_router
+from app.schemas.models.app import AppEntry, AppStatus, AppType
+from app.schemas.models.app_grant import AppGrantDoc
+from app.schemas.models.user import UserDoc
+from app.schemas.results import AuthResult
 
 _USER_OID = ObjectId()
 _EMAIL = "test@example.com"
@@ -177,7 +177,7 @@ def _app_factory():
         app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
         register_error_handlers(app)
 
-        static_dir = os.path.join(_PROJECT_ROOT, "static")
+        static_dir = os.path.join(_PROJECT_ROOT, "app", "static")
         if os.path.isdir(static_dir):
             app.mount("/static", StaticFiles(directory=static_dir), name="static")
 

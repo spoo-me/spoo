@@ -13,10 +13,10 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi import FastAPI
 
-from dependencies import CurrentUser, get_custom_domain_service
-from routes.api_v1 import router as api_v1_router
-from schemas.models.api_key import ApiKeyDoc
-from schemas.models.url import UrlV2Doc
+from app.dependencies import CurrentUser, get_custom_domain_service
+from app.routes.api_v1 import router as api_v1_router
+from app.schemas.models.api_key import ApiKeyDoc
+from app.schemas.models.url import UrlV2Doc
 from tests.conftest import build_test_app
 
 

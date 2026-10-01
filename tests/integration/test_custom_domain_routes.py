@@ -18,21 +18,21 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     CurrentUser,
     get_current_user,
     get_custom_domain_service,
     get_feature_flag_service,
 )
-from errors import (
+from app.errors import (
     DomainAlreadyRegisteredError,
     ForbiddenError,
     InvalidDomainTransitionError,
     NotFoundError,
 )
-from routes.api_v1 import router as api_v1_router
-from schemas.enums.domain_status import DomainStatus, VerificationMethod
-from schemas.models.custom_domain import CustomDomainDoc
+from app.routes.api_v1 import router as api_v1_router
+from app.schemas.enums.domain_status import DomainStatus, VerificationMethod
+from app.schemas.models.custom_domain import CustomDomainDoc
 from tests.conftest import build_test_app
 
 _USER_ID = ObjectId()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from services.meta_tags.parse_html import parse_meta_tags
+from app.services.meta_tags.parse_html import parse_meta_tags
 
 BASE = "https://dest.example.com/article/42"
 

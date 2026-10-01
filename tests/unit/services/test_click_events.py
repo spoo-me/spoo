@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from infrastructure.cache.url_cache import (
+from app.infrastructure.cache.url_cache import (
     UrlCacheData,
 )
-from services.click.events import (
+from app.services.click.events import (
     EVENT_TYPE_CLICK,
     STREAM_FIELD_DATA,
     STREAM_FIELD_TYPE,

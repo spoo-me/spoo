@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from services.safety.events import (
+from app.services.safety.events import (
     STREAM_FIELD_DATA,
     SafetyAnalyzeEvent,
     safety_event_from_payload,

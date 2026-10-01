@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 
 def _url_data(**overrides):
-    from infrastructure.cache.url_cache import UrlCacheData
+    from app.infrastructure.cache.url_cache import UrlCacheData
 
     base = dict(
         id="507f1f77bcf86cd799439011",

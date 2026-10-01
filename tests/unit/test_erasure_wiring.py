@@ -12,25 +12,25 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from config import AppSettings
-from dependencies.wiring import (
+from app.config import AppSettings
+from app.dependencies.wiring import (
     build_account_erasure_service,
     build_erasure_mailer,
     build_posthog_eraser,
     build_r2_storage,
 )
-from infrastructure.cloudflare_kv import CloudflareKVClient
-from infrastructure.email.zeptomail import ZeptoMailProvider
-from infrastructure.posthog_erasure import HttpPostHogEraser
-from infrastructure.storage.r2 import R2StorageClient
-from services.account_erasure_service import (
+from app.infrastructure.cloudflare_kv import CloudflareKVClient
+from app.infrastructure.email.zeptomail import ZeptoMailProvider
+from app.infrastructure.posthog_erasure import HttpPostHogEraser
+from app.infrastructure.storage.r2 import R2StorageClient
+from app.services.account_erasure_service import (
     AccountErasureService,
     NoopErasureMailer,
     NoopPostHogEraser,
 )
-from services.cf_saas_backend import CfSaasBackend
-from services.edge_cache.og_writethrough import OgEdgeWritethrough
-from services.mock_dcv_backend import MockDcvBackend
+from app.services.cf_saas_backend import CfSaasBackend
+from app.services.edge_cache.og_writethrough import OgEdgeWritethrough
+from app.services.mock_dcv_backend import MockDcvBackend
 
 _SIDE_EFFECT_ENV = (
     "ZEPTO_API_TOKEN",
@@ -141,7 +141,7 @@ class TestBuildR2Storage:
         instead of crashing on the client's https guard."""
         _full_r2_env(base_env)
         base_env.setenv("R2_ENDPOINT_URL", "http://minio:9000")
-        with patch("dependencies.wiring.log", new=MagicMock()) as mock_log:
+        with patch("app.dependencies.wiring.log", new=MagicMock()) as mock_log:
             assert build_r2_storage(AppSettings(), MagicMock()) is None
         event = mock_log.warning.call_args.args[0]
         assert event == "r2_storage_disabled_insecure_endpoint"

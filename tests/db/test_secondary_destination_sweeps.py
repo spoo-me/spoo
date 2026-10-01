@@ -8,9 +8,9 @@ from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
 
-from repositories.url_repository import UrlRepository
-from schemas.models.base import ANONYMOUS_OWNER_ID
-from schemas.models.url import UrlDestination
+from app.repositories.url_repository import UrlRepository
+from app.schemas.models.base import ANONYMOUS_OWNER_ID
+from app.schemas.models.url import UrlDestination
 
 
 async def _insert(

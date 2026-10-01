@@ -7,13 +7,13 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from schemas.dto.requests.auth import (
+from app.schemas.dto.requests.auth import (
     LoginRequest,
     RegisterRequest,
     ResetPasswordRequest,
     VerifyEmailRequest,
 )
-from schemas.dto.responses.auth import (
+from app.schemas.dto.responses.auth import (
     AuthProviderInfo,
     OAuthProviderDetail,
     OnboardingCompleteResponse,

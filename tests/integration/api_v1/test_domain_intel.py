@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from dependencies import get_current_user
-from infrastructure.cache.meta_fetch_cache import MetaFetchCache
-from infrastructure.safe_fetch import FetchHardError
-from services.domain_intel_service import DomainIntelService, _cert_summary
+from app.dependencies import get_current_user
+from app.infrastructure.cache.meta_fetch_cache import MetaFetchCache
+from app.infrastructure.safe_fetch import FetchHardError
+from app.services.domain_intel_service import DomainIntelService, _cert_summary
 
 from .conftest import _build_test_app
 
@@ -62,7 +62,7 @@ def _patched(service: DomainIntelService, **kwargs):
     defaults.update(kwargs)
     return (
         patch(
-            "services.domain_intel_service.resolve_public_ip",
+            "app.services.domain_intel_service.resolve_public_ip",
             defaults["resolve_public_ip"],
         ),
         patch.object(DomainIntelService, "_dns", defaults["_dns"]),
@@ -98,7 +98,7 @@ def test_domain_intel_rejects_host_resolving_into_private_space():
     tls = AsyncMock(return_value=None)
     with (
         patch(
-            "services.domain_intel_service.resolve_public_ip",
+            "app.services.domain_intel_service.resolve_public_ip",
             AsyncMock(
                 side_effect=FetchHardError("host resolves to a non-public address")
             ),

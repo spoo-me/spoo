@@ -7,7 +7,7 @@ import emoji as _emoji
 import pytest
 import regex
 
-from shared.emoji_policy import (
+from app.shared.emoji_policy import (
     DEFAULT_ACCEPT_MAX_VERSION,
     DEFAULT_GENERATE_MAX_VERSION,
     FALLBACK_GROUP,

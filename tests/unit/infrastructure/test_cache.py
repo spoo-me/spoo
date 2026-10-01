@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, patch
 
 from bson import ObjectId
 
-from infrastructure.cache.dual_cache import DualCache
-from infrastructure.cache.url_cache import UrlCache, UrlCacheData
+from app.infrastructure.cache.dual_cache import DualCache
+from app.infrastructure.cache.url_cache import UrlCache, UrlCacheData
 
 from .conftest import _fake_redis, _url_data
 
@@ -122,7 +122,7 @@ class TestUrlCacheDataMetaFields:
     def test_decodes_payload_without_meta_fields(self):
         # Exact shape of a pre-meta-tags Redis entry: new fields must
         # default to None so a deploy doesn't 5xx until the cache TTLs out.
-        from infrastructure.cache.url_cache import UrlCacheData
+        from app.infrastructure.cache.url_cache import UrlCacheData
 
         legacy = (
             '{"_id":"507f1f77bcf86cd799439011","alias":"a","long_url":"https://x",'
@@ -140,7 +140,7 @@ class TestUrlCacheDataMetaFields:
         assert data.expired_redirect_url is None
 
     def test_meta_fields_roundtrip_json(self):
-        from infrastructure.cache.url_cache import UrlCacheData
+        from app.infrastructure.cache.url_cache import UrlCacheData
 
         data = _url_data(
             meta_title="T", meta_image="https://x/i.png", meta_color="#112233"
@@ -165,20 +165,21 @@ class TestUrlCacheDataVerifyPassword:
     def test_v2_correct_password(self):
         data = _url_data(password_hash="$argon2id$hash", schema_version="v2")
         with patch(
-            "infrastructure.cache.url_cache.verify_password_hash", return_value=True
+            "app.infrastructure.cache.url_cache.verify_password_hash", return_value=True
         ):
             assert data.verify_password("correct") is True
 
     def test_v2_wrong_password(self):
         data = _url_data(password_hash="$argon2id$hash", schema_version="v2")
         with patch(
-            "infrastructure.cache.url_cache.verify_password_hash", return_value=False
+            "app.infrastructure.cache.url_cache.verify_password_hash",
+            return_value=False,
         ):
             assert data.verify_password("wrong") is False
 
     def test_v2_none_password_short_circuits_without_hashing(self):
         data = _url_data(password_hash="$argon2id$hash", schema_version="v2")
-        with patch("infrastructure.cache.url_cache.verify_password_hash") as mock:
+        with patch("app.infrastructure.cache.url_cache.verify_password_hash") as mock:
             result = data.verify_password(None)
             assert result is False
             mock.assert_not_called()
@@ -318,7 +319,7 @@ class TestUrlCacheDataAbVariants:
         assert result.ab_variants is None
 
     async def test_ab_variants_round_trip(self):
-        from schemas.models.url import AbVariant
+        from app.schemas.models.url import AbVariant
 
         variants = [AbVariant(url="https://example.com/b", weight=40)]
         data = _url_data(domain=DOMAIN).model_copy(update={"ab_variants": variants})
@@ -368,7 +369,7 @@ class TestFromV2DocExpirationNormalization:
         in host-local time."""
         from datetime import datetime, timezone
 
-        from schemas.models.url import UrlV2Doc
+        from app.schemas.models.url import UrlV2Doc
 
         naive = datetime(2025, 6, 1, 12, 0, 0)  # naive UTC from Mongo
         doc = UrlV2Doc.from_mongo(
@@ -433,7 +434,7 @@ class TestUrlCacheDataIsNotYetLive:
     def test_from_v2_doc_carries_start_and_fallback(self):
         from datetime import datetime, timezone
 
-        from schemas.models.url import UrlV2Doc
+        from app.schemas.models.url import UrlV2Doc
 
         starts = datetime(2030, 6, 1, 12, 0, 0)  # naive UTC from Mongo
         doc = UrlV2Doc.from_mongo(
@@ -456,7 +457,7 @@ class TestFromV2DocFractionalStart:
     def test_fractional_start_rounds_up_so_the_link_is_never_live_early(self):
         from datetime import datetime, timezone
 
-        from schemas.models.url import UrlV2Doc
+        from app.schemas.models.url import UrlV2Doc
 
         starts = datetime(2030, 6, 1, 12, 0, 0, 900_000, tzinfo=timezone.utc)
         doc = UrlV2Doc.from_mongo(

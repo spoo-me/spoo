@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from infrastructure.safe_fetch import (
+from app.infrastructure.safe_fetch import (
     FetchHardError,
     _is_public,
     _read_body,
@@ -74,7 +74,7 @@ class TestResolvePublicIp:
 
         with (
             patch(
-                "infrastructure.safe_fetch.dns.asyncresolver.resolve",
+                "app.infrastructure.safe_fetch.dns.asyncresolver.resolve",
                 new=AsyncMock(side_effect=_answer),
             ),
             pytest.raises(FetchHardError, match="non-public"),
@@ -123,7 +123,7 @@ class TestFetchGuards:
 
         with (
             patch(
-                "infrastructure.safe_fetch.resolve_public_ip",
+                "app.infrastructure.safe_fetch.resolve_public_ip",
                 new=AsyncMock(return_value="93.184.216.34"),
             ),
             patch("httpx.AsyncClient.send", new=_fake_send),

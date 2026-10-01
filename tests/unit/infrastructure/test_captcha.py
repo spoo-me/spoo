@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
-from infrastructure.captcha.hcaptcha import HCaptchaProvider
+from app.infrastructure.captcha.hcaptcha import HCaptchaProvider
 
 
 class TestHCaptchaProvider:

@@ -9,9 +9,9 @@ import pytest
 from bson import ObjectId
 from pymongo.errors import DuplicateKeyError
 
-from errors import ConflictError, NotFoundError, ValidationError
-from schemas.models.tag import TAGS_MAX_PER_OWNER, TagColor, TagDoc
-from services.tag_service import TagService
+from app.errors import ConflictError, NotFoundError, ValidationError
+from app.schemas.models.tag import TAGS_MAX_PER_OWNER, TagColor, TagDoc
+from app.services.tag_service import TagService
 
 OWNER = ObjectId("c" * 24)
 T1 = ObjectId("1" * 24)

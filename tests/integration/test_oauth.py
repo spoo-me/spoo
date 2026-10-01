@@ -20,19 +20,19 @@ from slowapi.errors import RateLimitExceeded
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import AppSettings
-from dependencies import (
+from app.config import AppSettings
+from app.dependencies import (
     CurrentUser,
     get_oauth_service,
     require_auth,
 )
-from errors import ValidationError
-from middleware.error_handler import register_error_handlers
-from middleware.rate_limiter import limiter
-from routes.auth import router as auth_router
-from routes.oauth_routes import router as oauth_router
-from schemas.models.user import ProviderInfo, UserDoc
-from schemas.results import AuthResult
+from app.errors import ValidationError
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.rate_limiter import limiter
+from app.routes.auth import router as auth_router
+from app.routes.oauth_routes import router as oauth_router
+from app.schemas.models.user import ProviderInfo, UserDoc
+from app.schemas.results import AuthResult
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -146,7 +146,7 @@ def test_oauth_initiate_redirects_to_provider():
     )
 
     with (
-        patch("routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
+        patch("app.routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
         TestClient(
             app, raise_server_exceptions=False, follow_redirects=False
         ) as client,
@@ -190,7 +190,7 @@ def test_oauth_callback_new_user_creates_account():
     )
 
     with (
-        patch("routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
+        patch("app.routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
         TestClient(
             app, raise_server_exceptions=False, follow_redirects=False
         ) as client,
@@ -238,7 +238,7 @@ def test_oauth_callback_existing_user_logs_in():
     )
 
     with (
-        patch("routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
+        patch("app.routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
         TestClient(
             app, raise_server_exceptions=False, follow_redirects=False
         ) as client,
@@ -283,7 +283,7 @@ def test_oauth_callback_email_collision_auto_links():
     )
 
     with (
-        patch("routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
+        patch("app.routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
         TestClient(
             app, raise_server_exceptions=False, follow_redirects=False
         ) as client,
@@ -308,7 +308,7 @@ def test_oauth_link_requires_auth():
     )
 
     with (
-        patch("routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
+        patch("app.routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
         TestClient(app, raise_server_exceptions=False) as client,
     ):
         resp = client.get("/oauth/google/link")
@@ -334,7 +334,7 @@ def test_oauth_link_initiates_for_authenticated_user():
     )
 
     with (
-        patch("routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
+        patch("app.routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
         TestClient(
             app, raise_server_exceptions=False, follow_redirects=False
         ) as client,
@@ -447,7 +447,7 @@ def test_oauth_callback_missing_state_returns_400():
     )
 
     with (
-        patch("routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
+        patch("app.routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
         TestClient(app, raise_server_exceptions=False) as client,
     ):
         resp = client.get("/oauth/google/callback")
@@ -469,7 +469,7 @@ def test_oauth_callback_provider_error_returns_400():
     )
 
     with (
-        patch("routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
+        patch("app.routes.oauth_routes.PROVIDER_STRATEGIES", {"google": mock_strategy}),
         TestClient(app, raise_server_exceptions=False) as client,
     ):
         resp = client.get(

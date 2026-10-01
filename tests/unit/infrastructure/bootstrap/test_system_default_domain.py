@@ -9,10 +9,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from infrastructure.bootstrap.system_default_domain import (
+from app.infrastructure.bootstrap.system_default_domain import (
     ensure_system_default_domain,
 )
-from schemas.models.base import ANONYMOUS_OWNER_ID
+from app.schemas.models.base import ANONYMOUS_OWNER_ID
 
 DOMAIN_OID = ObjectId("eeeeeeeeeeeeeeeeeeeeeeee")
 

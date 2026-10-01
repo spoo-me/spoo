@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from starlette.requests import Request
 
-from middleware.logging import _auth_kind, _client_tag
+from app.middleware.logging import _auth_kind, _client_tag
 
 
 def _request(headers: dict[str, str] | None = None) -> Request:
@@ -138,7 +138,7 @@ def _run_app(set_auth_ctx: bool):
     from starlette.routing import Route
     from starlette.testclient import TestClient
 
-    from middleware.logging import RequestLoggingMiddleware
+    from app.middleware.logging import RequestLoggingMiddleware
 
     async def endpoint(request):
         if set_auth_ctx:
@@ -153,7 +153,7 @@ def _run_app(set_auth_ctx: bool):
     app = Starlette(routes=[Route("/x", endpoint)])
     app.add_middleware(RequestLoggingMiddleware)
 
-    with patch("middleware.logging.log") as mock_log:
+    with patch("app.middleware.logging.log") as mock_log:
         TestClient(app).get("/x")
         return _logged_kwargs(mock_log)
 

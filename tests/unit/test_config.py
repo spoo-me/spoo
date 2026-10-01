@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from config import (
+from app.config import (
     AppSettings,
     CustomDomainSettings,
     DatabaseSettings,
@@ -264,7 +264,7 @@ class TestWebhookSettingsGuard:
         key for signing secrets — startup must refuse, not warn."""
         import pytest as _pytest
 
-        from config import AppSettings
+        from app.config import AppSettings
 
         monkeypatch.setenv("WEBHOOKS_ENABLED", "true")
         monkeypatch.delenv("SECRET_KEY", raising=False)
@@ -273,7 +273,7 @@ class TestWebhookSettingsGuard:
             AppSettings(secret_key="", flask_secret_key="")
 
     def test_enabled_webhooks_accept_configured_secret(self, monkeypatch):
-        from config import AppSettings
+        from app.config import AppSettings
 
         monkeypatch.setenv("WEBHOOKS_ENABLED", "true")
         settings = AppSettings(secret_key="a-real-secret")

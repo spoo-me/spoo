@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from infrastructure.cache.web_risk_budget import WebRiskBudget
+from app.infrastructure.cache.web_risk_budget import WebRiskBudget
 
 
 def _redis(counts):

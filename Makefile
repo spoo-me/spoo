@@ -1,7 +1,7 @@
 .PHONY: dev test test-unit test-integration lint format format-check docker-up docker-down openapi
 
 dev:                ## Start development server
-	uv run uvicorn main:app --reload --no-access-log
+	uv run uvicorn app.main:app --reload --no-access-log
 
 test:               ## Run all tests
 	uv run pytest
@@ -33,7 +33,7 @@ docker-down:        ## Stop full stack
 openapi:            ## Export OpenAPI spec to openapi.json
 	MONGODB_URI="mongodb://localhost:27017/" APP_URL="https://spoo.me" \
 	uv run python -c \
-		"from app import create_app; import json; app = create_app(); \
+		"from app.factory import create_app; import json; app = create_app(); \
 		print(json.dumps(app.openapi(), indent=2))" > openapi.json.tmp
 	mv openapi.json.tmp openapi.json
 

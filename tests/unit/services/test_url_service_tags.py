@@ -8,9 +8,13 @@ from unittest.mock import AsyncMock
 import pytest
 from bson import ObjectId
 
-from errors import ValidationError
-from schemas.dto.requests.url import CreateUrlRequest, ListUrlsQuery, UpdateUrlRequest
-from schemas.models.tag import TagDoc
+from app.errors import ValidationError
+from app.schemas.dto.requests.url import (
+    CreateUrlRequest,
+    ListUrlsQuery,
+    UpdateUrlRequest,
+)
+from app.schemas.models.tag import TagDoc
 
 from .test_url_service import (
     URL_OID,
@@ -31,7 +35,7 @@ def _tag(tag_id: ObjectId, name: str) -> TagDoc:
 
 
 def _svc(owned: list[TagDoc] | None = None):
-    from services.url_service import UrlService
+    from app.services.url_service import UrlService
 
     url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
     blocked_url_repo.get_patterns.return_value = []

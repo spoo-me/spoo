@@ -12,13 +12,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from errors import AppError, ForbiddenError, ValidationError
+from app.errors import AppError, ForbiddenError, ValidationError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
 def make_service(captcha_ok=True, contact_sent=True, report_sent=True):
-    from services.contact_service import ContactService
+    from app.services.contact_service import ContactService
 
     notifier = AsyncMock()
     captcha = AsyncMock()

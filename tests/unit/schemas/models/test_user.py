@@ -1,6 +1,6 @@
 """Unit tests for UserDoc."""
 
-from schemas.models.user import UserDoc
+from app.schemas.models.user import UserDoc
 
 from .conftest import now, oid
 

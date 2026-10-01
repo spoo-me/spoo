@@ -2,7 +2,7 @@
 
 import pytest
 
-from shared.url_utils import (
+from app.shared.url_utils import (
     extract_fqdn,
     extract_hostname,
     is_registrable_apex,
@@ -183,7 +183,7 @@ class TestLinkDestinationUrlsFor:
     def test_reads_every_destination_field_off_a_doc_shaped_object(self):
         from types import SimpleNamespace
 
-        from shared.url_utils import (
+        from app.shared.url_utils import (
             SINGLE_DESTINATION_FIELDS,
             link_destination_urls_for,
         )
@@ -208,7 +208,7 @@ class TestLinkDestinationUrlsFor:
     def test_missing_and_empty_fields_are_skipped(self):
         from types import SimpleNamespace
 
-        from shared.url_utils import link_destination_urls_for
+        from app.shared.url_utils import link_destination_urls_for
 
         assert link_destination_urls_for(
             SimpleNamespace(long_url="https://main.example/", expired_redirect_url="")

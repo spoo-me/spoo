@@ -3,8 +3,8 @@
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-from config import EmailSettings
-from infrastructure.email.zeptomail import ZeptoMailProvider
+from app.config import EmailSettings
+from app.infrastructure.email.zeptomail import ZeptoMailProvider
 
 
 class TestZeptoMailProvider:

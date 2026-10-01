@@ -9,7 +9,7 @@ import pytest
 from bson import ObjectId
 from pymongo.errors import PyMongoError
 
-from repositories.app_grant_repository import AppGrantRepository
+from app.repositories.app_grant_repository import AppGrantRepository
 
 from .conftest import USER_OID, make_collection
 

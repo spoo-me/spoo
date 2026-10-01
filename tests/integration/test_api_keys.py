@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     CurrentUser,
     get_api_key_service,
     get_current_user,
@@ -26,8 +26,8 @@ from dependencies import (
     require_jwt_verified,
     require_keys_access,
 )
-from routes.api_v1 import router as api_v1_router
-from schemas.models.api_key import ApiKeyDoc
+from app.routes.api_v1 import router as api_v1_router
+from app.schemas.models.api_key import ApiKeyDoc
 from tests.conftest import build_test_app
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -128,7 +128,7 @@ def test_create_api_key_requires_verified_email():
 
     # require_verified_email calls require_auth first, then checks email_verified.
     # We override require_verified_email to raise the correct error.
-    from errors import EmailNotVerifiedError
+    from app.errors import EmailNotVerifiedError
 
     def _raise_unverified():
         raise EmailNotVerifiedError("Email verification required")
@@ -153,7 +153,7 @@ def test_create_api_key_requires_verified_email():
 
 def test_create_api_key_requires_auth():
     """No auth -> 401."""
-    from errors import AuthenticationError
+    from app.errors import AuthenticationError
 
     def _raise_unauth():
         raise AuthenticationError("Authentication required")
@@ -237,7 +237,7 @@ def test_list_api_keys_returns_without_token():
 
 def test_use_api_key_for_shorten():
     """POST /api/v1/shorten with API key (shorten:create scope) -> 201."""
-    from schemas.models.url import UrlV2Doc
+    from app.schemas.models.url import UrlV2Doc
 
     api_key_user = _make_api_key_user(scopes=["shorten:create"])
 
@@ -346,7 +346,7 @@ def test_revoke_api_key_hard():
 
 def test_revoked_api_key_rejected():
     """After revocation, using key returns None (unauthenticated) -> 401."""
-    from errors import AuthenticationError
+    from app.errors import AuthenticationError
 
     # Simulate the get_current_user returning None for a revoked key
     # Then require_auth raises 401
@@ -372,7 +372,7 @@ def test_expired_api_key_rejected():
     """API key past expires_at -> unauthenticated (get_current_user returns None)."""
     # When an expired API key is used, get_current_user returns None.
     # For endpoints requiring auth, this means 401.
-    from errors import AuthenticationError
+    from app.errors import AuthenticationError
 
     def _raise_unauth():
         raise AuthenticationError("Authentication required")

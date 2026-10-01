@@ -11,7 +11,7 @@ from .conftest import KEY_OID, USER_OID, _api_key_doc, make_collection
 
 class TestApiKeyRepository:
     def _repo(self, col=None):
-        from repositories.api_key_repository import ApiKeyRepository
+        from app.repositories.api_key_repository import ApiKeyRepository
 
         return ApiKeyRepository(col or make_collection())
 

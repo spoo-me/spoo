@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
-from config import ClickEventsSettings
-from infrastructure.queue_redis import connect_queue_redis, parse_redis_version
+from app.config import ClickEventsSettings
+from app.infrastructure.queue_redis import connect_queue_redis, parse_redis_version
 
 
 class TestParseRedisVersion:
@@ -25,7 +25,7 @@ class TestParseRedisVersion:
 
 class TestConnectQueueRedis:
     async def test_inline_mode_never_connects(self):
-        with patch("infrastructure.queue_redis.create_redis_client") as create:
+        with patch("app.infrastructure.queue_redis.create_redis_client") as create:
             result = await connect_queue_redis(ClickEventsSettings(sink="inline"))
         assert result is None
         create.assert_not_called()
@@ -37,7 +37,7 @@ class TestConnectQueueRedis:
     async def test_unreachable_server_returns_none(self):
         settings = ClickEventsSettings(sink="stream", queue_redis_uri="redis://q/0")
         with patch(
-            "infrastructure.queue_redis.create_redis_client",
+            "app.infrastructure.queue_redis.create_redis_client",
             AsyncMock(return_value=None),
         ):
             assert await connect_queue_redis(settings) is None
@@ -47,7 +47,7 @@ class TestConnectQueueRedis:
         client.info.return_value = {"redis_version": "8.2.0"}
         settings = ClickEventsSettings(sink="stream", queue_redis_uri="redis://q/0")
         with patch(
-            "infrastructure.queue_redis.create_redis_client",
+            "app.infrastructure.queue_redis.create_redis_client",
             AsyncMock(return_value=client),
         ):
             assert await connect_queue_redis(settings) is client
@@ -59,7 +59,7 @@ class TestConnectQueueRedis:
         client.info.return_value = {"redis_version": "7.4.2"}
         settings = ClickEventsSettings(sink="stream", queue_redis_uri="redis://q/0")
         with patch(
-            "infrastructure.queue_redis.create_redis_client",
+            "app.infrastructure.queue_redis.create_redis_client",
             AsyncMock(return_value=client),
         ):
             assert await connect_queue_redis(settings) is None
@@ -70,7 +70,7 @@ class TestConnectQueueRedis:
         client.info.side_effect = ConnectionError("blip")
         settings = ClickEventsSettings(sink="stream", queue_redis_uri="redis://q/0")
         with patch(
-            "infrastructure.queue_redis.create_redis_client",
+            "app.infrastructure.queue_redis.create_redis_client",
             AsyncMock(return_value=client),
         ):
             assert await connect_queue_redis(settings) is None

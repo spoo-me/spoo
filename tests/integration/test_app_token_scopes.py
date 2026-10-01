@@ -17,11 +17,11 @@ from fastapi.testclient import TestClient
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import AppSettings
-from dependencies import get_api_key_service, get_url_service
-from routes.api_v1 import router as api_v1_router
-from routes.auth import router as auth_router
-from schemas.models.api_key import ApiKeyDoc
+from app.config import AppSettings
+from app.dependencies import get_api_key_service, get_url_service
+from app.routes.api_v1 import router as api_v1_router
+from app.routes.auth import router as auth_router
+from app.schemas.models.api_key import ApiKeyDoc
 from tests.conftest import build_test_app
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

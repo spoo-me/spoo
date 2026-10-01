@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock
 import pytest
 from bson import ObjectId
 
-from errors import EmailNotVerifiedError, ValidationError
-from schemas.models.api_key import ApiKeyDoc
+from app.errors import EmailNotVerifiedError, ValidationError
+from app.schemas.models.api_key import ApiKeyDoc
 
 USER_OID = ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")
 KEY_OID = ObjectId("cccccccccccccccccccccccc")
@@ -25,7 +25,7 @@ def make_repo():
 
 
 def make_service(repo=None):
-    from services.api_key_service import ApiKeyService
+    from app.services.api_key_service import ApiKeyService
 
     return ApiKeyService(repo or make_repo())
 

@@ -11,9 +11,14 @@ from pydantic import BaseModel
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.models.test import TestModel
 
-from config import LlmSettings
-from infrastructure.llm import LlmTask, LlmTaskFailed, LlmTaskRunner, build_llm_tasks
-from infrastructure.llm.registry import load_prompt
+from app.config import LlmSettings
+from app.infrastructure.llm import (
+    LlmTask,
+    LlmTaskFailed,
+    LlmTaskRunner,
+    build_llm_tasks,
+)
+from app.infrastructure.llm.registry import load_prompt
 
 
 class Verdict(BaseModel):
@@ -178,7 +183,7 @@ class TestCostTelemetryIsNotRedacted:
     ate every cost field, so spend telemetry never reached Axiom."""
 
     def test_token_count_fields_survive_redaction(self):
-        from infrastructure.logging import redact_sensitive_fields
+        from app.infrastructure.logging import redact_sensitive_fields
 
         out = redact_sensitive_fields(
             None,
@@ -206,9 +211,9 @@ class TestSamplingTemperature:
     def _agent(**overrides):
         from pydantic import BaseModel
 
-        from config import LlmSettings
-        from infrastructure.llm.registry import LlmTask
-        from infrastructure.llm.runner import LlmTaskRunner
+        from app.config import LlmSettings
+        from app.infrastructure.llm.registry import LlmTask
+        from app.infrastructure.llm.runner import LlmTaskRunner
 
         class Out(BaseModel):
             x: int

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://spoo.me/schemas/edge-cache-entry.json",
   "title": "EdgeCacheEntry",
-  "description": "KV value written by PromoteToEdgeCacheAction and OgEdgeWritethrough (services/edge_cache/) and served by the edge Worker. Key format: cache:{domain}:{short_code}, domain lowercased with no www prefix. Absent optionals are omitted, not null (to_kv_json). Both sides are tested against fixtures.json — change entry shape, key format, fixtures, Python models, and Worker parsing only in lockstep. Consumers MUST passthrough unknown types (forward compatibility for e.g. password_form).",
+  "description": "KV value written by PromoteToEdgeCacheAction and OgEdgeWritethrough (app/services/edge_cache/) and served by the edge Worker. Key format: cache:{domain}:{short_code}, domain lowercased with no www prefix. Absent optionals are omitted, not null (to_kv_json). Both sides are tested against fixtures.json — change entry shape, key format, fixtures, Python models, and Worker parsing only in lockstep. Consumers MUST passthrough unknown types (forward compatibility for e.g. password_form).",
   "$defs": {
     "status": {
       "description": "HTTP redirect status. Origin always writes 302.",

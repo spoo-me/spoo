@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from shared.tags import (
+from app.shared.tags import (
     TAG_MAX_LENGTH,
     TAGS_MAX_PER_LINK,
     normalise_tag,

@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from bson import ObjectId
 
-from errors import (
+from app.errors import (
     AppError,
     BlockedUrlError,
     ConflictError,
@@ -27,10 +27,10 @@ from errors import (
     NotYetLiveError,
     ValidationError,
 )
-from infrastructure.cache.url_cache import UrlCacheData
-from schemas.dto.requests.url import UpdateUrlRequest
-from schemas.models.base import ANONYMOUS_OWNER_ID
-from schemas.models.url import EmojiUrlDoc, LegacyUrlDoc, UrlStatus, UrlV2Doc
+from app.infrastructure.cache.url_cache import UrlCacheData
+from app.schemas.dto.requests.url import UpdateUrlRequest
+from app.schemas.models.base import ANONYMOUS_OWNER_ID
+from app.schemas.models.url import EmojiUrlDoc, LegacyUrlDoc, UrlStatus, UrlV2Doc
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constants
@@ -163,8 +163,8 @@ def make_repos():
 def make_policy(blocked_url_repo):
     """A REAL L0 gate over the mocked pattern repo (ttl=0 so every check
     reads the mock fresh) — blocked/self-link tests keep their semantics."""
-    from services.safety.policy import UrlPolicyService
-    from services.safety.providers import BlockedPatternProvider
+    from app.services.safety.policy import UrlPolicyService
+    from app.services.safety.providers import BlockedPatternProvider
 
     return UrlPolicyService(
         [
@@ -187,7 +187,7 @@ def make_service(
     geo_rules_enabled=True,
     ab_variants_enabled=True,
 ):
-    from services.url_service import UrlService
+    from app.services.url_service import UrlService
 
     return UrlService(
         url_repo=url_repo,
@@ -608,7 +608,7 @@ class TestUrlServiceCreate:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com")
         result, _claim_token = await svc.create(
@@ -629,7 +629,7 @@ class TestUrlServiceCreate:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://a.evil.co.uk/kit?x=1")
         await svc.create(req, owner_id=USER_OID, client_ip="1.2.3.4")
@@ -651,7 +651,7 @@ class TestUrlServiceCreate:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com")
         result, _claim_token = await svc.create(
@@ -673,7 +673,7 @@ class TestUrlServiceCreate:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com")
         result, _claim_token = await svc.create(
@@ -695,7 +695,7 @@ class TestUrlServiceCreate:
         legacy_repo.check_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com", alias="myalias")
         await svc.create(req, owner_id=USER_OID, client_ip="1.2.3.4")
@@ -715,7 +715,7 @@ class TestUrlServiceCreate:
         # Exists in v1 → should reject
         legacy_repo.check_exists.return_value = True
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com", alias="myalias")
         with pytest.raises(ConflictError):
@@ -732,7 +732,7 @@ class TestUrlServiceCreate:
         url_repo.check_alias_exists.return_value = False
         legacy_repo.check_exists.return_value = False
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com", alias="pricing")
         with pytest.raises(ValidationError) as exc:
@@ -754,7 +754,7 @@ class TestUrlServiceCreate:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com", alias="pricing")
         await svc.create(
@@ -780,7 +780,7 @@ class TestUrlServiceCreate:
         # check_alias documents "first failing check wins". No real reserved
         # entry can fail length/format (test_reserved_aliases pins that
         # invariant), so force the reserved arm on to prove the ordering.
-        import services.url_service as url_service_module
+        import app.services.url_service as url_service_module
 
         url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
         svc = make_service(
@@ -807,7 +807,7 @@ class TestUrlServiceCreate:
         url_repo.check_alias_exists.return_value = False
         legacy_repo.check_exists.return_value = False
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(domain=SYSTEM_DEFAULT_DOMAIN)
         with pytest.raises(ValidationError) as exc:
@@ -825,7 +825,7 @@ class TestUrlServiceCreate:
 
         blocked_url_repo.get_patterns.return_value = [r"https://evil\.com"]
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://evil.com/page")
         with pytest.raises(ValidationError):
@@ -840,7 +840,7 @@ class TestUrlServiceCreate:
 
         blocked_url_repo.get_patterns.return_value = []
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://spoo.me/abc")
         with pytest.raises(ValidationError):
@@ -857,7 +857,7 @@ class TestUrlServiceCreate:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com", password="Secret1!")
         await svc.create(req, owner_id=USER_OID, client_ip="1.2.3.4")
@@ -878,7 +878,7 @@ class TestUrlServiceCreate:
         url_repo.check_alias_exists.return_value = False  # needed for alias generation
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com")
         await svc.create(req, owner_id=None, client_ip="1.2.3.4")
@@ -899,7 +899,7 @@ class TestUrlServiceCreate:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com")
         await svc.create(req, owner_id=USER_OID, client_ip="1.2.3.4")
@@ -918,7 +918,7 @@ class TestUrlServiceCreate:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         # far future unix timestamp
         future_ts = 9999999999
@@ -937,7 +937,7 @@ class TestUrlServiceCreate:
 
         blocked_url_repo.get_patterns.return_value = []
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         past_ts = 1000000  # very old timestamp
         req = CreateUrlRequest(long_url="https://example.com", expire_after=past_ts)
@@ -968,7 +968,7 @@ class TestUrlServiceCreateEmojiAlias:
     @pytest.mark.asyncio
     async def test_custom_emoji_alias_stored_canonical(self):
         svc, url_repo, _legacy_repo, _emoji_repo = self._svc()
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         vs16 = "️"
         req = CreateUrlRequest(long_url="https://example.com", alias="⭐" + vs16 + "🎉")
@@ -984,7 +984,7 @@ class TestUrlServiceCreateEmojiAlias:
     @pytest.mark.parametrize("alias", ["🇺🇸", "🏳️‍🌈", "1️⃣", "🏿"])
     async def test_policy_rejected_emoji_raises_validation_error(self, alias):
         svc, *_ = self._svc()
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com", alias=alias)
         with pytest.raises(ValidationError) as exc:
@@ -994,7 +994,7 @@ class TestUrlServiceCreateEmojiAlias:
     @pytest.mark.asyncio
     async def test_emoji_alias_too_many_graphemes_raises_length_error(self):
         svc, *_ = self._svc()
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com", alias="🎉" * 16)
         with pytest.raises(ValidationError) as exc:
@@ -1007,7 +1007,7 @@ class TestUrlServiceCreateEmojiAlias:
         # otherwise the v2-first resolve order would shadow the live link.
         svc, _url_repo, _legacy_repo, emoji_repo = self._svc()
         emoji_repo.check_exists_vs16_insensitive.return_value = True
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com", alias="⭐🎉")
         with pytest.raises(ConflictError):
@@ -1017,8 +1017,8 @@ class TestUrlServiceCreateEmojiAlias:
     @pytest.mark.asyncio
     async def test_alias_type_emoji_generates_policy_valid_alias(self):
         svc, url_repo, _legacy_repo, _emoji_repo = self._svc()
-        from schemas.dto.requests.url import CreateUrlRequest
-        from shared.emoji_policy import check_emoji_alias
+        from app.schemas.dto.requests.url import CreateUrlRequest
+        from app.shared.emoji_policy import check_emoji_alias
 
         req = CreateUrlRequest(long_url="https://example.com", alias_type="emoji")
         result, _claim_token = await svc.create(
@@ -1033,7 +1033,7 @@ class TestUrlServiceCreateEmojiAlias:
     async def test_alias_type_emoji_generation_exhaustion_raises(self):
         svc, url_repo, *_ = self._svc()
         url_repo.check_alias_exists.return_value = True  # every candidate taken
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com", alias_type="emoji")
         with pytest.raises(AppError):
@@ -1042,7 +1042,7 @@ class TestUrlServiceCreateEmojiAlias:
     @pytest.mark.asyncio
     async def test_alias_type_ignored_when_alias_provided(self):
         svc, _url_repo, *_ = self._svc()
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com", alias="mylink", alias_type="emoji"
@@ -1113,7 +1113,7 @@ class TestUrlServiceUpdate:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(long_url="https://new-url.com")
         await svc.update(URL_OID, req, USER_OID)
@@ -1137,7 +1137,7 @@ class TestUrlServiceUpdate:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(long_url="https://b.new-dest.com/x")
         await svc.update(URL_OID, req, USER_OID)
@@ -1158,10 +1158,10 @@ class TestUrlServiceUpdate:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         monkeypatch.setattr(
-            "services.url_service.UrlDestination.for_link",
+            "app.services.url_service.UrlDestination.for_link",
             classmethod(lambda cls, long_url, **_: None),
         )
         req = UpdateUrlRequest(long_url="https://b.new-dest.com/x")
@@ -1183,7 +1183,7 @@ class TestUrlServiceUpdate:
         existing = make_url_v2_doc(owner_id=USER_OID)
         url_repo.find_by_id.return_value = existing
 
-        from schemas.dto.requests.url import MetaTagsRequest, UpdateUrlRequest
+        from app.schemas.dto.requests.url import MetaTagsRequest, UpdateUrlRequest
 
         req = UpdateUrlRequest(meta_tags=MetaTagsRequest(title="New Card"))
         await svc.update(URL_OID, req, USER_OID, client_ip="9.9.9.9")
@@ -1202,7 +1202,7 @@ class TestUrlServiceUpdate:
         existing = make_url_v2_doc()
         url_repo.find_by_id.return_value = existing
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         # Send same long_url — no actual change
         req = UpdateUrlRequest(long_url="https://example.com")
@@ -1225,7 +1225,7 @@ class TestUrlServiceUpdate:
         legacy_repo.check_exists.return_value = False
         emoji_repo.check_exists_vs16_insensitive.return_value = False
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         vs16 = "️"
         req = UpdateUrlRequest(alias="⭐" + vs16 + "🎉")
@@ -1246,7 +1246,7 @@ class TestUrlServiceUpdate:
         existing = make_url_v2_doc(alias="⭐🎉")
         url_repo.find_by_id.return_value = existing
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         vs16 = "️"
         req = UpdateUrlRequest(alias="⭐" + vs16 + "🎉")
@@ -1264,7 +1264,7 @@ class TestUrlServiceUpdate:
         existing = make_url_v2_doc()
         url_repo.find_by_id.return_value = existing
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(alias="🇺🇸")
         with pytest.raises(ValidationError) as exc:
@@ -1283,7 +1283,7 @@ class TestUrlServiceUpdate:
 
         other_user = ObjectId("eeeeeeeeeeeeeeeeeeeeeeee")
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(long_url="https://new-url.com")
         with pytest.raises(ForbiddenError):
@@ -1298,7 +1298,7 @@ class TestUrlServiceUpdate:
 
         url_repo.find_by_id.return_value = None
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(long_url="https://new-url.com")
         with pytest.raises(NotFoundError):
@@ -1316,7 +1316,7 @@ class TestUrlServiceUpdate:
         # New alias already exists in v2
         url_repo.check_alias_exists.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(alias="taken")
         with pytest.raises(ConflictError):
@@ -1332,7 +1332,7 @@ class TestUrlServiceUpdate:
         existing = make_url_v2_doc(status="BLOCKED")
         url_repo.find_by_id.return_value = existing
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(long_url="https://new-url.com")
         with pytest.raises(ForbiddenError, match="Cannot modify a blocked URL"):
@@ -1351,7 +1351,7 @@ class TestUrlServiceUpdate:
         existing = make_url_v2_doc(status="BLOCKED")
         url_repo.find_by_id.return_value = existing
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(status="ACTIVE")
         with pytest.raises(ForbiddenError, match="Cannot modify a blocked URL"):
@@ -1379,7 +1379,7 @@ class TestUrlServiceUpdate:
         url_repo.check_alias_exists.return_value = False
         legacy_repo.check_exists.return_value = False
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(domain="links.acme.com")
         await svc.update(URL_OID, req, USER_OID)
@@ -1402,7 +1402,7 @@ class TestUrlServiceUpdate:
         existing = make_url_v2_doc(domain="links.acme.com")
         url_repo.find_by_id.return_value = existing
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(domain="links.acme.com")
         await svc.update(URL_OID, req, USER_OID)
@@ -1423,7 +1423,7 @@ class TestUrlServiceUpdate:
         url_repo.check_alias_exists.return_value = False
         legacy_repo.check_exists.return_value = False
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         # `UpdateUrlRequest(domain=None)` populates model_fields_set via the
         # constructor signature; using model_validate keeps it explicit that
@@ -1448,7 +1448,7 @@ class TestUrlServiceUpdate:
         # Target domain already has this alias.
         url_repo.check_alias_exists.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(domain="links.acme.com")
         with pytest.raises(ConflictError, match="is already in use on"):
@@ -1471,7 +1471,7 @@ class TestUrlServiceUpdate:
         url_repo.check_alias_exists.return_value = False
         legacy_repo.check_exists.return_value = False
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(alias="newalias", domain="links.acme.com")
         await svc.update(URL_OID, req, USER_OID)
@@ -1521,7 +1521,7 @@ class TestUrlServiceAutoReactivate:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(max_clicks=10)
         await svc.update(URL_OID, req, USER_OID)
@@ -1554,7 +1554,7 @@ class TestUrlServiceAutoReactivate:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(max_clicks=0)
         await svc.update(URL_OID, req, USER_OID)
@@ -1586,7 +1586,7 @@ class TestUrlServiceAutoReactivate:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(expire_after="2030-01-01T00:00:00Z")
         await svc.update(URL_OID, req, USER_OID)
@@ -1618,7 +1618,7 @@ class TestUrlServiceAutoReactivate:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(max_clicks=10, status="INACTIVE")
         await svc.update(URL_OID, req, USER_OID)
@@ -1650,7 +1650,7 @@ class TestUrlServiceAutoReactivate:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         # Raising to 4 still below total_clicks of 5
         req = UpdateUrlRequest(max_clicks=4)
@@ -1784,7 +1784,7 @@ class TestUrlServiceUpdateEdgeCases:
         )
 
         url_repo.find_by_id.return_value = None
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         with pytest.raises(NotFoundError):
             await svc.update(URL_OID, UpdateUrlRequest(), USER_OID)
@@ -1798,7 +1798,7 @@ class TestUrlServiceUpdateEdgeCases:
 
         other_user = ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")
         url_repo.find_by_id.return_value = make_url_v2_doc(owner_id=other_user)
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         with pytest.raises(ForbiddenError):
             await svc.update(URL_OID, UpdateUrlRequest(), USER_OID)
@@ -1813,7 +1813,7 @@ class TestUrlServiceUpdateEdgeCases:
 
         existing = make_url_v2_doc()
         url_repo.find_by_id.return_value = existing
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         # Empty request — nothing in model_fields_set, no long_url or alias given
         result = await svc.update(URL_OID, UpdateUrlRequest(), USER_OID)
@@ -1834,7 +1834,7 @@ class TestUrlServiceUpdateEdgeCases:
         url_repo.update.return_value = True
         url_cache.invalidate.return_value = None
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(password=None)
         # Pydantic v2: explicitly passing password=None puts it in model_fields_set
@@ -1856,7 +1856,7 @@ class TestUrlServiceUpdateEdgeCases:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(max_clicks=0)
         await svc.update(URL_OID, req, USER_OID)
@@ -1877,7 +1877,7 @@ class TestUrlServiceUpdateEdgeCases:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(expire_after=None)
         await svc.update(URL_OID, req, USER_OID)
@@ -1898,7 +1898,7 @@ class TestUrlServiceUpdateEdgeCases:
         url_repo.check_alias_exists.return_value = True
         legacy_repo.check_exists.return_value = False
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(alias="newcode")
         with pytest.raises(ConflictError):
@@ -1915,7 +1915,7 @@ class TestUrlServiceUpdateEdgeCases:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(block_bots=True)
         await svc.update(URL_OID, req, USER_OID)
@@ -1940,7 +1940,7 @@ class TestUrlServiceListByOwner:
         url_repo.count_by_query.return_value = 1
         url_repo.find_by_owner.return_value = [make_url_v2_doc()]
 
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         result = await svc.list_by_owner(USER_OID, ListUrlsQuery())
 
@@ -1959,7 +1959,7 @@ class TestUrlServiceListByOwner:
         url_repo.count_by_query.return_value = 0
         url_repo.find_by_owner.return_value = []
 
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         q = ListUrlsQuery(filter='{"status": "INACTIVE"}')
         await svc.list_by_owner(USER_OID, q)
@@ -1977,7 +1977,7 @@ class TestUrlServiceListByOwner:
         url_repo.count_by_query.return_value = 0
         url_repo.find_by_owner.return_value = []
 
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         q = ListUrlsQuery(filter='{"search": "example"}')
         await svc.list_by_owner(USER_OID, q)
@@ -1995,7 +1995,7 @@ class TestUrlServiceListByOwner:
         url_repo.count_by_query.return_value = 0
         url_repo.find_by_owner.return_value = []
 
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         q = ListUrlsQuery(filter='{"passwordSet": true}')
         await svc.list_by_owner(USER_OID, q)
@@ -2013,7 +2013,7 @@ class TestUrlServiceListByOwner:
         url_repo.count_by_query.return_value = 0
         url_repo.find_by_owner.return_value = []
 
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         q = ListUrlsQuery(filter='{"maxClicksSet": false}')
         await svc.list_by_owner(USER_OID, q)
@@ -2031,7 +2031,7 @@ class TestUrlServiceListByOwner:
         url_repo.count_by_query.return_value = 50
         url_repo.find_by_owner.return_value = [make_url_v2_doc()] * 20
 
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         result = await svc.list_by_owner(USER_OID, ListUrlsQuery(pageSize=20))
 
@@ -2050,7 +2050,7 @@ class TestUrlServiceCreateOnCustomDomain:
 
     @pytest.mark.asyncio
     async def test_create_uses_provided_domain_for_doc_and_alias_check(self):
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
         svc = make_service(
@@ -2085,7 +2085,7 @@ class TestUrlServiceCreateOnCustomDomain:
         # system default namespace regardless of which tenant the URL was
         # being created on. With the domain= kwarg threaded through, the
         # candidate must be checked against the custom domain.
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
         svc = make_service(
@@ -2112,7 +2112,7 @@ class TestUrlServiceCreateOnCustomDomain:
 
     @pytest.mark.asyncio
     async def test_create_with_no_domain_uses_system_default(self):
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
         svc = make_service(
@@ -2145,7 +2145,7 @@ class TestUrlServiceCreateOnCustomDomain:
 class TestUrlServiceBulkDelete:
     @pytest.mark.asyncio
     async def test_bulk_delete_refuses_system_default(self):
-        from errors import ValidationError
+        from app.errors import ValidationError
 
         url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
         svc = make_service(
@@ -2232,7 +2232,7 @@ class TestUrlServiceBulkDelete:
 class TestUrlServiceListByOwnerDomainFilter:
     @pytest.mark.asyncio
     async def test_list_with_domain_filter_passes_to_query(self):
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
         svc = make_service(
@@ -2250,7 +2250,7 @@ class TestUrlServiceListByOwnerDomainFilter:
 
     @pytest.mark.asyncio
     async def test_list_without_domain_filter_omits_field(self):
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         url_repo, legacy_repo, emoji_repo, blocked_url_repo, url_cache = make_repos()
         svc = make_service(
@@ -2286,7 +2286,7 @@ class TestGeoRulesFeatureGate:
         )
         blocked_url_repo.get_patterns.return_value = []
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com", geo_rules={"IN": "https://example.in/"}
@@ -2316,7 +2316,7 @@ class TestUrlServiceExpiredFallback:
     @pytest.mark.asyncio
     async def test_create_persists_fallback_and_stamps_its_host(self):
         svc, url_repo, _ = self._svc()
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com", expired_redirect_url=self.FALLBACK
@@ -2331,7 +2331,7 @@ class TestUrlServiceExpiredFallback:
     @pytest.mark.asyncio
     async def test_create_blocked_fallback_rejected_with_field_path(self):
         svc, url_repo, _ = self._svc(patterns=[r"https://evil\.com"])
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -2345,7 +2345,7 @@ class TestUrlServiceExpiredFallback:
     @pytest.mark.asyncio
     async def test_create_self_link_fallback_rejected(self):
         svc, _, _ = self._svc()
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -2409,7 +2409,7 @@ class TestUrlServiceExpiredFallback:
     async def test_create_counts_the_fallback_in_l1(self):
         svc, _, _ = self._svc()
         svc._url_policy.record_create = AsyncMock()
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com", expired_redirect_url=self.FALLBACK
@@ -2492,7 +2492,7 @@ class TestUrlServiceGeoRules:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com", geo_rules=self.GEO)
         result, _claim_token = await svc.create(
@@ -2513,7 +2513,7 @@ class TestUrlServiceGeoRules:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -2532,7 +2532,7 @@ class TestUrlServiceGeoRules:
         )
         blocked_url_repo.get_patterns.return_value = []
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -2548,7 +2548,7 @@ class TestUrlServiceGeoRules:
         max_emoji_alias_length."""
         import pycountry
 
-        from services.url_service import _validate_geo_rules_shape
+        from app.services.url_service import _validate_geo_rules_shape
 
         codes = [c.alpha_2 for c in pycountry.countries][:51]
         rules = {code: "https://example.com/x" for code in codes}
@@ -2565,7 +2565,7 @@ class TestUrlServiceGeoRules:
         )
         blocked_url_repo.get_patterns.return_value = [r"https://evil\.com"]
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -2584,7 +2584,7 @@ class TestUrlServiceGeoRules:
         )
         blocked_url_repo.get_patterns.return_value = []
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -2604,7 +2604,7 @@ class TestUrlServiceGeoRules:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -2629,7 +2629,7 @@ class TestUrlServiceGeoRules:
         url_repo.update.return_value = True
         blocked_url_repo.get_patterns.return_value = []
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(geo_rules=self.GEO)
         await svc.update(URL_OID, req, USER_OID)
@@ -2648,7 +2648,7 @@ class TestUrlServiceGeoRules:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         # Explicit null must be present in model_fields_set — build via validate
         req = UpdateUrlRequest.model_validate({"geo_rules": None})
@@ -2668,7 +2668,7 @@ class TestUrlServiceGeoRules:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest.model_validate({"geo_rules": {}})
         await svc.update(URL_OID, req, USER_OID)
@@ -2687,7 +2687,7 @@ class TestUrlServiceGeoRules:
         url_repo.update.return_value = True
         blocked_url_repo.get_patterns.return_value = []
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(long_url="https://new-url.com")
         await svc.update(URL_OID, req, USER_OID)
@@ -2709,7 +2709,7 @@ class TestUrlServiceGeoRules:
         # Would reject every GEO destination if validation ran
         blocked_url_repo.get_patterns.return_value = [r"https://example\."]
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(geo_rules=self.GEO)
         await svc.update(URL_OID, req, USER_OID)
@@ -2727,7 +2727,7 @@ class TestUrlServiceGeoRules:
         url_repo.find_by_id.return_value = existing
         blocked_url_repo.get_patterns.return_value = [r"https://evil\.com"]
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(geo_rules={"IN": "https://evil.com/x"})
         with pytest.raises(ValidationError) as exc:
@@ -2746,7 +2746,7 @@ class TestUrlServiceGeoRules:
         url_repo.find_by_id.return_value = existing
         blocked_url_repo.get_patterns.return_value = [r"https://evil\.com"]
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(long_url="https://evil.com/page")
         with pytest.raises(ValidationError) as exc:
@@ -2755,14 +2755,14 @@ class TestUrlServiceGeoRules:
         assert "blocked" in str(exc.value).lower()
 
     def test_v2_doc_to_cache_carries_geo_rules(self):
-        from infrastructure.cache.url_cache import UrlCacheData
+        from app.infrastructure.cache.url_cache import UrlCacheData
 
         doc = make_url_v2_doc(geo_rules=self.GEO)
         cache_data = UrlCacheData.from_v2_doc(doc)
         assert cache_data.geo_rules == self.GEO
 
     def test_v2_doc_to_cache_none_when_no_rules(self):
-        from infrastructure.cache.url_cache import UrlCacheData
+        from app.infrastructure.cache.url_cache import UrlCacheData
 
         doc = make_url_v2_doc()
         cache_data = UrlCacheData.from_v2_doc(doc)
@@ -2813,7 +2813,7 @@ class TestAbVariantsFeatureGate:
         )
         blocked_url_repo.get_patterns.return_value = []
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -2843,7 +2843,7 @@ class TestUrlServiceAbVariants:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com", ab_variants=self.VARIANTS
@@ -2864,7 +2864,7 @@ class TestUrlServiceAbVariants:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         await svc.create(
             CreateUrlRequest(long_url="https://example.com", ab_variants=[]),
@@ -2874,8 +2874,8 @@ class TestUrlServiceAbVariants:
         assert url_repo.insert.call_args[0][0]["ab_variants"] is None
 
     def test_too_many_entries_rejected(self):
-        from schemas.dto.requests.url import AbVariantRequest
-        from services.url_service import _validate_ab_variants_shape
+        from app.schemas.dto.requests.url import AbVariantRequest
+        from app.services.url_service import _validate_ab_variants_shape
 
         variants = [
             AbVariantRequest(url="https://example.com/x", weight=1) for _ in range(11)
@@ -2892,7 +2892,7 @@ class TestUrlServiceAbVariants:
         )
         blocked_url_repo.get_patterns.return_value = [r"https://evil\.com"]
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -2915,7 +2915,7 @@ class TestUrlServiceAbVariants:
         )
         blocked_url_repo.get_patterns.return_value = []
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -2936,7 +2936,7 @@ class TestUrlServiceAbVariants:
         url_repo.update.return_value = make_url_v2_doc(ab_variants=self.VARIANTS)
         blocked_url_repo.get_patterns.return_value = []
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         await svc.update(URL_OID, UpdateUrlRequest(ab_variants=self.VARIANTS), USER_OID)
 
@@ -2954,7 +2954,7 @@ class TestUrlServiceAbVariants:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = make_url_v2_doc()
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest.model_validate({"ab_variants": clear_value})
         await svc.update(URL_OID, req, USER_OID)
@@ -2972,7 +2972,7 @@ class TestUrlServiceAbVariants:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = existing
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         await svc.update(URL_OID, UpdateUrlRequest(block_bots=True), USER_OID)
 
@@ -2988,7 +2988,7 @@ class TestUrlServiceAbVariants:
         url_repo.find_by_id.return_value = make_url_v2_doc(ab_variants=self.VARIANTS)
         blocked_url_repo.get_patterns.return_value = [r"https://example\."]
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         await svc.update(URL_OID, UpdateUrlRequest(ab_variants=self.VARIANTS), USER_OID)
 
@@ -3004,7 +3004,7 @@ class TestUrlServiceAbVariants:
         url_repo.find_by_id.return_value = make_url_v2_doc()
         blocked_url_repo.get_patterns.return_value = [r"https://evil\.com"]
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(
             ab_variants=[{"url": "https://evil.com/x", "weight": 10}]
@@ -3026,7 +3026,7 @@ class TestUrlServiceAbVariants:
         )
         url_repo.find_by_id.return_value = make_url_v2_doc()
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         with pytest.raises(ValidationError) as exc:
             await svc.update(
@@ -3035,7 +3035,7 @@ class TestUrlServiceAbVariants:
         assert exc.value.field == "ab_variants"
 
     def test_v2_doc_to_cache_carries_ab_variants(self):
-        from infrastructure.cache.url_cache import UrlCacheData
+        from app.infrastructure.cache.url_cache import UrlCacheData
 
         cache_data = UrlCacheData.from_v2_doc(
             make_url_v2_doc(ab_variants=self.VARIANTS)
@@ -3050,7 +3050,7 @@ class TestUrlServiceAbVariants:
 
 class TestV2DocToCacheMetaTags:
     def test_carries_meta_tags(self):
-        from infrastructure.cache.url_cache import UrlCacheData
+        from app.infrastructure.cache.url_cache import UrlCacheData
 
         doc = make_url_v2_doc(
             meta_tags={
@@ -3071,7 +3071,7 @@ class TestV2DocToCacheMetaTags:
         assert d.meta_image_height is None
 
     def test_no_meta_tags_maps_none(self):
-        from infrastructure.cache.url_cache import UrlCacheData
+        from app.infrastructure.cache.url_cache import UrlCacheData
 
         d = UrlCacheData.from_v2_doc(make_url_v2_doc())
         assert d.meta_title is None
@@ -3086,7 +3086,7 @@ class TestV2DocToCacheMetaTags:
 
 
 def _meta_req(**meta):
-    from schemas.dto.requests.url import MetaTagsRequest, UpdateUrlRequest
+    from app.schemas.dto.requests.url import MetaTagsRequest, UpdateUrlRequest
 
     if meta.get("meta_tags") is None and "meta_tags" in meta:
         return UpdateUrlRequest(meta_tags=None)
@@ -3103,8 +3103,8 @@ def _mock_meta_service() -> AsyncMock:
 class TestHandleMetaTags:
     @pytest.mark.asyncio
     async def test_absent_field_is_noop(self):
-        from schemas.dto.requests.url import UpdateUrlRequest
-        from services.url_service import _handle_meta_tags
+        from app.schemas.dto.requests.url import UpdateUrlRequest
+        from app.services.url_service import _handle_meta_tags
 
         svc = AsyncMock()
         ops: dict = {}
@@ -3116,7 +3116,7 @@ class TestHandleMetaTags:
 
     @pytest.mark.asyncio
     async def test_null_clears_existing(self):
-        from services.url_service import _handle_meta_tags
+        from app.services.url_service import _handle_meta_tags
 
         svc = AsyncMock()
         ops: dict = {}
@@ -3131,7 +3131,7 @@ class TestHandleMetaTags:
 
     @pytest.mark.asyncio
     async def test_null_on_link_without_meta_is_noop(self):
-        from services.url_service import _handle_meta_tags
+        from app.services.url_service import _handle_meta_tags
 
         svc = AsyncMock()
         ops: dict = {}
@@ -3140,7 +3140,7 @@ class TestHandleMetaTags:
 
     @pytest.mark.asyncio
     async def test_object_replaces_whole_and_stamps_updated_at(self):
-        from services.url_service import _handle_meta_tags
+        from app.services.url_service import _handle_meta_tags
 
         svc = _mock_meta_service()
         ops: dict = {}
@@ -3156,7 +3156,7 @@ class TestHandleMetaTags:
 
     @pytest.mark.asyncio
     async def test_validates_against_new_destination_when_long_url_changes(self):
-        from services.url_service import _handle_meta_tags
+        from app.services.url_service import _handle_meta_tags
 
         svc = _mock_meta_service()
         ops: dict = {"long_url": "https://new-destination.com"}
@@ -3177,7 +3177,7 @@ class TestValidateMetaTags:
 
     @pytest.mark.asyncio
     async def test_clean_content_passes(self):
-        from schemas.dto.requests.url import MetaTagsRequest
+        from app.schemas.dto.requests.url import MetaTagsRequest
 
         svc = self._svc_with_patterns(["evil-token"])
         await svc.validate_meta_tags(
@@ -3186,7 +3186,7 @@ class TestValidateMetaTags:
 
     @pytest.mark.asyncio
     async def test_blocked_pattern_in_title_rejected(self):
-        from schemas.dto.requests.url import MetaTagsRequest
+        from app.schemas.dto.requests.url import MetaTagsRequest
 
         svc = self._svc_with_patterns(["evil-token"])
         with pytest.raises(ValidationError) as exc:
@@ -3198,7 +3198,7 @@ class TestValidateMetaTags:
 
     @pytest.mark.asyncio
     async def test_blocked_pattern_in_image_rejected(self):
-        from schemas.dto.requests.url import MetaTagsRequest
+        from app.schemas.dto.requests.url import MetaTagsRequest
 
         svc = self._svc_with_patterns(["evil-token"])
         with pytest.raises(ValidationError):
@@ -3209,7 +3209,7 @@ class TestValidateMetaTags:
 
     @pytest.mark.asyncio
     async def test_destination_recheck_rejects_blocked_long_url(self):
-        from schemas.dto.requests.url import MetaTagsRequest
+        from app.schemas.dto.requests.url import MetaTagsRequest
 
         svc = self._svc_with_patterns(["evil-token"])
         with pytest.raises(ValidationError) as exc:
@@ -3434,7 +3434,7 @@ def _matches_expired_clause(doc: UrlV2Doc, now: datetime) -> bool:
 
 class TestEffectiveStatusClause:
     def test_expired_clause_shape(self):
-        from services.url_service import effective_status_clause
+        from app.services.url_service import effective_status_clause
 
         now = datetime.now(timezone.utc)
         clause = effective_status_clause(UrlStatus.EXPIRED, now)
@@ -3451,7 +3451,7 @@ class TestEffectiveStatusClause:
         }
 
     def test_active_clause_is_complement_of_derived_arms(self):
-        from services.url_service import (
+        from app.services.url_service import (
             _derived_expiry_arms,
             effective_status_clause,
         )
@@ -3468,7 +3468,7 @@ class TestEffectiveStatusClause:
 
     @pytest.mark.parametrize("status", [UrlStatus.INACTIVE, UrlStatus.BLOCKED])
     def test_stored_is_truth_for_admin_states(self, status):
-        from services.url_service import effective_status_clause
+        from app.services.url_service import effective_status_clause
 
         clause = effective_status_clause(status, datetime.now(timezone.utc))
         assert clause == {"status": status}
@@ -3515,7 +3515,7 @@ class TestListFilterComposition:
     @pytest.mark.asyncio
     async def test_expired_filter_includes_derived_arms(self):
         svc, url_repo = self._svc()
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         await svc.list_by_owner(USER_OID, ListUrlsQuery(filter='{"status": "EXPIRED"}'))
 
@@ -3528,7 +3528,7 @@ class TestListFilterComposition:
     @pytest.mark.asyncio
     async def test_active_filter_excludes_derived_expired(self):
         svc, url_repo = self._svc()
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         await svc.list_by_owner(USER_OID, ListUrlsQuery(filter='{"status": "ACTIVE"}'))
 
@@ -3540,7 +3540,7 @@ class TestListFilterComposition:
     async def test_status_and_search_compose_via_and(self):
         """Both clauses carry $or — naive merging would clobber one."""
         svc, url_repo = self._svc()
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         await svc.list_by_owner(
             USER_OID,
@@ -3561,7 +3561,7 @@ class TestListFilterComposition:
     @pytest.mark.asyncio
     async def test_search_only_still_merges_to_top_level(self):
         svc, url_repo = self._svc()
-        from schemas.dto.requests.url import ListUrlsQuery
+        from app.schemas.dto.requests.url import ListUrlsQuery
 
         await svc.list_by_owner(USER_OID, ListUrlsQuery(filter='{"search": "ex"}'))
 
@@ -3613,7 +3613,7 @@ class TestAutoReactivateRequiresRequestedChange:
             expire_after=datetime.now(timezone.utc) + timedelta(days=30),
         )
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         await svc.update(
             URL_OID, UpdateUrlRequest(long_url="https://other.org"), USER_OID
@@ -3631,7 +3631,7 @@ class TestAutoReactivateRequiresRequestedChange:
             expire_after=datetime.now(timezone.utc) + timedelta(days=30),
         )
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         result = await svc.update(URL_OID, UpdateUrlRequest(), USER_OID)
 
@@ -3647,7 +3647,7 @@ class TestAutoReactivateRequiresRequestedChange:
             expire_after=datetime.now(timezone.utc) - timedelta(days=1),
         )
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         future = datetime.now(timezone.utc) + timedelta(days=7)
         await svc.update(URL_OID, UpdateUrlRequest(expire_after=future), USER_OID)
@@ -3931,7 +3931,7 @@ class TestSingleItemEdgePurge:
 
 
 def make_claim_item(url_id: ObjectId | None = None, token: str = "t" * 43):
-    from schemas.dto.requests.url import ClaimItemRequest
+    from app.schemas.dto.requests.url import ClaimItemRequest
 
     return ClaimItemRequest(url_id=str(url_id or URL_OID), token=token)
 
@@ -3946,7 +3946,7 @@ class TestUrlServiceCreateClaimToken:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com")
         doc, token = await svc.create(req, owner_id=owner_id, client_ip="1.2.3.4")
@@ -3954,7 +3954,7 @@ class TestUrlServiceCreateClaimToken:
 
     @pytest.mark.asyncio
     async def test_anonymous_create_mints_token_and_stores_only_hash(self):
-        from infrastructure.crypto import hash_token
+        from app.infrastructure.crypto import hash_token
 
         _doc, token, inserted = await self._create(None)
         assert token is not None
@@ -3995,7 +3995,7 @@ class TestUrlServiceClaim:
         return svc, url_repo, url_cache
 
     def _anon_doc(self, token: str | None = None):
-        from infrastructure.crypto import hash_token
+        from app.infrastructure.crypto import hash_token
 
         doc = make_url_v2_doc(owner_id=ANONYMOUS_OWNER_ID)
         doc.claim_token_hash = hash_token(token or self.TOKEN)
@@ -4003,7 +4003,7 @@ class TestUrlServiceClaim:
 
     @pytest.mark.asyncio
     async def test_happy_path_claims_and_evicts_cache(self):
-        from infrastructure.crypto import hash_token
+        from app.infrastructure.crypto import hash_token
 
         svc, url_repo, url_cache = self._svc()
         url_repo.find_by_id.return_value = self._anon_doc()
@@ -4080,8 +4080,8 @@ class TestUrlServiceClaim:
 
     @pytest.mark.asyncio
     async def test_ceiling_rejects_batch_before_any_lookup(self):
-        from errors import ForbiddenError
-        from services.url_service import CLAIM_LIMIT_PER_ACCOUNT
+        from app.errors import ForbiddenError
+        from app.services.url_service import CLAIM_LIMIT_PER_ACCOUNT
 
         svc, url_repo, _ = self._svc()
         url_repo.count_claimed.return_value = CLAIM_LIMIT_PER_ACCOUNT
@@ -4092,7 +4092,7 @@ class TestUrlServiceClaim:
 
     @pytest.mark.asyncio
     async def test_ceiling_allows_batch_that_exactly_fills(self):
-        from services.url_service import CLAIM_LIMIT_PER_ACCOUNT
+        from app.services.url_service import CLAIM_LIMIT_PER_ACCOUNT
 
         svc, url_repo, _ = self._svc()
         url_repo.count_claimed.return_value = CLAIM_LIMIT_PER_ACCOUNT - 1
@@ -4347,7 +4347,7 @@ class TestUrlServiceScheduling:
     @pytest.mark.asyncio
     async def test_create_future_start_is_stored(self):
         svc, url_repo, _url_cache = self._svc()
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -4365,7 +4365,7 @@ class TestUrlServiceScheduling:
     @pytest.mark.asyncio
     async def test_create_past_start_rejected(self):
         svc, *_ = self._svc()
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(long_url="https://example.com", starts_at=self.PAST_TS)
         with pytest.raises(ValidationError, match="starts_at must be in the future"):
@@ -4374,7 +4374,7 @@ class TestUrlServiceScheduling:
     @pytest.mark.asyncio
     async def test_create_start_after_expiry_rejected(self):
         svc, *_ = self._svc()
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -4388,7 +4388,7 @@ class TestUrlServiceScheduling:
     async def test_create_pre_start_url_runs_the_destination_gate(self):
         """A self-link fallback is refused like a self-link destination."""
         svc, *_ = self._svc()
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://example.com",
@@ -4404,7 +4404,7 @@ class TestUrlServiceScheduling:
     @pytest.mark.asyncio
     async def test_update_sets_and_clears_start(self):
         svc, url_repo, _url_cache = self._svc()
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         url_repo.find_by_id.return_value = make_url_v2_doc()
         await svc.update(URL_OID, UpdateUrlRequest(starts_at=self.FUTURE_TS), USER_OID)
@@ -4427,7 +4427,7 @@ class TestUrlServiceScheduling:
     @pytest.mark.asyncio
     async def test_update_start_after_existing_expiry_rejected(self):
         svc, url_repo, _url_cache = self._svc()
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         url_repo.find_by_id.return_value = make_url_v2_doc(
             expire_after=datetime.fromtimestamp(self.FUTURE_TS, tz=timezone.utc)
@@ -4442,7 +4442,7 @@ class TestUrlServiceScheduling:
         """Mongo hands back naive UTC; the request side is aware. The order
         check must normalise both or the comparison raises TypeError."""
         svc, url_repo, _url_cache = self._svc()
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         naive_expiry = datetime.fromtimestamp(self.FUTURE_TS, tz=timezone.utc).replace(
             tzinfo=None
@@ -4456,7 +4456,7 @@ class TestUrlServiceScheduling:
     @pytest.mark.asyncio
     async def test_update_expiry_against_naive_stored_start_is_a_400_not_a_500(self):
         svc, url_repo, _url_cache = self._svc()
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         naive_start = datetime.fromtimestamp(self.FUTURE_TS, tz=timezone.utc).replace(
             tzinfo=None
@@ -4470,7 +4470,7 @@ class TestUrlServiceScheduling:
     @pytest.mark.asyncio
     async def test_update_unchanged_start_is_a_noop(self):
         svc, url_repo, _url_cache = self._svc()
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         starts = datetime.fromtimestamp(self.FUTURE_TS, tz=timezone.utc)
         url_repo.find_by_id.return_value = make_url_v2_doc(starts_at=starts)
@@ -4480,7 +4480,7 @@ class TestUrlServiceScheduling:
     # ── list filter ──────────────────────────────────────────────────────
 
     def test_scheduled_clause_shape(self):
-        from services.url_service import (
+        from app.services.url_service import (
             _derived_expiry_arms,
             effective_status_clause,
         )
@@ -4530,7 +4530,7 @@ class TestSecondaryDestinationStamping:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://clean.example/",
@@ -4552,7 +4552,7 @@ class TestSecondaryDestinationStamping:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         await svc.create(
             CreateUrlRequest(long_url="https://clean.example/"),
@@ -4573,7 +4573,7 @@ class TestSecondaryDestinationStamping:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(geo_rules={"BR": "https://hidden.example/br"})
         await svc.update(URL_OID, req, USER_OID)
@@ -4581,7 +4581,7 @@ class TestSecondaryDestinationStamping:
         written = url_repo.update.call_args[0][1]["$set"]
         assert written["geo_rules"] == {"BR": "https://hidden.example/br"}
         assert written["dest"]["secondary_hosts"] == ["hidden.example"]
-        from shared.url_utils import parse_destination
+        from app.shared.url_utils import parse_destination
 
         assert written["dest"]["host"] == parse_destination(existing.long_url)["host"]
 
@@ -4595,7 +4595,7 @@ class TestSecondaryDestinationStamping:
         url_repo.check_alias_exists.return_value = False
         url_repo.insert.return_value = URL_OID
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://clean.example/",
@@ -4621,7 +4621,7 @@ class TestSecondaryDestinationStamping:
         url_repo.update.return_value = existing
         blocked_url_repo.get_patterns.return_value = []
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         req = UpdateUrlRequest(
             ab_variants=[{"url": "https://hidden.example/b", "weight": 40}]
@@ -4643,7 +4643,7 @@ class TestSecondaryDestinationStamping:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = make_url_v2_doc()
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         await svc.update(URL_OID, UpdateUrlRequest(ab_variants=None), USER_OID)
 
@@ -4662,7 +4662,7 @@ class TestSecondaryDestinationStamping:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         await svc.update(URL_OID, UpdateUrlRequest(geo_rules=None), USER_OID)
 
@@ -4684,7 +4684,7 @@ class TestPreStartUrlStamping:
 
         from datetime import timedelta
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://clean.example/",
@@ -4707,7 +4707,7 @@ class TestPreStartUrlStamping:
         url_repo.find_by_id.return_value = existing
         url_repo.update.return_value = True
 
-        from schemas.dto.requests.url import UpdateUrlRequest
+        from app.schemas.dto.requests.url import UpdateUrlRequest
 
         await svc.update(
             URL_OID,
@@ -4732,7 +4732,7 @@ class TestL1SeesSecondaryDestinations:
         url_repo.insert.return_value = URL_OID
         svc._url_policy.record_create = AsyncMock()
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         req = CreateUrlRequest(
             long_url="https://clean.example/",
@@ -4764,7 +4764,7 @@ class TestL1SeesSecondaryDestinations:
         url_repo.insert.return_value = URL_OID
         svc._url_policy.record_create = AsyncMock()
 
-        from schemas.dto.requests.url import CreateUrlRequest
+        from app.schemas.dto.requests.url import CreateUrlRequest
 
         codes = ["IN", "US", "DE", "FR", "BR", "JP", "GB", "CA", "AU", "ES"]
         req = CreateUrlRequest(

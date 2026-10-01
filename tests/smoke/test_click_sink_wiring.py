@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-from config import AppSettings, ClickEventsSettings
-from dependencies.wiring import wire_services
-from services.click.sinks import InlineSink, RedisStreamSink
+from app.config import AppSettings, ClickEventsSettings
+from app.dependencies.wiring import wire_services
+from app.services.click.sinks import InlineSink, RedisStreamSink
 
 _COLLECTIONS = (
     "urlsV2",

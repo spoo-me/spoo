@@ -33,7 +33,7 @@ services:
   app:
     build: .
     container_name: spoo_app
-    command: uv run uvicorn main:app --host 0.0.0.0 --port 8000 --no-access-log --reload
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log --reload
     volumes:
       # This mount enables hot reloading for your application code
       - .:/app
@@ -84,7 +84,7 @@ services:
     container_name: spoo_click_worker
     profiles: ["click-events"]
     command: >
-      uv run uvicorn --factory workers.click_worker:create_app
+      uv run uvicorn --factory app.workers.click_worker:create_app
       --host 0.0.0.0 --port 8001 --no-access-log
     ports:
       - "8001:8001"

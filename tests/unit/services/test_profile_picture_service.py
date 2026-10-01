@@ -15,8 +15,8 @@ os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
 from bson import ObjectId
 
-from errors import NotFoundError, ValidationError
-from services.profile_picture_service import ProfilePictureService
+from app.errors import NotFoundError, ValidationError
+from app.services.profile_picture_service import ProfilePictureService
 
 
 def _make_provider(provider="google", picture="https://img.example.com/pic.jpg"):
@@ -249,7 +249,7 @@ async def test_upload_picture_stores_r2_url_with_upload_source():
 async def test_upload_picture_pins_storage_prefix_on_first_use():
     """First upload persists the computed prefix — a later SECRET_KEY
     rotation must not orphan the objects for the erasure sweep."""
-    from services.image_ingest import owner_key_prefix
+    from app.services.image_ingest import owner_key_prefix
 
     user = _make_user_doc()  # storage_prefix=None → first upload
     svc, repo = _make_service(user, storage=_storage())

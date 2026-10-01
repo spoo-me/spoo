@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     CurrentUser,
     get_credential_service,
     get_password_service,
@@ -21,10 +21,10 @@ from dependencies import (
     get_verification_service,
     require_auth,
 )
-from errors import AuthenticationError, ValidationError
-from routes.auth import router as auth_router
-from schemas.models.user import UserDoc
-from schemas.results import AuthResult
+from app.errors import AuthenticationError, ValidationError
+from app.routes.auth import router as auth_router
+from app.schemas.models.user import UserDoc
+from app.schemas.results import AuthResult
 from tests.conftest import build_test_app
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

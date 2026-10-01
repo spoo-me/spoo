@@ -6,8 +6,8 @@ import string
 import emoji as _emoji
 import pytest
 
-from shared.emoji_policy import check_emoji_alias, generation_pool
-from shared.generators import (
+from app.shared.emoji_policy import check_emoji_alias, generation_pool
+from app.shared.generators import (
     generate_emoji_alias,
     generate_emoji_alias_v2,
     generate_otp_code,

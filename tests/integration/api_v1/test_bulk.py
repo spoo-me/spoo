@@ -12,9 +12,9 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import get_bulk_url_service, require_auth
-from errors import ForbiddenError, ValidationError
-from schemas.dto.responses.bulk import (
+from app.dependencies import get_bulk_url_service, require_auth
+from app.errors import ForbiddenError, ValidationError
+from app.schemas.dto.responses.bulk import (
     BulkOperationSummary,
     BulkUrlOperationResponse,
     BulkUrlResultRow,
@@ -198,7 +198,7 @@ class TestBulkDomainRoute:
         custom_svc = AsyncMock()
         custom_svc.assert_owned_and_active = AsyncMock(return_value=None)
 
-        from dependencies import get_custom_domain_service
+        from app.dependencies import get_custom_domain_service
 
         application = _build_test_app(
             {
@@ -229,7 +229,7 @@ class TestBulkDomainRoute:
         custom_svc = AsyncMock()
         custom_svc.assert_owned_and_active = AsyncMock()
 
-        from dependencies import get_custom_domain_service
+        from app.dependencies import get_custom_domain_service
 
         application = _build_test_app(
             {
@@ -258,7 +258,7 @@ class TestBulkDomainRoute:
             side_effect=ForbiddenError("You don't own this domain")
         )
 
-        from dependencies import get_custom_domain_service
+        from app.dependencies import get_custom_domain_service
 
         application = _build_test_app(
             {

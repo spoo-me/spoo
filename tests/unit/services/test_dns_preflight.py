@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from services.dns_preflight import check_cname, uses_cloudflare_dns
+from app.services.dns_preflight import check_cname, uses_cloudflare_dns
 
 
 def _stub_query(cname_per_resolver=None, a_per_fqdn=None):
@@ -30,7 +30,7 @@ class TestCheckCname:
     @pytest.mark.asyncio
     async def test_pass_when_one_resolver_sees_expected_target(self):
         with patch(
-            "services.dns_preflight._query",
+            "app.services.dns_preflight._query",
             side_effect=_stub_query(
                 cname_per_resolver={"1.1.1.1": ["customers.spoo.me"]},
             ),
@@ -41,7 +41,7 @@ class TestCheckCname:
     @pytest.mark.asyncio
     async def test_normalises_trailing_dots(self):
         with patch(
-            "services.dns_preflight._query",
+            "app.services.dns_preflight._query",
             side_effect=_stub_query(
                 cname_per_resolver={
                     "1.1.1.1": ["customers.spoo.me"],
@@ -56,7 +56,7 @@ class TestCheckCname:
     async def test_unknown_record_yields_friendly_propagation_message(self):
         # CNAME absent everywhere + no A records to fall back on.
         with patch(
-            "services.dns_preflight._query",
+            "app.services.dns_preflight._query",
             side_effect=_stub_query(),
         ):
             result = await check_cname("links.acme.com", "customers.spoo.me")
@@ -66,7 +66,7 @@ class TestCheckCname:
     @pytest.mark.asyncio
     async def test_wrong_target_yields_diagnostic_message(self):
         with patch(
-            "services.dns_preflight._query",
+            "app.services.dns_preflight._query",
             side_effect=_stub_query(
                 cname_per_resolver={
                     "1.1.1.1": ["someoneelse.example"],
@@ -84,7 +84,7 @@ class TestCheckCname:
         async def _all_none(fqdn, rtype, ns):
             return None
 
-        with patch("services.dns_preflight._query", side_effect=_all_none):
+        with patch("app.services.dns_preflight._query", side_effect=_all_none):
             result = await check_cname("links.acme.com", "customers.spoo.me")
         assert result.ok is False
 
@@ -94,7 +94,7 @@ class TestCheckCname:
         # the expected target's A set — accept.
         cf_ips = ["104.21.84.220", "172.67.197.99"]
         with patch(
-            "services.dns_preflight._query",
+            "app.services.dns_preflight._query",
             side_effect=_stub_query(
                 a_per_fqdn={
                     "acme.com": cf_ips,
@@ -108,7 +108,7 @@ class TestCheckCname:
     @pytest.mark.asyncio
     async def test_apex_a_records_mismatch_fails(self):
         with patch(
-            "services.dns_preflight._query",
+            "app.services.dns_preflight._query",
             side_effect=_stub_query(
                 a_per_fqdn={
                     "acme.com": ["1.2.3.4"],

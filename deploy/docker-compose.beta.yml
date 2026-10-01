@@ -31,7 +31,7 @@ services:
     container_name: spoo_app_beta
     restart: always
     command: >
-      uv run uvicorn main:app
+      uv run uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
       --workers 1
@@ -125,7 +125,7 @@ services:
     container_name: spoo_click_worker_beta
     restart: always
     command: >
-      uv run uvicorn --factory workers.click_worker:create_app
+      uv run uvicorn --factory app.workers.click_worker:create_app
       --host 0.0.0.0 --port 8001
       --no-access-log
       --timeout-graceful-shutdown 30

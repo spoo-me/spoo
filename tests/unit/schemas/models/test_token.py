@@ -2,7 +2,7 @@
 
 import pytest
 
-from schemas.models.token import VerificationTokenDoc
+from app.schemas.models.token import VerificationTokenDoc
 
 from .conftest import now, oid
 

@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 from bson import ObjectId
 
-from schemas.models.tag import TagDoc
+from app.schemas.models.tag import TagDoc
 
 from .test_stats_service import OWNER_ID, _q, facet_response, make_service
 

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from infrastructure.web_risk import (
+from app.infrastructure.web_risk import (
     DISPLAY_THREAT_TYPES,
     ENFORCEMENT_THREAT_TYPES,
     WebRiskClient,

@@ -24,28 +24,28 @@ from slowapi.errors import RateLimitExceeded
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import AppSettings
-from dependencies import (
+from app.config import AppSettings
+from app.dependencies import (
     get_click_service,
     get_db,
     get_redis,
     get_settings,
     get_url_service,
 )
-from infrastructure.cache.url_cache import UrlCache, UrlCacheData
-from middleware.error_handler import register_error_handlers
-from middleware.rate_limiter import limiter
-from routes.legacy.url_shortener import router as legacy_url_router
-from routes.redirect_routes import router as redirect_router
-from schemas.dto.requests.url import UpdateUrlRequest
-from schemas.models.url import UrlV2Doc
-from services.url_service import UrlService
+from app.infrastructure.cache.url_cache import UrlCache, UrlCacheData
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.rate_limiter import limiter
+from app.routes.legacy.url_shortener import router as legacy_url_router
+from app.routes.redirect_routes import router as redirect_router
+from app.schemas.dto.requests.url import UpdateUrlRequest
+from app.schemas.models.url import UrlV2Doc
+from app.services.url_service import UrlService
 from tests.conftest import build_test_app
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 _STATIC_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static"
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "app", "static"
 )
 
 
@@ -96,7 +96,7 @@ def _make_url_service(
     blocked_url_repo = AsyncMock()
     blocked_url_repo.get_patterns = AsyncMock(return_value=[])
 
-    from services.safety.policy import UrlPolicyService
+    from app.services.safety.policy import UrlPolicyService
 
     return UrlService(
         url_repo,

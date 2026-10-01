@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import get_current_user, get_url_service, require_auth
-from services.url_service import ClaimResult
+from app.dependencies import get_current_user, get_url_service, require_auth
+from app.services.url_service import ClaimResult
 
 from .conftest import _build_test_app, _make_user
 

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from shared.reserved_aliases import RESERVED_ALIASES, is_reserved_alias
-from shared.validators import validate_alias
+from app.shared.reserved_aliases import RESERVED_ALIASES, is_reserved_alias
+from app.shared.validators import validate_alias
 
 
 def test_frontend_surfaces_are_reserved():

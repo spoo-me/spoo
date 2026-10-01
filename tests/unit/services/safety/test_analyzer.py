@@ -7,11 +7,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from schemas.enums.safety import VerdictTier
-from schemas.models.verdict import VerdictDoc
-from services.safety.analyzer import SafetyAnalyzer
-from services.safety.events import SafetyAnalyzeEvent
-from services.safety.providers import ProviderVerdict
+from app.schemas.enums.safety import VerdictTier
+from app.schemas.models.verdict import VerdictDoc
+from app.services.safety.analyzer import SafetyAnalyzer
+from app.services.safety.events import SafetyAnalyzeEvent
+from app.services.safety.providers import ProviderVerdict
 
 
 def _event(host="evil.com") -> SafetyAnalyzeEvent:
@@ -306,7 +306,7 @@ class TestDeepAdmission:
     admission policy — and an admitted event must not also ping review."""
 
     def _deep_build(self, *, admitted: bool, reason: str = "always"):
-        from services.safety.admission import AdmissionDecision
+        from app.services.safety.admission import AdmissionDecision
 
         verdict_repo = AsyncMock()
         verdict_repo.find_by_host = AsyncMock(return_value=None)
@@ -373,7 +373,7 @@ class TestDeepAdmission:
     @pytest.mark.asyncio
     async def test_toxic_escalates_the_host_decision_to_investigation(self):
         """A screening hit blocks narrowly and escalates the host question."""
-        from services.safety.admission import AdmissionDecision
+        from app.services.safety.admission import AdmissionDecision
 
         provider = _Provider(
             ProviderVerdict(tier=VerdictTier.TOXIC, reason="feed hit", scope="links"),
@@ -417,7 +417,7 @@ class TestDeepAdmission:
     async def test_host_scoped_feed_hit_never_pays_for_a_second_opinion(self):
         """The feed already answered the host question, so there is no reach
         left to investigate and no model call to make."""
-        from services.safety.admission import AdmissionDecision
+        from app.services.safety.admission import AdmissionDecision
 
         provider = _Provider(
             ProviderVerdict(tier=VerdictTier.TOXIC, reason="feed hit"),
@@ -444,7 +444,7 @@ class TestDeepAdmission:
     async def test_host_scoped_hit_from_a_non_feed_source_still_escalates(self):
         """Only a feed short-circuits the reach question. An operator
         pattern matching host-wide is still a claim worth investigating."""
-        from services.safety.admission import AdmissionDecision
+        from app.services.safety.admission import AdmissionDecision
 
         provider = _Provider(
             ProviderVerdict(tier=VerdictTier.TOXIC, reason="operator pattern"),
@@ -711,7 +711,7 @@ class TestRedirectScreening:
         )
 
         with patch(
-            "services.safety.resolver.resolve_terminal_url",
+            "app.services.safety.resolver.resolve_terminal_url",
             AsyncMock(return_value="https://evil-landing.com/kit"),
         ):
             await analyzer.analyze(self._wrapper_event())
@@ -741,7 +741,7 @@ class TestRedirectScreening:
         )
 
         with patch(
-            "services.safety.resolver.resolve_terminal_url",
+            "app.services.safety.resolver.resolve_terminal_url",
             AsyncMock(return_value="https://normal-blog.example/post"),
         ):
             await analyzer.analyze(self._wrapper_event())
@@ -767,7 +767,7 @@ class TestRedirectScreening:
         )
 
         with patch(
-            "services.safety.resolver.resolve_terminal_url",
+            "app.services.safety.resolver.resolve_terminal_url",
             AsyncMock(return_value=None),
         ):
             await analyzer.analyze(self._wrapper_event())

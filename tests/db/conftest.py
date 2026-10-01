@@ -29,10 +29,10 @@ os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 from pymongo import MongoClient
 from pymongo.asynchronous.mongo_client import AsyncMongoClient
 
-from config import AppSettings
-from dependencies.wiring import build_account_erasure_service
-from repositories.indexes import ensure_indexes
-from repositories.user_repository import UserRepository
+from app.config import AppSettings
+from app.dependencies.wiring import build_account_erasure_service
+from app.repositories.indexes import ensure_indexes
+from app.repositories.user_repository import UserRepository
 
 MONGO_TEST_URI = os.environ.get(
     "MONGO_TEST_URI", "mongodb://localhost:27017/?directConnection=true"

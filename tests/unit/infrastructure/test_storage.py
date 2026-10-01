@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from errors import R2StorageError
-from infrastructure.storage.r2 import R2StorageClient
-from shared.sigv4 import sigv4_headers
+from app.errors import R2StorageError
+from app.infrastructure.storage.r2 import R2StorageClient
+from app.shared.sigv4 import sigv4_headers
 
 # ── SigV4 ─────────────────────────────────────────────────────────────────────
 

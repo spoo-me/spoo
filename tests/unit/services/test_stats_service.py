@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from errors import AuthenticationError, ValidationError
-from schemas.dto.requests.stats import StatsQuery
+from app.errors import AuthenticationError, ValidationError
+from app.schemas.dto.requests.stats import StatsQuery
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ START_ISO = START.isoformat()
 
 
 def make_service():
-    from services.stats_service import StatsService
+    from app.services.stats_service import StatsService
 
     click_repo = AsyncMock()
     url_repo = AsyncMock()
@@ -374,20 +374,20 @@ class TestClickQueryBuilding:
     def test_owner_id_filter_always_present(self):
         from bson import ObjectId
 
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(OWNER_ID, START, NOW, {})
         assert q["meta.owner_id"] == ObjectId(OWNER_ID)
 
     def test_time_range_in_query(self):
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(OWNER_ID, START, NOW, {})
         assert q["clicked_at"]["$gte"] == START
         assert q["clicked_at"]["$lte"] == NOW
 
     def test_dimension_filter_added(self):
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(
             OWNER_ID, START, NOW, {"browser": ["Chrome", "Firefox"]}
@@ -395,7 +395,7 @@ class TestClickQueryBuilding:
         assert q["browser"] == {"$in": ["Chrome", "Firefox"]}
 
     def test_referrer_direct_filter_uses_or_clause(self):
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(
             OWNER_ID, START, NOW, {"referrer": ["Direct"]}
@@ -405,7 +405,7 @@ class TestClickQueryBuilding:
     def test_short_code_filter_is_plain(self):
         """No scope lock exists any more — short_code is a plain filter that
         slices the owner-stamped aggregate."""
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(
             OWNER_ID, START, NOW, {"short_code": ["link1", "link2"]}
@@ -419,7 +419,7 @@ class TestClickQueryBuilding:
         so overwriting it would build an ownership-free query."""
         from bson import ObjectId
 
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         locked = ObjectId()
         q = {"meta.url_id": locked}
@@ -427,7 +427,7 @@ class TestClickQueryBuilding:
         assert q["meta.url_id"] == locked
 
     def test_plain_utm_filter_added(self):
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(
             OWNER_ID, START, NOW, {"utm_source": ["newsletter"]}
@@ -437,7 +437,7 @@ class TestClickQueryBuilding:
     def test_utm_none_sentinel_matches_missing_field(self):
         """ "(none)" must match null/missing utm values, like referrer's
         "Direct"."""
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(
             OWNER_ID, START, NOW, {"utm_source": ["(none)"]}
@@ -449,7 +449,7 @@ class TestClickQueryBuilding:
         ]
 
     def test_utm_sentinel_mixed_with_values(self):
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(
             OWNER_ID, START, NOW, {"utm_medium": ["(none)", "email"]}
@@ -461,7 +461,7 @@ class TestClickQueryBuilding:
         ]
 
     def test_variant_filter_targets_variant_index_as_ints(self):
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(
             OWNER_ID, START, NOW, {"variant": ["0", "1"]}
@@ -470,7 +470,7 @@ class TestClickQueryBuilding:
         assert "variant" not in q
 
     def test_variant_default_sentinel_matches_missing_field(self):
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(
             OWNER_ID, START, NOW, {"variant": ["(default)", "1"]}
@@ -484,7 +484,7 @@ class TestClickQueryBuilding:
     def test_two_null_sentinel_filters_nest_under_and(self):
         """Two $or groups must combine under $and — a second bare "$or"
         key would silently overwrite the first."""
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(
             OWNER_ID,
@@ -497,7 +497,7 @@ class TestClickQueryBuilding:
         assert all("$or" in group for group in q["$and"])
 
     def test_device_filter_added(self):
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(
             OWNER_ID, START, NOW, {"device": ["mobile", "tablet"]}
@@ -508,7 +508,7 @@ class TestClickQueryBuilding:
         """ "unknown" is BOTH a stored value (classifier fallback) and the
         sentinel for pre-device-tracking clicks — the filter must match
         both, or it disagrees with what group-by shows."""
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         q = StatsService._build_click_query(
             OWNER_ID, START, NOW, {"device": ["unknown"]}
@@ -525,9 +525,9 @@ class TestClickQueryBuilding:
         for filtering (null-sentinel map), and for new writes (classifier
         fallback). If any of the three drifts, widget counts and filter
         counts stop agreeing."""
-        from services.click.handlers import classify_device
-        from services.stats_service import _NULL_SENTINEL_FILTERS
-        from shared.aggregation_strategies import AggregationStrategyFactory
+        from app.services.click.handlers import classify_device
+        from app.services.stats_service import _NULL_SENTINEL_FILTERS
+        from app.shared.aggregation_strategies import AggregationStrategyFactory
 
         pipeline = AggregationStrategyFactory.get("device").build_pipeline({})
         group_expr = pipeline[1]["$group"]["_id"]
@@ -583,7 +583,7 @@ class TestClaimedLinksArm:
     async def test_claimed_arm_nests_under_and_with_sentinel_filters(self):
         from bson import ObjectId
 
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         claimed = [ObjectId("f" * 24)]
         start = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -608,7 +608,7 @@ class TestUrlIdFilter:
     def test_url_id_filter_builds_in_arm_of_object_ids(self):
         from bson import ObjectId
 
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         ids = ["a" * 24, "b" * 24]
         q = StatsService._build_click_query(OWNER_ID, START, NOW, {"url_id": ids})
@@ -620,7 +620,7 @@ class TestUrlIdFilter:
         needed, no leak possible."""
         from bson import ObjectId
 
-        from services.stats_service import StatsService
+        from app.services.stats_service import StatsService
 
         foreign = "f" * 24
         q = StatsService._build_click_query(OWNER_ID, START, NOW, {"url_id": [foreign]})
@@ -650,7 +650,7 @@ class TestUrlIdFilter:
 def make_url_doc(alias="mylink"):
     from bson import ObjectId
 
-    from schemas.models.url import UrlV2Doc
+    from app.schemas.models.url import UrlV2Doc
 
     return UrlV2Doc(
         **{
@@ -666,7 +666,7 @@ def make_url_doc(alias="mylink"):
 
 
 def _lq(**kwargs):
-    from schemas.dto.requests.stats import LinkStatsQuery
+    from app.schemas.dto.requests.stats import LinkStatsQuery
 
     defaults = {
         "start_date": START_ISO,
@@ -771,7 +771,7 @@ class TestResolveWindowParity:
 
     @staticmethod
     def _both():
-        from services.public_stats_service import PublicStatsService
+        from app.services.public_stats_service import PublicStatsService
 
         stats, _, _ = make_service()
         public = PublicStatsService(resolver=AsyncMock(), stats_service=stats)

@@ -13,8 +13,8 @@ from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
 
-from schemas.models.url import EmojiUrlDoc, LegacyUrlDoc, UrlStatus, UrlV2Doc
-from services.public_link_resolver import ResolvedPublicLink, SchemaVersion
+from app.schemas.models.url import EmojiUrlDoc, LegacyUrlDoc, UrlStatus, UrlV2Doc
+from app.services.public_link_resolver import ResolvedPublicLink, SchemaVersion
 
 
 class TestLegacyModelFunnel:
@@ -51,7 +51,7 @@ class TestPublicResolverStatus:
 class TestLegacyStatsProjection:
     def test_pipeline_projects_the_blocked_flag(self):
         """Without this the downstream endpoints cannot check at all."""
-        from routes.legacy.helpers import get_stats_pipeline
+        from app.routes.legacy.helpers import get_stats_pipeline
 
         project = next(
             stage["$project"]
@@ -92,7 +92,7 @@ class TestScheduledWithheld:
         assert link.effective_status() == "scheduled"
 
     def test_public_preview_withholds_destination(self):
-        from services.public_preview_service import PublicPreviewService
+        from app.services.public_preview_service import PublicPreviewService
 
         svc = PublicPreviewService.__new__(PublicPreviewService)
         link = ResolvedPublicLink(

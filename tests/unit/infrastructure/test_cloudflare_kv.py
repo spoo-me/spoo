@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 
-from infrastructure.cloudflare_kv import CloudflareKVClient
+from app.infrastructure.cloudflare_kv import CloudflareKVClient
 
 
 def _http_with_response(

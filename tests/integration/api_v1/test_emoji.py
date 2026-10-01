@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from config import AppSettings
-from shared.emoji_policy import accepted_singletons, check_emoji_alias
+from app.config import AppSettings
+from app.shared.emoji_policy import accepted_singletons, check_emoji_alias
 
 from .conftest import _build_test_app
 

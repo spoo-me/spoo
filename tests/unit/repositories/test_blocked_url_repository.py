@@ -11,7 +11,7 @@ from .conftest import make_collection
 
 class TestBlockedUrlRepository:
     def _repo(self, col=None):
-        from repositories.blocked_url_repository import BlockedUrlRepository
+        from app.repositories.blocked_url_repository import BlockedUrlRepository
 
         return BlockedUrlRepository(col or make_collection())
 

@@ -12,19 +12,19 @@ from fastapi.testclient import TestClient
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import AppSettings
-from errors import ForbiddenError, NotFoundError
-from middleware.error_handler import register_error_handlers
-from middleware.logging import RequestLoggingMiddleware
-from middleware.rate_limiter import limiter
-from middleware.security import (
+from app.config import AppSettings
+from app.errors import ForbiddenError, NotFoundError
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.logging import RequestLoggingMiddleware
+from app.middleware.rate_limiter import limiter
+from app.middleware.security import (
     MaxContentLengthMiddleware,
     SecurityHeadersMiddleware,
     configure_cors,
 )
 
 _STATIC_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "static"
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "app", "static"
 )
 
 
@@ -218,7 +218,7 @@ def test_cors_public_route_preflight():
 def test_cors_private_route_allowed_origin():
     app = _build_test_app(include_logging=False)
     # Override private origins for this test
-    from middleware.security import SplitCORSMiddleware
+    from app.middleware.security import SplitCORSMiddleware
 
     for mw in app.user_middleware:
         if mw.cls is SplitCORSMiddleware:
@@ -261,7 +261,7 @@ def test_cors_public_route_exposes_headers():
 
 def test_cors_private_route_exposes_headers():
     app = _build_test_app(include_logging=False)
-    from middleware.security import SplitCORSMiddleware
+    from app.middleware.security import SplitCORSMiddleware
 
     for mw in app.user_middleware:
         if mw.cls is SplitCORSMiddleware:

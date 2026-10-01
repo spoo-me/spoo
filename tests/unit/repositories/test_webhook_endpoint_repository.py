@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from bson import ObjectId
 
-from repositories.webhook_endpoint_repository import WebhookEndpointRepository
+from app.repositories.webhook_endpoint_repository import WebhookEndpointRepository
 
 from .conftest import make_collection
 

@@ -14,10 +14,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from config import AppSettings, CustomDomainSettings
-from dependencies.wiring import wire_services
-from schemas.enums.domain_status import VerificationMethod
-from services.cf_saas_backend import CfSaasBackend
+from app.config import AppSettings, CustomDomainSettings
+from app.dependencies.wiring import wire_services
+from app.schemas.enums.domain_status import VerificationMethod
+from app.services.cf_saas_backend import CfSaasBackend
 
 
 def _wire(custom_domains: CustomDomainSettings):

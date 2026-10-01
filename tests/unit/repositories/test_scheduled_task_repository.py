@@ -9,8 +9,8 @@ import pytest
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
-from repositories.scheduled_task_repository import ScheduledTaskRepository
-from schemas.models.scheduled_task import TaskRunResult
+from app.repositories.scheduled_task_repository import ScheduledTaskRepository
+from app.schemas.models.scheduled_task import TaskRunResult
 
 
 def _col() -> AsyncMock:

@@ -21,8 +21,8 @@ from slowapi.errors import RateLimitExceeded
 
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 
-from config import AppSettings
-from dependencies import (
+from app.config import AppSettings
+from app.dependencies import (
     CurrentUser,
     get_credential_service,
     get_oauth_service,
@@ -32,17 +32,17 @@ from dependencies import (
     get_verification_service,
     require_auth,
 )
-from errors import (
+from app.errors import (
     AuthenticationError,
     ConflictError,
     ValidationError,
 )
-from middleware.error_handler import register_error_handlers
-from middleware.rate_limiter import limiter
-from routes.auth import router as auth_router
-from routes.oauth_routes import router as oauth_router
-from schemas.models.user import UserDoc
-from schemas.results import AuthResult
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.rate_limiter import limiter
+from app.routes.auth import router as auth_router
+from app.routes.oauth_routes import router as oauth_router
+from app.schemas.models.user import UserDoc
+from app.schemas.results import AuthResult
 from tests.conftest import build_test_app
 
 
@@ -734,7 +734,7 @@ def test_oauth_callback_missing_state_returns_400():
 
     # Patch PROVIDER_STRATEGIES so provider lookup succeeds
     with (
-        patch("routes.oauth_routes.PROVIDER_STRATEGIES", {"google": MagicMock()}),
+        patch("app.routes.oauth_routes.PROVIDER_STRATEGIES", {"google": MagicMock()}),
         TestClient(app, raise_server_exceptions=False) as client,
     ):
         # No providers configured → 404 before state check
@@ -766,7 +766,7 @@ def test_oauth_callback_invalid_state_returns_400():
     application.dependency_overrides[get_oauth_service] = lambda: mock_oauth_svc
 
     with (
-        patch("routes.oauth_routes.PROVIDER_STRATEGIES", {"google": MagicMock()}),
+        patch("app.routes.oauth_routes.PROVIDER_STRATEGIES", {"google": MagicMock()}),
         TestClient(application, raise_server_exceptions=False) as client,
     ):
         resp = client.get("/oauth/google/callback?state=malformed")

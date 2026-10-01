@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from services.scheduler.registry import ScheduledTask
-from services.scheduler.tasks import HEARTBEAT_TASK, build_task_registry
+from app.services.scheduler.registry import ScheduledTask
+from app.services.scheduler.tasks import HEARTBEAT_TASK, build_task_registry
 
 
 async def _noop() -> dict | None:

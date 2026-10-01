@@ -11,7 +11,7 @@
 """Read-only inspection of the emoji-alias generation pool.
 
 The pool is derived at import time from the pinned ``emoji`` package data
-(``shared/emoji_policy.py``) rather than checked in as an artifact, so this
+(``app/shared/emoji_policy.py``) rather than checked in as an artifact, so this
 script is the reviewer tool for seeing what a given version cap actually
 yields — pool size, Unicode emoji-version histogram, and a paranoia check
 that every pool entry passes the acceptance policy (the same invariant the
@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import emoji
 
-from shared.emoji_policy import (
+from app.shared.emoji_policy import (
     DEFAULT_GENERATE_MAX_VERSION,
     check_emoji_alias,
     generation_pool,

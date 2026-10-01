@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pymongo.errors import PyMongoError
 
-from repositories.report_repository import (
+from app.repositories.report_repository import (
     ReportRepository,
     ReportSubmissionRepository,
 )

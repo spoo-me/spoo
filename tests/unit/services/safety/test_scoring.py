@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from services.safety.scoring import CreationPatternScorer
+from app.services.safety.scoring import CreationPatternScorer
 
 
 def _redis(counts: list[int]) -> MagicMock:

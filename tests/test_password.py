@@ -1,4 +1,4 @@
-from shared.validators import validate_url_password as validate_password
+from app.shared.validators import validate_url_password as validate_password
 
 
 def test_password_too_short():

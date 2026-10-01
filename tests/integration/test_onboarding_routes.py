@@ -17,13 +17,13 @@ from unittest.mock import AsyncMock
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
-from dependencies import (
+from app.dependencies import (
     CurrentUser,
     get_onboarding_cache,
     get_user_repo,
     require_auth,
 )
-from routes.auth import router as auth_router
+from app.routes.auth import router as auth_router
 from tests.conftest import build_test_app
 
 _USER_ID = ObjectId()

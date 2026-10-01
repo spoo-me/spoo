@@ -26,12 +26,12 @@ os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/")
 if not os.environ.get("JWT_SECRET"):
     os.environ["JWT_SECRET"] = "test-jwt-secret-not-for-production"
 
-from config import AppSettings
-from middleware.error_handler import register_error_handlers
-from middleware.rate_limiter import limiter
+from app.config import AppSettings
+from app.middleware.error_handler import register_error_handlers
+from app.middleware.rate_limiter import limiter
 
 _STATIC_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static"
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "static"
 )
 
 
@@ -103,7 +103,7 @@ def build_test_app(
         # A REAL permissive L0 gate (no providers): valid URLs pass,
         # invalid/self-links reject — matches the pre-gate route behavior.
         # Tests exercising blocks override get_url_policy instead.
-        from services.safety.policy import UrlPolicyService
+        from app.services.safety.policy import UrlPolicyService
 
         app.state.url_policy = UrlPolicyService(
             [], blocked_self_domains=[settings.system_default_domain]

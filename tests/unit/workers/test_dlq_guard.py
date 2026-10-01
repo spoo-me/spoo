@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from workers.dlq import (
+from app.workers.dlq import (
     DLQ_FIELD_GROUP,
     DLQ_FIELD_REASON,
     DLQ_FIELD_SOURCE_ID,

@@ -4,7 +4,7 @@ services:
     container_name: spoo_app
     restart: always
     command: >
-      uv run uvicorn main:app
+      uv run uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
       --workers 2
@@ -111,7 +111,7 @@ services:
     restart: always
     # Caddy terminates TLS for CF orange-cloud requests using a Cloudflare
     # Origin CA certificate (mounted from ./caddy/origin.{crt,key}). UFW on
-    # the host (see infrastructure/ufw-cloudflare.sh) restricts inbound 443
+    # the host (see app/infrastructure/ufw-cloudflare.sh) restricts inbound 443
     # to CF IP ranges only — so any request reaching Caddy came from CF.
     #
     # Architecturally this replaces cloudflared. CF Tunnel routed all traffic
@@ -267,7 +267,7 @@ services:
     container_name: spoo_click_worker
     restart: always
     command: >
-      uv run uvicorn --factory workers.click_worker:create_app
+      uv run uvicorn --factory app.workers.click_worker:create_app
       --host 0.0.0.0 --port 8001
       --no-access-log
       --timeout-graceful-shutdown 30

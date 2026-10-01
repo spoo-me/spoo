@@ -11,8 +11,8 @@ names the work in its failure message.
 
 from __future__ import annotations
 
-from config import AppSettings
-from schemas.models.url import UrlDestination
+from app.config import AppSettings
+from app.schemas.models.url import UrlDestination
 
 _WORK = """
 geo targeting was enabled (GEO_RULES_ENABLED=true) but safety cannot see

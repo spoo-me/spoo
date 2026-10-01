@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+from functools import lru_cache
 
 _MAX_RUN = 2
 _KEEP = re.compile(r"\(keep\)\s*$")
@@ -20,28 +21,38 @@ _DIVIDER = re.compile(r"^\s*#\s*[─=—-]{3,}")
 _HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
-def added_lines(path: str) -> list[tuple[int, str]]:
-    """(line number, text) for every line this commit adds to *path*."""
+@lru_cache(maxsize=1)
+def staged_additions() -> dict[str, list[tuple[int, str]]]:
+    """(line number, text) for every line this commit adds, by path."""
     try:
         diff = subprocess.run(
-            ["git", "diff", "--cached", "-U0", "--", path],
+            ["git", "diff", "--cached", "-U0", "-M"],
             capture_output=True,
             text=True,
             check=False,
         ).stdout
     except OSError:
-        return []
-    out: list[tuple[int, str]] = []
+        return {}
+    out: dict[str, list[tuple[int, str]]] = {}
+    current: list[tuple[int, str]] = []
     lineno = 0
     for line in diff.splitlines():
+        if line.startswith("+++ "):
+            current = out.setdefault(line[6:] if line.startswith("+++ b/") else "", [])
+            continue
         hunk = _HUNK.match(line)
         if hunk:
             lineno = int(hunk.group(1))
             continue
-        if line.startswith("+") and not line.startswith("+++"):
-            out.append((lineno, line[1:]))
+        if line.startswith("+"):
+            current.append((lineno, line[1:]))
             lineno += 1
     return out
+
+
+def added_lines(path: str) -> list[tuple[int, str]]:
+    """Diffed as a whole so a renamed file only reports its changed lines."""
+    return staged_additions().get(path, [])
 
 
 def offenders(added: list[tuple[int, str]]) -> list[tuple[int, int]]:

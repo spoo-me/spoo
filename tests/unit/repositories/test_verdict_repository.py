@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from repositories.verdict_repository import VerdictRepository
-from schemas.enums.safety import VerdictTier
+from app.repositories.verdict_repository import VerdictRepository
+from app.schemas.enums.safety import VerdictTier
 
 
 def _col() -> AsyncMock:

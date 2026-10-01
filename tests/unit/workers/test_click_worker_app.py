@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from config import AppSettings, ClickEventsSettings
-from workers.click_worker import (
+from app.config import AppSettings, ClickEventsSettings
+from app.workers.click_worker import (
     _build_runtime,
     _first_message_id,
     create_worker_app,
@@ -182,7 +182,7 @@ class TestRuntimeWiring:
         fake_runtime.aclose = AsyncMock()
 
         with patch(
-            "workers.click_worker._build_runtime",
+            "app.workers.click_worker._build_runtime",
             AsyncMock(return_value=fake_runtime),
         ) as build:
             app = create_worker_app(settings)
@@ -205,7 +205,7 @@ class TestSafetyRuntime:
         settings.safety.web_risk_api_key = "k123"
 
         with patch(
-            "workers.click_worker.create_redis_client", new=AsyncMock()
+            "app.workers.click_worker.create_redis_client", new=AsyncMock()
         ) as redis_factory:
             redis_factory.return_value = MagicMock()
             runtime = await _build_runtime(settings, ["stats"], run_safety=True)
@@ -222,7 +222,7 @@ class TestSafetyRuntime:
         settings.llm.api_key = "k456"
 
         with patch(
-            "workers.click_worker.create_redis_client", new=AsyncMock()
+            "app.workers.click_worker.create_redis_client", new=AsyncMock()
         ) as redis_factory:
             redis_factory.return_value = MagicMock()
             runtime = await _build_runtime(settings, ["stats"], run_safety=True)
@@ -241,7 +241,7 @@ class TestWebhooksRuntime:
         settings.secret_key = "s" * 32
 
         with patch(
-            "workers.click_worker.create_redis_client", new=AsyncMock()
+            "app.workers.click_worker.create_redis_client", new=AsyncMock()
         ) as redis_factory:
             redis_factory.return_value = AsyncMock()
             runtime = await _build_runtime(settings, ["stats"], run_webhooks=True)

@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from schemas.enums.safety import VerdictTier
-from services.safety.policy import UrlPolicyService
-from services.safety.providers import (
+from app.schemas.enums.safety import VerdictTier
+from app.services.safety.policy import UrlPolicyService
+from app.services.safety.providers import (
     BlockedPatternProvider,
     FeedDomainProvider,
     ProviderVerdict,
@@ -171,7 +171,7 @@ class TestPublicMessageOverride:
 
 class TestRedirectProbe:
     def _policy(self, *, contains: bool):
-        from services.safety.policy import UrlPolicyService
+        from app.services.safety.policy import UrlPolicyService
 
         feed_repo = AsyncMock()
         feed_repo.contains = AsyncMock(return_value=contains)
@@ -200,7 +200,7 @@ class TestRedirectProbe:
 
     @pytest.mark.asyncio
     async def test_missing_deps_degrade_to_a_noop(self):
-        from services.safety.policy import UrlPolicyService
+        from app.services.safety.policy import UrlPolicyService
 
         policy = UrlPolicyService([], blocked_self_domains=["spoo.me"])
         await policy.record_create("https://t.co/AbCdEf")
@@ -210,7 +210,7 @@ class _SeededFeedRepo:
     """The shipped seed files as the feed store, keyed like the real repo."""
 
     def __init__(self, extra: dict[str, set[str]] | None = None):
-        from services.safety.feeds import (
+        from app.services.safety.feeds import (
             REDIRECTOR_FEED,
             SHORTENER_FEED,
             load_redirector_seed,
@@ -234,8 +234,8 @@ class TestShortenerGateOnShippedSeeds:
 
     @staticmethod
     def _gate(repo) -> UrlPolicyService:
-        from config import SafetySettings
-        from services.safety.feeds import build_feed_providers
+        from app.config import SafetySettings
+        from app.services.safety.feeds import build_feed_providers
 
         gate, _, messages = build_feed_providers(
             SafetySettings(shorteners_enabled=True), repo
@@ -282,7 +282,7 @@ class TestShortenerGateOnShippedSeeds:
 
     @pytest.mark.asyncio
     async def test_a_redirector_entry_for_the_shortener_itself_exempts_nothing(self):
-        from services.safety.feeds import REDIRECTOR_FEED
+        from app.services.safety.feeds import REDIRECTOR_FEED
 
         repo = _SeededFeedRepo({REDIRECTOR_FEED: {"goo.gl"}})
         rejection = await self._gate(repo).check("https://goo.gl/xyz")
@@ -291,7 +291,7 @@ class TestShortenerGateOnShippedSeeds:
 
     @pytest.mark.asyncio
     async def test_the_exemption_is_shortener_only(self):
-        from services.safety.feeds import MANUAL_FEED
+        from app.services.safety.feeds import MANUAL_FEED
 
         repo = _SeededFeedRepo({MANUAL_FEED: {"goo.gl"}})
         rejection = await self._gate(repo).check("https://maps.app.goo.gl/AbCdEf")

@@ -9,9 +9,9 @@ from datetime import datetime, timezone
 import pytest
 from bson import ObjectId
 
-from repositories.webhook_delivery_repository import WebhookDeliveryRepository
-from schemas.enums.webhook import DeliveryStatus
-from schemas.models.webhook import DeliveryAttempt
+from app.repositories.webhook_delivery_repository import WebhookDeliveryRepository
+from app.schemas.enums.webhook import DeliveryStatus
+from app.schemas.models.webhook import DeliveryAttempt
 
 from .conftest import make_collection
 
