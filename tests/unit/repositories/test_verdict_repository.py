@@ -35,7 +35,10 @@ class TestUpsertVerdict:
         )
 
         args, kwargs = col.update_one.await_args
-        assert args[0] == {"host": "evil.contaboserver.net"}
+        assert args[0] == {
+            "host": "evil.contaboserver.net",
+            "decided_by": {"$in": ["system", None]},
+        }
         assert kwargs["upsert"] is True
         st = args[1]["$set"]
         assert st["tier"] == "toxic"
@@ -68,3 +71,53 @@ class TestFindByHost:
         col = _col()
         col.find_one = AsyncMock(return_value=None)
         assert await VerdictRepository(col).find_by_host("clean.com") is None
+
+
+class TestHumanVerdictGuard:
+    @pytest.mark.asyncio
+    async def test_system_writes_only_match_system_docs(self):
+        col = _col()
+        repo = VerdictRepository(col)
+        written = await repo.upsert_verdict(
+            "x.example",
+            registrable_domain="example",
+            tier=VerdictTier.UNCERTAIN,
+            reason=None,
+            source="screening",
+            trigger="sweep",
+        )
+        assert written is True
+        query = col.update_one.await_args.args[0]
+        assert query == {"host": "x.example", "decided_by": {"$in": ["system", None]}}
+
+    @pytest.mark.asyncio
+    async def test_a_human_verdict_rejects_the_system_upsert(self):
+        from pymongo.errors import DuplicateKeyError
+
+        col = _col()
+        col.update_one = AsyncMock(side_effect=DuplicateKeyError("E11000 host"))
+        repo = VerdictRepository(col)
+        written = await repo.upsert_verdict(
+            "x.example",
+            registrable_domain="example",
+            tier=VerdictTier.TOXIC,
+            reason="model said scam",
+            source="llm",
+            trigger="report",
+        )
+        assert written is False
+
+    @pytest.mark.asyncio
+    async def test_a_human_write_matches_by_host_alone(self):
+        col = _col()
+        repo = VerdictRepository(col)
+        await repo.upsert_verdict(
+            "x.example",
+            registrable_domain="example",
+            tier=VerdictTier.BENIGN,
+            reason="checked by hand",
+            source="human",
+            trigger="operator",
+            decided_by="human",
+        )
+        assert col.update_one.await_args.args[0] == {"host": "x.example"}

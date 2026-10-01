@@ -4,6 +4,7 @@ pure function) and the investigator flow."""
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -175,6 +176,7 @@ def _investigator(
         }
     )
     verdict_repo = AsyncMock()
+    verdict_repo.find_by_host = AsyncMock(return_value=None)
     enforcer = AsyncMock()
     enforcer.block_host = AsyncMock(
         return_value=AsyncMock(blocked_count=3, legacy_count=1)
@@ -316,6 +318,35 @@ class TestInvestigatorFlow:
         review_ctx = notifier.safety_review.await_args.kwargs["context"]
         assert review_ctx["needs"] == "list proposal"
         assert review_ctx["proposals"][0]["domain"] == "sus.link"
+
+
+class TestHumanVerdictsAreFinal:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tier", [VerdictTier.BENIGN, VerdictTier.TOXIC])
+    async def test_a_human_verdict_skips_the_investigation(self, tier):
+        inv, verdict_repo, enforcer, notifier = _investigator(
+            _verdict(Classification.SCAM_HOST)
+        )
+        verdict_repo.find_by_host = AsyncMock(
+            return_value=SimpleNamespace(decided_by="human", tier=tier)
+        )
+        await inv.investigate(_event())
+        inv._runner.run.assert_not_awaited()
+        verdict_repo.upsert_verdict.assert_not_awaited()
+        enforcer.block_host.assert_not_awaited()
+        notifier.safety_action.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_system_verdict_is_still_reinvestigated(self):
+        inv, verdict_repo, _e, _n = _investigator(_verdict(Classification.SCAM_HOST))
+        verdict_repo.find_by_host = AsyncMock(
+            return_value=SimpleNamespace(
+                decided_by="system", tier=VerdictTier.UNCERTAIN
+            )
+        )
+        await inv.investigate(_event())
+        inv._runner.run.assert_awaited_once()
+        verdict_repo.upsert_verdict.assert_awaited_once()
 
 
 class TestScopeAuthority:

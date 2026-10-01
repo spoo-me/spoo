@@ -296,6 +296,12 @@ class DeepInvestigator:
         self._model = model_name
 
     async def investigate(self, event: SafetyAnalyzeEvent) -> None:
+        existing = await self._verdict_repo.find_by_host(event.host)
+        if existing is not None and existing.decided_by != "system":
+            log.info(
+                "safety_investigation_skipped", host=event.host, reason="human_verdict"
+            )
+            return
         bundle = await build_evidence_bundle(event, self._url_repo)
         reset_hard_hit()
         reset_last_render()
