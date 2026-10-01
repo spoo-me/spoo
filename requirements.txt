@@ -117,7 +117,7 @@ uv==0.11.26
 uvicorn==0.52.4
 uvloop==0.22.1
 validators==0.35.0
-virtualenv==21.5.1
+virtualenv==21.7.12
 watchfiles==1.2.0
 websockets==17.0.1
 wrapt==2.3.0
