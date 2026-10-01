@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from pymongo.errors import DuplicateKeyError
+
 from app.repositories.base import BaseRepository
 from app.schemas.enums.safety import VerdictTier
 from app.schemas.models.verdict import VerdictDoc
@@ -30,7 +32,8 @@ class VerdictRepository(BaseRepository[VerdictDoc]):
         scope: str | None = None,
         path_pattern: str | None = None,
         provenance: dict | None = None,
-    ) -> None:
+    ) -> bool:
+        """Returns False when a human verdict on *host* kept this system write out."""
         now = datetime.now(timezone.utc)
         fields = {
             "registrable_domain": registrable_domain,
@@ -54,11 +57,19 @@ class VerdictRepository(BaseRepository[VerdictDoc]):
         # untouched.
         if provenance:
             fields.update(provenance)
-        await self._col.update_one(
-            {"host": host},
-            {"$set": fields, "$setOnInsert": {"created_at": now}},
-            upsert=True,
-        )
+        query: dict = {"host": host}
+        if decided_by == "system":
+            query["decided_by"] = {"$in": ["system", None]}
+        try:
+            await self._col.update_one(
+                query,
+                {"$set": fields, "$setOnInsert": {"created_at": now}},
+                upsert=True,
+            )
+        except DuplicateKeyError:
+            # The unique host index rejects the upsert: a human verdict owns the doc.
+            return False
+        return True
 
     async def find_by_host(self, host: str) -> VerdictDoc | None:
         return await self._find_one({"host": host})
