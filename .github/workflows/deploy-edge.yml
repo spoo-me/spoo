@@ -70,7 +70,8 @@ jobs:
   deploy:
     needs: check
     # PRs only run checks; deploys happen on main pushes and dispatches.
-    if: github.event_name != 'pull_request'
+    # Routes were detached on 2026-10-07; a deploy would re-attach them.
+    if: github.event_name != 'pull_request' && vars.EDGE_CACHE_ENABLED == 'true'
     runs-on: ubuntu-latest
     concurrency: deploy-edge
     steps:
