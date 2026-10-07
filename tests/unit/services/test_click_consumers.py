@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -47,7 +48,18 @@ class TestStatsClickConsumer:
             utm_medium=event.utm_medium,
             utm_campaign=event.utm_campaign,
             variant_index=event.variant_index,
+            clicked_at=event.enqueued_at,
         )
+
+    async def test_late_processing_keeps_the_click_time(self):
+        click_service = AsyncMock()
+        consumer = StatsClickConsumer(click_service)
+        clicked = datetime(2026, 1, 2, 23, 58, tzinfo=timezone.utc)
+        event = make_event(enqueued_at=clicked)
+
+        await consumer.consume(event.model_dump(mode="json"))
+
+        assert click_service.track_click.await_args.kwargs["clicked_at"] == clicked
 
     async def test_drops_undecodable_payload_without_raising(self):
         """Malformed payloads can never succeed — drop, don't poison the group."""
