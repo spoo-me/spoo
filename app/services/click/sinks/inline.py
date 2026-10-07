@@ -31,4 +31,5 @@ class InlineSink:
             utm_medium=event.utm_medium,
             utm_campaign=event.utm_campaign,
             variant_index=event.variant_index,
+            clicked_at=event.enqueued_at,
         )

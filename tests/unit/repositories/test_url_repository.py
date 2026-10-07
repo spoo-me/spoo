@@ -160,14 +160,14 @@ class TestUrlRepository:
         assert await self._repo(col).check_alias_exists("nope", DOMAIN) is False
 
     @pytest.mark.asyncio
-    async def test_increment_clicks_uses_inc_and_set(self):
+    async def test_increment_clicks_keeps_newest_last_click(self):
         col = make_collection()
         col.update_one = AsyncMock(return_value=MagicMock(matched_count=1))
         ts = datetime(2024, 6, 1, tzinfo=timezone.utc)
         await self._repo(col).increment_clicks(URL_OID, last_click_time=ts)
         col.update_one.assert_awaited_once_with(
             {"_id": URL_OID},
-            {"$inc": {"total_clicks": 1}, "$set": {"last_click": ts}},
+            {"$inc": {"total_clicks": 1}, "$max": {"last_click": ts}},
         )
 
     @pytest.mark.asyncio
@@ -177,8 +177,7 @@ class TestUrlRepository:
         await self._repo(col).increment_clicks(URL_OID)
         args = col.update_one.call_args
         update_doc = args[0][1]
-        assert "$set" in update_doc
-        assert isinstance(update_doc["$set"]["last_click"], datetime)
+        assert isinstance(update_doc["$max"]["last_click"], datetime)
 
     @pytest.mark.asyncio
     async def test_expire_if_max_clicks_returns_true_when_expired(self):

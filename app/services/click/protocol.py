@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from typing_extensions import Protocol
 
@@ -19,6 +20,8 @@ class ClickContext:
     redirect_ms: int
     user_agent: str
     referrer: str | None
+    # When the visitor clicked, not when a worker got round to it.
+    clicked_at: datetime
     is_emoji: bool = False
     cf_city: str | None = None
     # Campaign tags from the short link's query string (already sanitised

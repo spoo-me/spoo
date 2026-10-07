@@ -907,7 +907,8 @@ class UrlRepository(BaseRepository[UrlV2Doc]):
             {"_id": url_id},
             {
                 "$inc": {"total_clicks": increment},
-                "$set": {"last_click": click_time},
+                # $max: a retried older event must not move last_click backwards.
+                "$max": {"last_click": click_time},
             },
         )
 

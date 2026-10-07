@@ -16,6 +16,7 @@ Tests verify:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -38,6 +39,8 @@ URL_OID = ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")
 ALIAS = "abc1234"
 CLIENT_IP = "1.2.3.4"
 REDIRECT_MS = 42
+# A past day, so a handler reading the wall clock can't pass by accident.
+CLICK_TIME = datetime(2026, 1, 2, 23, 58, 30, tzinfo=timezone.utc)
 NORMAL_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0"
 )
@@ -156,6 +159,7 @@ def make_context(
     utm_medium: str | None = None,
     utm_campaign: str | None = None,
     variant_index: int | None = None,
+    clicked_at: datetime = CLICK_TIME,
 ) -> ClickContext:
     return ClickContext(
         url_data=url_data,
@@ -170,6 +174,7 @@ def make_context(
         utm_medium=utm_medium,
         utm_campaign=utm_campaign,
         variant_index=variant_index,
+        clicked_at=clicked_at,
     )
 
 
@@ -265,6 +270,19 @@ class TestV2ClickHandler:
         assert doc["meta"]["short_code"] == ALIAS
         assert doc["ip_address"] == CLIENT_IP
         assert doc["country"] == "United States"
+
+    @pytest.mark.asyncio
+    async def test_click_time_comes_from_context_not_clock(self):
+        d = make_deps()
+        handler = make_v2_handler(d.click_repo, d.url_repo, d.geoip, d.url_cache)
+
+        await handler.handle(make_context(make_v2_cache()))
+
+        assert d.click_repo.insert.call_args[0][0]["clicked_at"] == CLICK_TIME
+        assert (
+            d.url_repo.increment_clicks.call_args.kwargs["last_click_time"]
+            == CLICK_TIME
+        )
 
     @pytest.mark.asyncio
     async def test_device_recorded_in_click_doc(self):
@@ -596,10 +614,26 @@ class TestLegacyClickHandler:
             )
 
         update_doc = d.legacy_repo.update.call_args[0][1]
-        assert "last-click" in update_doc["$set"]
+        assert "last-click" in update_doc["$max"]
         assert "last-click-browser" in update_doc["$set"]
         assert "last-click-os" in update_doc["$set"]
         assert "average_redirection_time" in update_doc["$set"]
+
+    @pytest.mark.asyncio
+    async def test_counters_and_last_click_use_context_time(self):
+        d = make_deps()
+        handler = make_legacy_handler(d.legacy_repo, d.emoji_repo, d.geoip)
+        url_data = make_v1_cache(short_code="abcdef")
+
+        with patch("app.services.click.handlers.is_bot_request", return_value=False):
+            await handler.handle(
+                make_context(url_data, short_code="abcdef", is_emoji=False)
+            )
+
+        update_doc = d.legacy_repo.update.call_args[0][1]
+        assert update_doc["$inc"]["counter.2026-01-02"] == 1
+        assert update_doc["$inc"]["unique_counter.2026-01-02"] == 1
+        assert update_doc["$max"]["last-click"] == "2026-01-02 23:58:30"
 
     @pytest.mark.asyncio
     async def test_unique_click_counter_incremented(self):
@@ -640,6 +674,7 @@ class TestTrackClickDispatch:
             redirect_ms=REDIRECT_MS,
             user_agent=NORMAL_UA,
             referrer=None,
+            clicked_at=CLICK_TIME,
         )
 
         v2_handler.handle.assert_called_once()
@@ -661,6 +696,7 @@ class TestTrackClickDispatch:
             redirect_ms=REDIRECT_MS,
             user_agent=NORMAL_UA,
             referrer=None,
+            clicked_at=CLICK_TIME,
         )
 
         legacy_handler.handle.assert_called_once()
@@ -683,6 +719,7 @@ class TestTrackClickDispatch:
             redirect_ms=REDIRECT_MS,
             user_agent=NORMAL_UA,
             referrer=None,
+            clicked_at=CLICK_TIME,
         )
 
         # "emoji" not in handlers → falls back to "v1" (legacy handler)
@@ -692,3 +729,4 @@ class TestTrackClickDispatch:
         # Verify is_emoji=True was passed through via ClickContext
         context: ClickContext = legacy_handler.handle.call_args[0][0]
         assert context.is_emoji is True
+        assert context.clicked_at == CLICK_TIME

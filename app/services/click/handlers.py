@@ -8,7 +8,6 @@ via constructor injection, and reads all click metadata from the ClickContext.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
 
 from bson import ObjectId
 from ua_parser import Result
@@ -157,9 +156,8 @@ class V2ClickHandler:
             ObjectId(url_data.owner_id) if url_data.owner_id else ANONYMOUS_OWNER_ID
         )
 
-        curr_time = datetime.now(timezone.utc)
         click_doc = ClickDoc(
-            clicked_at=curr_time,
+            clicked_at=context.clicked_at,
             meta=ClickMeta(
                 url_id=url_id,
                 short_code=short_code,
@@ -184,7 +182,9 @@ class V2ClickHandler:
         )
 
         await self._click_repo.insert(click_doc.to_mongo())
-        await self._url_repo.increment_clicks(url_id, last_click_time=curr_time)
+        await self._url_repo.increment_clicks(
+            url_id, last_click_time=context.clicked_at
+        )
 
         if should_sample("url_redirect"):
             log.info(
@@ -290,7 +290,7 @@ class LegacyClickHandler:
             country = country.replace(".", " ")
 
         # Build update document
-        updates: dict = {"$inc": {}, "$set": {}, "$addToSet": {}}
+        updates: dict = {"$inc": {}, "$set": {}, "$max": {}, "$addToSet": {}}
 
         if referrer_domain:
             updates["$inc"][f"referrer.{referrer_domain}.counts"] = 1
@@ -321,7 +321,7 @@ class LegacyClickHandler:
                 updates["$inc"][f"bots.{sanitized_bot}"] = 1
 
         # Daily counters
-        today = str(datetime.now(timezone.utc)).split()[0]
+        today = context.clicked_at.strftime("%Y-%m-%d")
         updates["$inc"][f"counter.{today}"] = 1
 
         # Unique click detection.
@@ -335,8 +335,8 @@ class LegacyClickHandler:
         updates["$inc"]["total-clicks"] = 1
 
         # Last click metadata
-        current_time_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        updates["$set"]["last-click"] = current_time_str
+        # Fixed-width timestamp strings compare in time order, so $max works here too.
+        updates["$max"]["last-click"] = context.clicked_at.strftime("%Y-%m-%d %H:%M:%S")
         updates["$set"]["last-click-browser"] = browser
         updates["$set"]["last-click-os"] = os_name
         updates["$set"]["last-click-country"] = country
