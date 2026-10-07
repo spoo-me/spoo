@@ -614,7 +614,7 @@ class TestLegacyClickHandler:
             )
 
         update_doc = d.legacy_repo.update.call_args[0][1]
-        assert "last-click" in update_doc["$set"]
+        assert "last-click" in update_doc["$max"]
         assert "last-click-browser" in update_doc["$set"]
         assert "last-click-os" in update_doc["$set"]
         assert "average_redirection_time" in update_doc["$set"]
@@ -633,7 +633,7 @@ class TestLegacyClickHandler:
         update_doc = d.legacy_repo.update.call_args[0][1]
         assert update_doc["$inc"]["counter.2026-01-02"] == 1
         assert update_doc["$inc"]["unique_counter.2026-01-02"] == 1
-        assert update_doc["$set"]["last-click"] == "2026-01-02 23:58:30"
+        assert update_doc["$max"]["last-click"] == "2026-01-02 23:58:30"
 
     @pytest.mark.asyncio
     async def test_unique_click_counter_incremented(self):

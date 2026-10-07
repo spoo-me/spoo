@@ -290,7 +290,7 @@ class LegacyClickHandler:
             country = country.replace(".", " ")
 
         # Build update document
-        updates: dict = {"$inc": {}, "$set": {}, "$addToSet": {}}
+        updates: dict = {"$inc": {}, "$set": {}, "$max": {}, "$addToSet": {}}
 
         if referrer_domain:
             updates["$inc"][f"referrer.{referrer_domain}.counts"] = 1
@@ -335,7 +335,8 @@ class LegacyClickHandler:
         updates["$inc"]["total-clicks"] = 1
 
         # Last click metadata
-        updates["$set"]["last-click"] = context.clicked_at.strftime("%Y-%m-%d %H:%M:%S")
+        # Fixed-width timestamp strings compare in time order, so $max works here too.
+        updates["$max"]["last-click"] = context.clicked_at.strftime("%Y-%m-%d %H:%M:%S")
         updates["$set"]["last-click-browser"] = browser
         updates["$set"]["last-click-os"] = os_name
         updates["$set"]["last-click-country"] = country
