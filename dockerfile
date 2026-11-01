@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.15-slim
 
 # Injected by CI: release version (2.1.0) or short sha for edge builds
 ARG APP_VERSION=dev
